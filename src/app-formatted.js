@@ -1,80 +1,5 @@
-!function(t) {
-    var e = {};
-    function o(i) {
-        if (e[i])
-            return e[i].exports;
-        var n = e[i] = {
-            i: i,
-            l: !1,
-            exports: {}
-        };
-        return t[i].call(n.exports, n, n.exports, o),
-        n.l = !0,
-        n.exports
-    }
-    o.m = t,
-    o.c = e,
-    o.d = function(t, e, i) {
-        o.o(t, e) || Object.defineProperty(t, e, {
-            enumerable: !0,
-            get: i
-        })
-    }
-    ,
-    o.r = function(t) {
-        "undefined" != typeof Symbol && Symbol.toStringTag && Object.defineProperty(t, Symbol.toStringTag, {
-            value: "Module"
-        }),
-        Object.defineProperty(t, "__esModule", {
-            value: !0
-        })
-    }
-    ,
-    o.t = function(t, e) {
-        if (1 & e && (t = o(t)),
-        8 & e)
-            return t;
-        if (4 & e && "object" == typeof t && t && t.__esModule)
-            return t;
-        var i = Object.create(null);
-        if (o.r(i),
-        Object.defineProperty(i, "default", {
-            enumerable: !0,
-            value: t
-        }),
-        2 & e && "string" != typeof t)
-            for (var n in t)
-                o.d(i, n, function(e) {
-                    return t[e]
-                }
-                .bind(null, n));
-        return i
-    }
-    ,
-    o.n = function(t) {
-        var e = t && t.__esModule ? function() {
-            return t.default
-        }
-        : function() {
-            return t
-        }
-        ;
-        return o.d(e, "a", e),
-        e
-    }
-    ,
-    o.o = function(t, e) {
-        return Object.prototype.hasOwnProperty.call(t, e)
-    }
-    ,
-    o.p = "",
-    o(o.s = 1)
-}([function(t) {
-    t.exports = {}
-}
-, function(t, e, o) {
-    "use strict";
-    o.r(e);
+"use strict";
+
     var i = {
         LANG: function() {
             switch (document.documentElement.lang) {
@@ -84,7 +9,7 @@
                 return "en"
             }
         }(),
-        BASE_PATH: ("baseUrl"in window ? baseUrl : "http://localhost/").replace(/^https?\:\/\/[^\/]+/, "").replace(/\/api\/$/, ""),
+        BASE_PATH: ("string" == typeof window.baseUrl ? window.baseUrl : "http://localhost/").replace(/^https?\:\/\/[^\/]+/, "").replace(/\/api\/$/, ""),
         boss_bison_bgm_info: {
             name: "boss_bison_bgm",
             start: 914888,
@@ -162,26 +87,26 @@
             boss_barlog_bgm: "assets/sounds/boss_barlog_bgm.mp3",
             boss_barlog_voice_add: "assets/sounds/boss_barlog_voice_add.mp3",
             boss_barlog_voice_ko: "assets/sounds/boss_barlog_voice_ko.mp3",
-            boss_barlog_voice_tama: "assets/sounds/boss_barlog_voice_tama.mp3",
+            boss_barlog_voice_projectile: "assets/sounds/boss_barlog_voice_projectile.mp3",
             boss_barlog_voice_barcelona: "assets/sounds/boss_barlog_voice_barcelona.mp3",
             boss_sagat_bgm: "assets/sounds/boss_sagat_bgm.mp3",
             boss_sagat_voice_add: "assets/sounds/boss_sagat_voice_add.mp3",
             boss_sagat_voice_ko: "assets/sounds/boss_sagat_voice_ko.mp3",
-            boss_sagat_voice_tama0: "assets/sounds/boss_sagat_voice_tama0.mp3",
-            boss_sagat_voice_tama1: "assets/sounds/boss_sagat_voice_tama1.mp3",
+            boss_sagat_voice_projectile0: "assets/sounds/boss_sagat_voice_projectile0.mp3",
+            boss_sagat_voice_projectile1: "assets/sounds/boss_sagat_voice_projectile1.mp3",
             boss_sagat_voice_kick: "assets/sounds/boss_sagat_voice_kick.mp3",
             boss_vega_bgm: "assets/sounds/boss_vega_bgm.mp3",
             boss_vega_voice_add: "assets/sounds/boss_vega_voice_add.mp3",
             boss_vega_voice_ko: "assets/sounds/boss_vega_voice_ko.mp3",
             boss_vega_voice_crusher: "assets/sounds/boss_vega_voice_crusher.mp3",
             boss_vega_voice_warp: "assets/sounds/boss_vega_voice_warp.mp3",
-            boss_vega_voice_tama: "assets/sounds/boss_vega_voice_tama.mp3",
+            boss_vega_voice_projectile: "assets/sounds/boss_vega_voice_projectile.mp3",
             boss_vega_voice_shoot: "assets/sounds/boss_vega_voice_shoot.mp3",
             boss_goki_bgm: "assets/sounds/boss_goki_bgm.mp3",
             boss_goki_voice_add: "assets/sounds/boss_goki_voice_add.mp3",
             boss_goki_voice_ko: "assets/sounds/boss_goki_voice_ko.mp3",
-            boss_goki_voice_tama0: "assets/sounds/boss_goki_voice_tama0.mp3",
-            boss_goki_voice_tama1: "assets/sounds/boss_goki_voice_tama1.mp3",
+            boss_goki_voice_projectile0: "assets/sounds/boss_goki_voice_projectile0.mp3",
+            boss_goki_voice_projectile1: "assets/sounds/boss_goki_voice_projectile1.mp3",
             boss_goki_voice_ashura: "assets/sounds/boss_goki_voice_ashura.mp3",
             boss_goki_voice_syungokusatu0: "assets/sounds/boss_goki_voice_syungokusatu0.mp3",
             boss_goki_voice_syungokusatu1: "assets/sounds/boss_goki_voice_syungokusatu1.mp3",
@@ -190,7 +115,7 @@
             boss_fang_voice_ko: "assets/sounds/boss_fang_voice_ko.mp3",
             boss_fang_voice_beam0: "assets/sounds/boss_fang_voice_beam0.mp3",
             boss_fang_voice_beam1: "assets/sounds/boss_fang_voice_beam1.mp3",
-            boss_fang_voice_tama: "assets/sounds/boss_fang_voice_tama.mp3",
+            boss_fang_voice_projectile: "assets/sounds/boss_fang_voice_projectile.mp3",
             bgm_continue: "assets/sounds/scene_continue/bgm_continue.mp3",
             bgm_gameover: "assets/sounds/scene_continue/bgm_gameover.mp3",
             voice_countdown0: "assets/sounds/scene_continue/voice_countdown0.mp3",
@@ -431,9 +356,9 @@
                 return "customEventdeadComplete"
             }
         }, {
-            key: "CUSTOM_EVENT_TAMA_ADD",
+            key: "CUSTOM_EVENT_PROJECTILE_ADD",
             get: function() {
-                return "customEventtamaadd"
+                return "customEventprojectileadd"
             }
         }]),
         p(e, [{
@@ -641,7 +566,6 @@
         n && v(o, n),
         e
     }();
-    o(0);
     // returns the type of the value passed as an argument, with special handling for Symbol instances
     function C(t) {
         return (C = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function(t) {
@@ -3699,11 +3623,11 @@
                     (a = PIXI.Texture.fromFrame(t.texture[i])).baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST,
                     t.texture[i] = a
                 }
-                if (null !== t.tamaData)
-                    for (var n = 0; n < t.tamaData.texture.length; n++) {
+                if (t.projectileData && t.projectileData.texture)
+                    for (var n = 0; n < t.projectileData.texture.length; n++) {
                         var a;
-                        (a = PIXI.Texture.fromFrame(t.tamaData.texture[n])).baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST,
-                        t.tamaData.texture[n] = a
+                        (a = PIXI.Texture.fromFrame(t.projectileData.texture[n])).baseTexture.scaleMode = PIXI.SCALE_MODES.NEAREST,
+                        t.projectileData.texture[n] = a
                     }
             }
             switch ((o = Le(this, Ue(e).call(this, t.texture, t.explosion))).name = t.name,
@@ -3712,7 +3636,7 @@
             o.hp = t.hp,
             o.speed = t.speed,
             o.cagage = t.cagage,
-            o.tamaData = t.tamaData,
+            o.projectileData = t.projectileData,
             o.itemName = t.itemName,
             o.itemTexture = t.itemTexture,
             o.whitefilter = new PIXI.filters.ColorMatrixFilter,
@@ -3772,7 +3696,9 @@
         }, {
             key: "shoot",
             value: function() {
-                this.emit(y.CUSTOM_EVENT_TAMA_ADD),
+                if (!this.projectileData)
+                    return;
+                this.emit(y.CUSTOM_EVENT_PROJECTILE_ADD),
                 g.stop("se_shoot"),
                 g.play("se_shoot")
             }
@@ -3899,7 +3825,7 @@
             o.hp = t.hp,
             o.cagage = t.cagage,
             o.animList = t.anim,
-            o.tamaData = t.tamaData;
+            o.projectileData = t.projectileData;
             for (var i = [], n = 0; n < 3; n++)
                 i[n] = PIXI.Texture.fromFrame("boss_dengerous" + n + ".gif");
             return o.dengerousBalloon = new PIXI.extras.AnimatedSprite(i),
@@ -3935,7 +3861,7 @@
         (n = [{
             key: "shoot",
             value: function() {
-                this.emit(y.CUSTOM_EVENT_TAMA_ADD),
+                this.emit(y.CUSTOM_EVENT_PROJECTILE_ADD),
                 g.stop("se_shoot"),
                 g.play("se_shoot")
             }
@@ -4380,8 +4306,8 @@
                     var u = PIXI.Texture.fromFrame(t.anim.shoot[l]);
                     t.anim.shoot[l] = u
                 }
-                for (var c = 0; c < t.tamaData.texture.length; c++)
-                    t.tamaData.texture[c] = PIXI.Texture.fromFrame(t.tamaData.texture[c])
+                for (var c = 0; c < t.projectileData.texture.length; c++)
+                    t.projectileData.texture[c] = PIXI.Texture.fromFrame(t.projectileData.texture[c])
             }
             return (o = lo(this, co(e).call(this, t))).unit.hitArea = new PIXI.Rectangle(30,20,o.unit.width - 60,o.unit.height - 30),
             o.dengerousBalloon.x = 30,
@@ -4516,7 +4442,7 @@
                 this.character.play(),
                 this.shadow.play(),
                 this.shoot(),
-                g.play("boss_barlog_voice_tama")
+                g.play("boss_barlog_voice_projectile")
             }
         }, {
             key: "onDead",
@@ -4618,14 +4544,14 @@
                     var u = PIXI.Texture.fromFrame(t.anim.attack[l]);
                     t.anim.attack[l] = u
                 }
-                for (var c = 0; c < t.tamaDataA.texture.length; c++)
-                    t.tamaDataA.texture[c] = PIXI.Texture.fromFrame(t.tamaDataA.texture[c]);
-                for (var f = 0; f < t.tamaDataB.texture.length; f++)
-                    t.tamaDataB.texture[f] = PIXI.Texture.fromFrame(t.tamaDataB.texture[f])
+                for (var c = 0; c < t.projectileDataA.texture.length; c++)
+                    t.projectileDataA.texture[c] = PIXI.Texture.fromFrame(t.projectileDataA.texture[c]);
+                for (var f = 0; f < t.projectileDataB.texture.length; f++)
+                    t.projectileDataB.texture[f] = PIXI.Texture.fromFrame(t.projectileDataB.texture[f])
             }
-            return (o = go(this, vo(e).call(this, t))).tamaDataA = t.tamaDataA,
-            o.tamaDataB = t.tamaDataB,
-            o.tamaData = o.tamaDataA,
+            return (o = go(this, vo(e).call(this, t))).projectileDataA = t.projectileDataA,
+            o.projectileDataB = t.projectileDataB,
+            o.projectileData = o.projectileDataA,
             o.unit.hitArea = new PIXI.Rectangle(20,20,o.unit.width - 40,o.unit.height - 20),
             o
         }
@@ -4673,7 +4599,7 @@
                     onCompleteScope: this
                 });
                 var s = Math.random();
-                s >= 0 && .3 >= s ? (this.tamaData = this.tamaDataA,
+                s >= 0 && .3 >= s ? (this.projectileData = this.projectileDataA,
                 this.tlShoot.to(this.unit, .25, {
                     x: -20
                 }),
@@ -4706,7 +4632,7 @@
                 this.tlShoot.addCallback(this.onShoot, "+=0.25", null, this),
                 this.tlShoot.addCallback(function() {
                     this.onIdle()
-                }, "+=0.3", null, this)) : s >= .31 && .6 >= s ? (this.tamaData = this.tamaDataA,
+                }, "+=0.3", null, this)) : s >= .31 && .6 >= s ? (this.projectileData = this.projectileDataA,
                 this.tlShoot.to(this.unit, .25, {
                     x: o
                 }),
@@ -4726,7 +4652,7 @@
                 this.tlShoot.addCallback(this.onShoot, "+=0.2", null, this),
                 this.tlShoot.addCallback(function() {
                     this.onIdle()
-                }, "+=0.3", null, this)) : s >= .61 && .8 >= s ? (this.tamaData = this.tamaDataB,
+                }, "+=0.3", null, this)) : s >= .61 && .8 >= s ? (this.projectileData = this.projectileDataB,
                 this.tlShoot.to(this.unit, .25, {
                     x: o
                 }),
@@ -4764,7 +4690,7 @@
                 this.character.play(),
                 this.shadow.play(),
                 this.shoot(),
-                g.play("boss_sagat_voice_tama0")
+                g.play("boss_sagat_voice_projectile0")
             }
         }, {
             key: "onBigShoot",
@@ -4774,7 +4700,7 @@
                 this.character.play(),
                 this.shadow.play(),
                 this.shoot(),
-                g.play("boss_sagat_voice_tama1")
+                g.play("boss_sagat_voice_projectile1")
             }
         }, {
             key: "onIdle",
@@ -4896,15 +4822,15 @@
                     var h = PIXI.Texture.fromFrame(t.anim.shoot[r]);
                     t.anim.shoot[r] = h
                 }
-                for (var l = 0; l < t.tamaDataA.texture.length; l++)
-                    t.tamaDataA.texture[l] = PIXI.Texture.fromFrame(t.tamaDataA.texture[l]);
-                for (var u = 0; u < t.tamaDataB.texture.length; u++)
-                    t.tamaDataB.texture[u] = PIXI.Texture.fromFrame(t.tamaDataB.texture[u]);
-                t.tamaDataB.name = "psychoField",
-                t.tamaData = t.tamaDataA
+                for (var l = 0; l < t.projectileDataA.texture.length; l++)
+                    t.projectileDataA.texture[l] = PIXI.Texture.fromFrame(t.projectileDataA.texture[l]);
+                for (var u = 0; u < t.projectileDataB.texture.length; u++)
+                    t.projectileDataB.texture[u] = PIXI.Texture.fromFrame(t.projectileDataB.texture[u]);
+                t.projectileDataB.name = "psychoField",
+                t.projectileData = t.projectileDataA
             }
-            return (o = To(this, Co(e).call(this, t))).tamaDataA = t.tamaDataA,
-            o.tamaDataB = t.tamaDataB,
+            return (o = To(this, Co(e).call(this, t))).projectileDataA = t.projectileDataA,
+            o.projectileDataB = t.projectileDataB,
             o.unit.hitArea = new PIXI.Rectangle(20,13,o.unit.width - 40,o.unit.height - 20),
             o.dengerousBalloon.y = 15,
             o.vegaBlur = new PIXI.filters.BlurFilter,
@@ -4988,13 +4914,13 @@
                 this.tlShoot.to(this.vegaBlur, .1, {
                     blur: 0
                 }),
-                this.tlShoot.addCallback(function() {}, "+=0.5", null, this)) : a >= .11 && .4 >= a ? (this.tamaData = this.tamaDataA,
+                this.tlShoot.addCallback(function() {}, "+=0.5", null, this)) : a >= .11 && .4 >= a ? (this.projectileData = this.projectileDataA,
                 this.tlShoot.to(this.vegaBlur, .1, {
                     blur: 15
                 }),
                 this.tlShoot.addCallback(function() {
                     this.unit.x = 0,
-                    g.play("boss_vega_voice_tama"),
+                    g.play("boss_vega_voice_projectile"),
                     this.onPsychoShoot()
                 }, "+=0", null, this),
                 this.tlShoot.to(this.vegaBlur, .1, {
@@ -5028,7 +4954,7 @@
                 }),
                 this.tlShoot.addCallback(function() {
                     this.unit.x = 128,
-                    g.play("boss_vega_voice_tama"),
+                    g.play("boss_vega_voice_projectile"),
                     this.onPsychoShoot()
                 }, "+=0", null, this),
                 this.tlShoot.to(this.vegaBlur, .1, {
@@ -5062,13 +4988,13 @@
                 }),
                 this.tlShoot.addCallback(function() {
                     this.unit.x = i.GAME_CENTER - this.unit.width / 2,
-                    g.play("boss_vega_voice_tama"),
+                    g.play("boss_vega_voice_projectile"),
                     this.onPsychoShoot()
                 }, "+=0", null, this),
                 this.tlShoot.to(this.vegaBlur, .1, {
                     blur: 0
                 }),
-                this.tlShoot.addCallback(function() {}, "+=4.0", null, this)) : a >= .41 && .7 >= a ? (this.tamaData = this.tamaDataB,
+                this.tlShoot.addCallback(function() {}, "+=4.0", null, this)) : a >= .41 && .7 >= a ? (this.projectileData = this.projectileDataB,
                 this.tlShoot.to(this.unit, .3, {
                     x: i.GAME_CENTER - this.unit.width / 2,
                     y: n + 10
@@ -5256,20 +5182,20 @@
                     var p = PIXI.Texture.fromFrame(t.anim.shootB[d]);
                     t.anim.shootB[d] = p
                 }
-                for (var m = 0; m < t.tamaDataA.texture.length; m++)
-                    t.tamaDataA.texture[m] = PIXI.Texture.fromFrame(t.tamaDataA.texture[m]);
-                for (var y = 0; y < t.tamaDataB.texture.length; y++)
-                    t.tamaDataB.texture[y] = PIXI.Texture.fromFrame(t.tamaDataB.texture[y]);
-                t.tamaData = t.tamaDataA
+                for (var m = 0; m < t.projectileDataA.texture.length; m++)
+                    t.projectileDataA.texture[m] = PIXI.Texture.fromFrame(t.projectileDataA.texture[m]);
+                for (var y = 0; y < t.projectileDataB.texture.length; y++)
+                    t.projectileDataB.texture[y] = PIXI.Texture.fromFrame(t.projectileDataB.texture[y]);
+                t.projectileData = t.projectileDataA
             }
             o = Mo(this, Bo(e).call(this, t)),
-            t.tamaDataA.explosion = t.explosion,
-            t.tamaDataB.explosion = t.explosion,
+            t.projectileDataA.explosion = t.explosion,
+            t.projectileDataB.explosion = t.explosion,
             o.unit.hitArea = new PIXI.Rectangle(15,20,o.unit.width - 30,o.unit.height - 24),
             o.dengerousBalloon.x = 5,
             o.dengerousBalloon.y = 20,
-            o.tamaDataA = t.tamaDataA,
-            o.tamaDataB = t.tamaDataB,
+            o.projectileDataA = t.projectileDataA,
+            o.projectileDataB = t.projectileDataB,
             o.shungokuHitEffectTextureList = [];
             for (var g = 0; g < 5; g++)
                 o.shungokuHitEffectTextureList[g] = PIXI.Texture.fromFrame("hit" + String(g) + ".gif");
@@ -5313,35 +5239,35 @@
                     }),
                     this.tlShoot.addCallback(this.onShootA, "+=0", null, this),
                     this.tlShoot.addCallback(function() {
-                        this.tamaData = this.tamaDataA,
-                        g.play("boss_goki_voice_tama0"),
+                        this.projectileData = this.projectileDataA,
+                        g.play("boss_goki_voice_projectile0"),
                         this.shoot()
                     }, "+=0.32", null, this),
                     this.tlShoot.addCallback(this.onShootA, "+=0", null, this),
                     this.tlShoot.addCallback(function() {
-                        this.tamaData = this.tamaDataA,
+                        this.projectileData = this.projectileDataA,
                         this.shoot()
                     }, "+=0.32", null, this),
                     this.tlShoot.addCallback(this.onShootA, "+=0", null, this),
                     this.tlShoot.addCallback(function() {
-                        this.tamaData = this.tamaDataA,
-                        g.play("boss_goki_voice_tama0"),
+                        this.projectileData = this.projectileDataA,
+                        g.play("boss_goki_voice_projectile0"),
                         this.shoot()
                     }, "+=0.32", null, this),
                     this.tlShoot.addCallback(this.onShootA, "+=0", null, this),
                     this.tlShoot.addCallback(function() {
-                        this.tamaData = this.tamaDataA,
+                        this.projectileData = this.projectileDataA,
                         this.shoot()
                     }, "+=0.32", null, this),
                     this.tlShoot.addCallback(this.onShootA, "+=0", null, this),
                     this.tlShoot.addCallback(function() {
-                        this.tamaData = this.tamaDataA,
-                        g.play("boss_goki_voice_tama0"),
+                        this.projectileData = this.projectileDataA,
+                        g.play("boss_goki_voice_projectile0"),
                         this.shoot()
                     }, "+=0.32", null, this),
                     this.tlShoot.addCallback(this.onShootA, "+=0", null, this),
                     this.tlShoot.addCallback(function() {
-                        this.tamaData = this.tamaDataA,
+                        this.projectileData = this.projectileDataA,
                         this.shoot()
                     }, "+=0.32", null, this),
                     this.tlShoot.addCallback(this.onIdle, "+=0.3", null, this);
@@ -5351,7 +5277,7 @@
                     }),
                     this.tlShoot.addCallback(this.onShootB, "+=0", null, this),
                     this.tlShoot.addCallback(function() {
-                        this.tamaData = this.tamaDataB,
+                        this.projectileData = this.projectileDataB,
                         this.shoot()
                     }, "+=0.4", null, this),
                     this.tlShoot.addCallback(this.onIdle, "+=0.8", null, this);
@@ -5402,7 +5328,7 @@
                 this.shadow.play(),
                 this.character.loop = !1,
                 this.shadow.loop = !1,
-                g.play("boss_goki_voice_tama1")
+                g.play("boss_goki_voice_projectile1")
             }
         }, {
             key: "ashuraSenku",
@@ -5586,25 +5512,25 @@
                     var u = PIXI.Texture.fromFrame(t.anim.shoot[l]);
                     t.anim.shoot[l] = u
                 }
-                for (var c = 0; c < t.tamaDataA.texture.length; c++)
-                    t.tamaDataA.texture[c] = PIXI.Texture.fromFrame(t.tamaDataA.texture[c]);
-                t.tamaDataA.name = "beam",
-                t.tamaDataA.cnt = 0;
-                for (var f = 0; f < t.tamaDataB.texture.length; f++)
-                    t.tamaDataB.texture[f] = PIXI.Texture.fromFrame(t.tamaDataB.texture[f]);
-                t.tamaDataB.name = "smoke",
-                t.tamaDataB.cnt = 0;
-                for (var d = 0; d < t.tamaDataC.texture.length; d++)
-                    t.tamaDataC.texture[d] = PIXI.Texture.fromFrame(t.tamaDataC.texture[d]);
-                t.tamaDataC.name = "meka",
-                t.tamaData = t.tamaDataA
+                for (var c = 0; c < t.projectileDataA.texture.length; c++)
+                    t.projectileDataA.texture[c] = PIXI.Texture.fromFrame(t.projectileDataA.texture[c]);
+                t.projectileDataA.name = "beam",
+                t.projectileDataA.cnt = 0;
+                for (var f = 0; f < t.projectileDataB.texture.length; f++)
+                    t.projectileDataB.texture[f] = PIXI.Texture.fromFrame(t.projectileDataB.texture[f]);
+                t.projectileDataB.name = "smoke",
+                t.projectileDataB.cnt = 0;
+                for (var d = 0; d < t.projectileDataC.texture.length; d++)
+                    t.projectileDataC.texture[d] = PIXI.Texture.fromFrame(t.projectileDataC.texture[d]);
+                t.projectileDataC.name = "meka",
+                t.projectileData = t.projectileDataA
             }
             return (o = Xo(this, No(e).call(this, t))).unit.hitArea = new PIXI.Rectangle(35,55,o.unit.width - 70,o.unit.height - 70),
             o.dengerousBalloon.x = 70,
             o.dengerousBalloon.y = 40,
-            o.tamaDataA = t.tamaDataA,
-            o.tamaDataB = t.tamaDataB,
-            o.tamaDataC = t.tamaDataC,
+            o.projectileDataA = t.projectileDataA,
+            o.projectileDataB = t.projectileDataB,
+            o.projectileDataC = t.projectileDataC,
             o.unit.removeChild(o.shadow),
             o
         }
@@ -5644,7 +5570,7 @@
                     onCompleteScope: this
                 });
                 var t = Math.random();
-                t >= 0 && .3 >= t ? (this.tamaData = this.tamaDataA,
+                t >= 0 && .3 >= t ? (this.projectileData = this.projectileDataA,
                 this.tlShoot.addCallback(this.onCharge, "+=0", null, this),
                 this.tlShoot.addCallback(this.onShoot, "+=0.5", null, this),
                 this.tlShoot.addCallback(this.onBeamVoice2, "+=0.0", null, this),
@@ -5653,11 +5579,11 @@
                 this.tlShoot.addCallback(this.onShoot, "+=0.5", null, this),
                 this.tlShoot.addCallback(this.onBeamVoice2, "+=0.0", null, this),
                 this.tlShoot.addCallback(this.onIdle, "+=0.3", null, this),
-                this.tlShoot.addCallback(function() {}, "+=1", null, this)) : t >= .31 && .7 >= t ? (this.tamaData = this.tamaDataC,
+                this.tlShoot.addCallback(function() {}, "+=1", null, this)) : t >= .31 && .7 >= t ? (this.projectileData = this.projectileDataC,
                 g.play("boss_fang_voice_beam1"),
                 this.tlShoot.addCallback(this.shoot, "+=0.0", null, this),
                 this.tlShoot.addCallback(this.onWait, "+=0.5", null, this),
-                this.tlShoot.addCallback(function() {}, "+=4", null, this)) : t >= .71 && 1 >= t && (this.tamaData = this.tamaDataB,
+                this.tlShoot.addCallback(function() {}, "+=4", null, this)) : t >= .71 && 1 >= t && (this.projectileData = this.projectileDataB,
                 this.tlShoot.addCallback(this.onSmoke, "+=0", null, this),
                 this.tlShoot.addCallback(this.onWait, "+=1.0", null, this),
                 this.tlShoot.addCallback(this.shoot, "+=0.3", null, this),
@@ -5706,7 +5632,7 @@
         }, {
             key: "onSmoke",
             value: function() {
-                g.play("boss_fang_voice_tama")
+                g.play("boss_fang_voice_projectile")
             }
         }, {
             key: "onIdle",
@@ -7193,8 +7119,25 @@
             }
             o.stageBg = new Bi(u),
             o.addChildAt(o.stageBg, 0);
+            // Normalize legacy recipe keys before gameplay objects are instantiated.
+            var p = B.resource.recipe.data;
+            if (p.enemyData)
+                for (var d0 in p.enemyData)
+                    if (Object.prototype.hasOwnProperty.call(p.enemyData, d0)) {
+                        var v = p.enemyData[d0];
+                        v && void 0 === v.projectileData && (v.projectileData = void 0 !== v.bulletData ? v.bulletData : null)
+                    }
+            if (p.bossData)
+                for (var y0 in p.bossData)
+                    if (Object.prototype.hasOwnProperty.call(p.bossData, y0)) {
+                        var m0 = p.bossData[y0];
+                        m0 && (void 0 === m0.projectileData && (m0.projectileData = void 0 !== m0.bulletData ? m0.bulletData : null),
+                        void 0 === m0.projectileDataA && (m0.projectileDataA = m0.bulletDataA),
+                        void 0 === m0.projectileDataB && (m0.projectileDataB = m0.bulletDataB),
+                        void 0 === m0.projectileDataC && (m0.projectileDataC = m0.bulletDataC))
+                    }
             // Set up player
-            var d = B.resource.recipe.data.playerData;
+            var d = p.playerData;
             return d.explosion = o.explosionTextures,
             o.player = new M(d),
             o.player.on(M.CUSTOM_EVENT_DEAD, o.gameover.bind(Yi(Yi(o)))),
@@ -7394,7 +7337,7 @@
                         s.unit.y = -32,
                         s.on(Ye.CUSTOM_EVENT_DEAD, this.enemyRemove.bind(this, s)),
                         s.on(Ye.CUSTOM_EVENT_DEAD_COMPLETE, this.enemyRemoveComplete.bind(this, s)),
-                        s.on(Ye.CUSTOM_EVENT_TAMA_ADD, this.tamaAdd.bind(this, s)),
+                        s.on(Ye.CUSTOM_EVENT_PROJECTILE_ADD, this.projectileAdd.bind(this, s)),
                         this.unitContainer.addChild(s),
                         this.enemyHitTestList.push(s)
                     }
@@ -7402,17 +7345,19 @@
                 this.waveCount++
             }
         }, {
-            key: "tamaAdd",
+            key: "projectileAdd",
             value: function(t) {
-                switch (t.tamaData.name) {
+                if (!t || !t.projectileData)
+                    return;
+                switch (t.projectileData.name) {
                 case "beam":
                     for (var e = 0; e < 2; e++) {
                         var o = 0 == e ? 121 : 141
-                          , n = new S(t.tamaData)
+                          , n = new S(t.projectileData)
                           , a = n.character.width
                           , s = n.character.height
                           , r = void 0;
-                        switch (t.tamaData.cnt) {
+                        switch (t.projectileData.cnt) {
                         case 0:
                             r = 105,
                             n.unit.hitArea = new PIXI.Rectangle(2.7 * -s,a / 2 - 10,s,a / 2);
@@ -7435,11 +7380,11 @@
                         this.unitContainer.addChild(n),
                         this.enemyHitTestList.push(n)
                     }
-                    t.tamaData.cnt >= 2 ? t.tamaData.cnt = 0 : t.tamaData.cnt++;
+                    t.projectileData.cnt >= 2 ? t.projectileData.cnt = 0 : t.projectileData.cnt++;
                     break;
                 case "smoke":
                     var h = 60 * Math.random() + 60
-                      , l = new S(t.tamaData);
+                      , l = new S(t.projectileData);
                     l.unit.hitArea = new PIXI.Rectangle(20,20,l.character.width - 40,l.character.height - 40),
                     l.rotX = Math.cos(h * Math.PI / 180),
                     l.rotY = Math.sin(h * Math.PI / 180),
@@ -7457,7 +7402,7 @@
                     break;
                 case "meka":
                     for (var u = 0; u < 32; u++) {
-                        var c = new S(t.tamaData);
+                        var c = new S(t.projectileData);
                         c.cont = 0,
                         c.start = 10 * u,
                         c.player = this.player.unit,
@@ -7482,7 +7427,7 @@
                     break;
                 case "psychoField":
                     for (var p = 0; p < 72; p++) {
-                        var m = new S(t.tamaData);
+                        var m = new S(t.projectileData);
                         m.rotX = Math.cos(p / 72 * 360 * Math.PI / 180),
                         m.rotY = Math.sin(p / 72 * 360 * Math.PI / 180),
                         m.unit.x = 50 * m.rotX + t.unit.x + t.unit.hitArea.width / 2 + m.unit.width / 2,
@@ -7494,7 +7439,7 @@
                     }
                     break;
                 default:
-                    var y = new S(t.tamaData);
+                    var y = new S(t.projectileData);
                     y.unit.x = t.unit.x + t.unit.width / 2 - y.unit.width / 2,
                     y.unit.y = t.unit.y + t.unit.hitArea.height / 2,
                     y.on(S.CUSTOM_EVENT_DEAD, this.enemyRemove.bind(this, y)),
@@ -7504,7 +7449,7 @@
                 }
             }
         }, {
-            key: "tamaAllRemove",
+            key: "projectileAllRemove",
             value: function() {}
         }, {
             key: "enemyRemove",
@@ -7529,7 +7474,7 @@
             value: function(t) {
                 t.off(Ye.CUSTOM_EVENT_DEAD, this.enemyRemove.bind(this)),
                 t.off(Ye.CUSTOM_EVENT_DEAD_COMPLETE, this.enemyRemoveComplete.bind(this)),
-                t.off(Ye.CUSTOM_EVENT_TAMA_ADD, this.tamaAdd.bind(this)),
+                t.off(Ye.CUSTOM_EVENT_PROJECTILE_ADD, this.projectileAdd.bind(this)),
                 this.unitContainer.removeChild(t)
             }
         }, {
@@ -7596,7 +7541,7 @@
                     e.continueCnt = D.continueCnt,
                     this.boss = new Ro(e),
                     this.boss.on(Ze.CUSTOM_EVENT_DEAD, this.bossRemove.bind(this, this.boss)),
-                    this.boss.on(Ze.CUSTOM_EVENT_TAMA_ADD, this.tamaAdd.bind(this, this.boss)),
+                    this.boss.on(Ze.CUSTOM_EVENT_PROJECTILE_ADD, this.projectileAdd.bind(this, this.boss)),
                     this.unitContainer.addChild(this.boss),
                     this.boss.unit.x = i.GAME_WIDTH,
                     this.boss.unit.y = i.GAME_HEIGHT / 4
@@ -7621,7 +7566,7 @@
                         this.boss = new Wo(o)
                     }
                     this.boss.on(Ze.CUSTOM_EVENT_DEAD, this.bossRemove.bind(this, this.boss)),
-                    this.boss.on(Ze.CUSTOM_EVENT_TAMA_ADD, this.tamaAdd.bind(this, this.boss)),
+                    this.boss.on(Ze.CUSTOM_EVENT_PROJECTILE_ADD, this.projectileAdd.bind(this, this.boss)),
                     this.enemyHitTestList.push(this.boss),
                     this.unitContainer.addChild(this.boss)
                 }
@@ -9064,26 +9009,26 @@
                         g.boss_barlog_bgm.volume = .4,
                         g.boss_barlog_voice_add.volume = .7,
                         g.boss_barlog_voice_ko.volume = .9,
-                        g.boss_barlog_voice_tama.volume = .6,
+                        g.boss_barlog_voice_projectile.volume = .6,
                         g.boss_barlog_voice_barcelona.volume = .7,
                         g.boss_sagat_bgm.volume = .4,
                         g.boss_sagat_voice_add.volume = .9,
                         g.boss_sagat_voice_ko.volume = .9,
-                        g.boss_sagat_voice_tama0.volume = .45,
-                        g.boss_sagat_voice_tama1.volume = .65,
+                        g.boss_sagat_voice_projectile0.volume = .45,
+                        g.boss_sagat_voice_projectile1.volume = .65,
                         g.boss_sagat_voice_kick.volume = .65,
                         g.boss_vega_bgm.volume = .3,
                         g.boss_vega_voice_add.volume = .7,
                         g.boss_vega_voice_ko.volume = .9,
                         g.boss_vega_voice_crusher.volume = .7,
                         g.boss_vega_voice_warp.volume = .7,
-                        g.boss_vega_voice_tama.volume = .7,
+                        g.boss_vega_voice_projectile.volume = .7,
                         g.boss_vega_voice_shoot.volume = .7,
                         g.boss_goki_bgm.volume = .4,
                         g.boss_goki_voice_add.volume = .7,
                         g.boss_goki_voice_ko.volume = .9,
-                        g.boss_goki_voice_tama0.volume = .7,
-                        g.boss_goki_voice_tama1.volume = .7,
+                        g.boss_goki_voice_projectile0.volume = .7,
+                        g.boss_goki_voice_projectile1.volume = .7,
                         g.boss_goki_voice_ashura.volume = .7,
                         g.boss_goki_voice_syungokusatu0.volume = .7,
                         g.boss_goki_voice_syungokusatu1.volume = .7,
@@ -9092,7 +9037,7 @@
                         g.boss_fang_voice_ko.volume = .9,
                         g.boss_fang_voice_beam0.volume = .6,
                         g.boss_fang_voice_beam1.volume = .6,
-                        g.boss_fang_voice_tama.volume = .6,
+                        g.boss_fang_voice_projectile.volume = .6,
                         g.bgm_continue.volume = .25,
                         g.bgm_gameover.volume = .3,
                         g.voice_countdown0.volume = .7,
@@ -9206,45 +9151,63 @@
             Object.defineProperty(t, i.key, i)
         }
     }
-    new (function() {
-        function t() {
-            var e = this;
-            !function(t, e) {
-                if (!(t instanceof e))
-                    throw new TypeError("Cannot call a class as a function")
-            }(this, t),
-            F.dlog("App.constructor start."),
-            this.loadListener = function(t) {
-                return e.init(t)
-            }
-            ,
-            window.addEventListener("load", this.loadListener),
-            F.dlog("App.constructor end.")
-        }
-        var e, o, n;
-        return e = t,
-        (o = [{
-            key: "init",
-            value: function() {
-                window.removeEventListener("load", this.loadListener),
-                D.baseUrl = document.getElementById("baseUrl").innerHTML,
-                B.Manager = new jn,
-                B.Manager.game = new PIXI.Application({
-                    antialias: !1,
-                    transparent: !1,
-                    resolution: 1,
-                    width: i.GAME_WIDTH,
-                    height: i.GAME_HEIGHT,
-                    backgroundColor: 0
-                }),
-                B.Manager.interact = new PIXI.interaction.InteractionManager(B.Manager.game.view),
-                B.Manager.interact.hitTestRectangle = St.hitTestFunc,
-                document.getElementById("canvas").appendChild(B.Manager.game.view),
-                B.Manager.begin()
-            }
-        }]) && Xn(e.prototype, o),
-        n && Xn(e, n),
-        t
-    }())
+
+export const BaseCast = l;
+export const BaseSpriteCast = K;
+export const BaseUnit = y;
+export const Bullet = S;
+export const Player = M;
+export const Enemy = Ye;
+export const Boss = Ze;
+export const BossBison = so;
+export const BossBarlog = po;
+export const BossSagat = wo;
+export const BossVega = Eo;
+export const BossGoki = Ro;
+export const BossFang = Wo;
+
+export const BaseScene = N;
+export const ContinueScene = Be;
+export const GameScene = Ki;
+export const ResultScene = tn;
+export const GameoverScene = tn;
+export const CongraScene = tn;
+export const EndingScene = tn;
+export const AdvScene = hn;
+export const TitleScene = mn;
+export const LoadScene = Rn;
+
+export function instantiateGame() {
+    F.dlog("App.init start.");
+
+    if (B.Manager && B.Manager.game) {
+        return B.Manager.game;
+    }
+
+    var baseUrlNode = document.getElementById("baseUrl");
+    D.baseUrl = baseUrlNode ? baseUrlNode.innerHTML : D.baseUrl;
+
+    B.Manager = new jn;
+    B.Manager.game = new PIXI.Application({
+        antialias: !1,
+        transparent: !1,
+        resolution: 1,
+        width: i.GAME_WIDTH,
+        height: i.GAME_HEIGHT,
+        backgroundColor: 0
+    });
+    B.Manager.interact = new PIXI.interaction.InteractionManager(B.Manager.game.view);
+    B.Manager.interact.hitTestRectangle = St.hitTestFunc;
+
+    var canvasNode = document.getElementById("canvas");
+    if (!canvasNode) {
+        throw new Error("#canvas element is required to start the game.");
+    }
+
+    canvasNode.appendChild(B.Manager.game.view);
+    B.Manager.begin();
+
+    return B.Manager.game;
 }
-]);
+
+export default instantiateGame;
