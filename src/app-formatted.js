@@ -22,6 +22,17 @@ export { EndingScene } from "./scenes/EndingScene.js";
 export { AdvScene } from "./scenes/AdvScene.js";
 export { TitleScene } from "./scenes/TitleScene.js";
 export { LoadScene } from "./scenes/LoadScene.js";
+export { gameState, loadHighScore, saveHighScore } from "./gameState.js";
+export { globals } from "./globals.js";
+export {
+    play,
+    bgmPlay,
+    stop,
+    stopAll,
+    pauseAll,
+    resumeAll,
+    setInitialVolumes,
+} from "./soundManager.js";
 
 export { instantiateGame } from "./app-original.js";
 export { default } from "./app-original.js";
