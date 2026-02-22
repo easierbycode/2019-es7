@@ -15,6 +15,15 @@ function resolveInteractionManager() {
     return game.renderer.plugins.interaction || null;
 }
 
+function resolvePixiApp() {
+    const game = globalThis.__PHASER_GAME__;
+    return game || null;
+}
+
+function resolveGameManager() {
+    return globalThis.__GAME_MANAGER__ || null;
+}
+
 export const globals = {};
 
 Object.defineProperty(globals, "resources", {
@@ -33,6 +42,22 @@ Object.defineProperty(globals, "interactionManager", {
     enumerable: true,
     get() {
         return resolveInteractionManager();
+    },
+});
+
+Object.defineProperty(globals, "pixiApp", {
+    configurable: false,
+    enumerable: true,
+    get() {
+        return resolvePixiApp();
+    },
+});
+
+Object.defineProperty(globals, "gameManager", {
+    configurable: false,
+    enumerable: true,
+    get() {
+        return resolveGameManager();
     },
 });
 
