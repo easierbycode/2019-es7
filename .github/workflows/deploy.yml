@@ -46,7 +46,6 @@ jobs:
           if [ ! -d cordova ]; then
             cordova create cordova com.easierbycode.game2019es7 "2019-es7"
             cd cordova
-            cordova telemetry off
             cordova platform add android@latest
           fi
 
