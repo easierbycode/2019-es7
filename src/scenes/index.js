@@ -1,4 +1,4 @@
-export { BaseScene } from "../app-formatted.js";
+export { BaseScene } from "./BaseScene.js";
 export { AdvScene } from "./AdvScene.js";
 export { TitleScene } from "./TitleScene.js";
 export { LoadScene } from "./LoadScene.js";
