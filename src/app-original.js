@@ -1,173 +1,51 @@
 "use strict";
 
+import {
+    LANG,
+    BASE_PATH,
+    BGM_INFO,
+    RESOURCE_PATHS,
+    STAGE_IDS,
+    GAME_DIMENSIONS,
+    STAGE_DIMENSIONS,
+    ANIMATION,
+    FPS,
+} from "./constants.js";
+import { SCENE_IDS } from "./enums/scene-ids.js";
+import { CUSTOM_EVENTS } from "./events/custom-events.js";
+import { PLAYER_STATES, BOSS_STATES } from "./enums/player-boss-states.js";
+
     var i = {
-        LANG: function() {
-            switch (document.documentElement.lang) {
-            case "ja":
-                return "ja";
-            default:
-                return "en"
-            }
-        }(),
-        BASE_PATH: ("string" == typeof window.baseUrl ? window.baseUrl : "http://localhost/").replace(/^https?\:\/\/[^\/]+/, "").replace(/\/api\/$/, ""),
-        boss_bison_bgm_info: {
-            name: "boss_bison_bgm",
-            start: 914888,
-            end: 6111881
-        },
-        boss_barlog_bgm_info: {
-            name: "boss_barlog_bgm",
-            start: 782400,
-            end: 4315201
-        },
-        boss_sagat_bgm_info: {
-            name: "boss_sagat_bgm",
-            start: 1635142,
-            end: 6883739
-        },
-        boss_vega_bgm_info: {
-            name: "boss_vega_bgm",
-            start: 513529,
-            end: 4325295
-        },
-        boss_goki_bgm_info: {
-            name: "boss_goki_bgm",
-            start: 864e3,
-            end: 6130287
-        },
-        boss_fang_bgm_info: {
-            name: "boss_fang_bgm",
-            start: 888672,
-            end: 5802799
-        },
-        RESOURCE: {
-            recipe: "assets/game.json",
-            game_ui: "assets/game_ui.json",
-            game_asset: "assets/game_asset.json",
-            voice_titlecall: "assets/sounds/scene_title/voice_titlecall.mp3",
-            se_decision: "assets/sounds/ui/se_decision.mp3",
-            se_correct: "assets/sounds/ui/se_correct.mp3",
-            se_cursor_sub: "assets/sounds/ui/se_cursor_sub.mp3",
-            se_cursor: "assets/sounds/ui/se_cursor.mp3",
-            se_over: "assets/sounds/ui/se_over.mp3",
-            adventure_bgm: "assets/sounds/scene_adventure/adventure_bgm.mp3",
-            g_adbenture_voice0: "assets/sounds/scene_adventure/g_adbenture_voice0.mp3",
-            voice_thankyou: "assets/sounds/voice_thankyou.mp3",
-            se_explosion: "assets/sounds/se_explosion.mp3",
-            se_shoot: "assets/sounds/se_shoot.mp3",
-            se_shoot_b: "assets/sounds/se_shoot_b.mp3",
-            se_sp: "assets/sounds/se_sp.mp3",
-            se_sp_explosion: "assets/sounds/se_sp_explosion.mp3",
-            se_damage: "assets/sounds/se_damage.mp3",
-            se_guard: "assets/sounds/se_guard.mp3",
-            se_finish_akebono: "assets/sounds/se_finish_akebono.mp3",
-            se_barrier_start: "assets/sounds/se_barrier_start.mp3",
-            se_barrier_end: "assets/sounds/se_barrier_end.mp3",
-            voice_round0: "assets/sounds/voice_round0.mp3",
-            voice_round1: "assets/sounds/voice_round1.mp3",
-            voice_round2: "assets/sounds/voice_round2.mp3",
-            voice_round3: "assets/sounds/voice_round3.mp3",
-            voice_fight: "assets/sounds/voice_fight.mp3",
-            voice_ko: "assets/sounds/voice_ko.mp3",
-            voice_another_fighter: "assets/sounds/voice_another_fighter.mp3",
-            g_stage_voice_0: "assets/sounds/scene_game/g_stage_voice_0.mp3",
-            g_stage_voice_1: "assets/sounds/scene_game/g_stage_voice_1.mp3",
-            g_stage_voice_2: "assets/sounds/scene_game/g_stage_voice_2.mp3",
-            g_stage_voice_3: "assets/sounds/scene_game/g_stage_voice_3.mp3",
-            g_stage_voice_4: "assets/sounds/scene_game/g_stage_voice_4.mp3",
-            g_damage_voice: "assets/sounds/g_damage_voice.mp3",
-            g_powerup_voice: "assets/sounds/g_powerup_voice.mp3",
-            g_sp_voice: "assets/sounds/g_sp_voice.mp3",
-            boss_bison_bgm: "assets/sounds/boss_bison_bgm.mp3",
-            boss_bison_voice_add: "assets/sounds/boss_bison_voice_add.mp3",
-            boss_bison_voice_ko: "assets/sounds/boss_bison_voice_ko.mp3",
-            boss_bison_voice_faint: "assets/sounds/boss_bison_voice_faint.mp3",
-            boss_bison_voice_faint_punch: "assets/sounds/boss_bison_voice_faint_punch.mp3",
-            boss_bison_voice_punch: "assets/sounds/boss_bison_voice_punch.mp3",
-            boss_barlog_bgm: "assets/sounds/boss_barlog_bgm.mp3",
-            boss_barlog_voice_add: "assets/sounds/boss_barlog_voice_add.mp3",
-            boss_barlog_voice_ko: "assets/sounds/boss_barlog_voice_ko.mp3",
-            boss_barlog_voice_projectile: "assets/sounds/boss_barlog_voice_projectile.mp3",
-            boss_barlog_voice_barcelona: "assets/sounds/boss_barlog_voice_barcelona.mp3",
-            boss_sagat_bgm: "assets/sounds/boss_sagat_bgm.mp3",
-            boss_sagat_voice_add: "assets/sounds/boss_sagat_voice_add.mp3",
-            boss_sagat_voice_ko: "assets/sounds/boss_sagat_voice_ko.mp3",
-            boss_sagat_voice_projectile0: "assets/sounds/boss_sagat_voice_projectile0.mp3",
-            boss_sagat_voice_projectile1: "assets/sounds/boss_sagat_voice_projectile1.mp3",
-            boss_sagat_voice_kick: "assets/sounds/boss_sagat_voice_kick.mp3",
-            boss_vega_bgm: "assets/sounds/boss_vega_bgm.mp3",
-            boss_vega_voice_add: "assets/sounds/boss_vega_voice_add.mp3",
-            boss_vega_voice_ko: "assets/sounds/boss_vega_voice_ko.mp3",
-            boss_vega_voice_crusher: "assets/sounds/boss_vega_voice_crusher.mp3",
-            boss_vega_voice_warp: "assets/sounds/boss_vega_voice_warp.mp3",
-            boss_vega_voice_projectile: "assets/sounds/boss_vega_voice_projectile.mp3",
-            boss_vega_voice_shoot: "assets/sounds/boss_vega_voice_shoot.mp3",
-            boss_goki_bgm: "assets/sounds/boss_goki_bgm.mp3",
-            boss_goki_voice_add: "assets/sounds/boss_goki_voice_add.mp3",
-            boss_goki_voice_ko: "assets/sounds/boss_goki_voice_ko.mp3",
-            boss_goki_voice_projectile0: "assets/sounds/boss_goki_voice_projectile0.mp3",
-            boss_goki_voice_projectile1: "assets/sounds/boss_goki_voice_projectile1.mp3",
-            boss_goki_voice_ashura: "assets/sounds/boss_goki_voice_ashura.mp3",
-            boss_goki_voice_syungokusatu0: "assets/sounds/boss_goki_voice_syungokusatu0.mp3",
-            boss_goki_voice_syungokusatu1: "assets/sounds/boss_goki_voice_syungokusatu1.mp3",
-            boss_fang_bgm: "assets/sounds/boss_fang_bgm.mp3",
-            boss_fang_voice_add: "assets/sounds/boss_fang_voice_add.mp3",
-            boss_fang_voice_ko: "assets/sounds/boss_fang_voice_ko.mp3",
-            boss_fang_voice_beam0: "assets/sounds/boss_fang_voice_beam0.mp3",
-            boss_fang_voice_beam1: "assets/sounds/boss_fang_voice_beam1.mp3",
-            boss_fang_voice_projectile: "assets/sounds/boss_fang_voice_projectile.mp3",
-            bgm_continue: "assets/sounds/scene_continue/bgm_continue.mp3",
-            bgm_gameover: "assets/sounds/scene_continue/bgm_gameover.mp3",
-            voice_countdown0: "assets/sounds/scene_continue/voice_countdown0.mp3",
-            voice_countdown1: "assets/sounds/scene_continue/voice_countdown1.mp3",
-            voice_countdown2: "assets/sounds/scene_continue/voice_countdown2.mp3",
-            voice_countdown3: "assets/sounds/scene_continue/voice_countdown3.mp3",
-            voice_countdown4: "assets/sounds/scene_continue/voice_countdown4.mp3",
-            voice_countdown5: "assets/sounds/scene_continue/voice_countdown5.mp3",
-            voice_countdown6: "assets/sounds/scene_continue/voice_countdown6.mp3",
-            voice_countdown7: "assets/sounds/scene_continue/voice_countdown7.mp3",
-            voice_countdown8: "assets/sounds/scene_continue/voice_countdown8.mp3",
-            voice_countdown9: "assets/sounds/scene_continue/voice_countdown9.mp3",
-            voice_gameover: "assets/sounds/scene_continue/voice_gameover.mp3",
-            g_continue_yes_voice0: "assets/sounds/scene_continue/g_continue_yes_voice0.mp3",
-            g_continue_yes_voice1: "assets/sounds/scene_continue/g_continue_yes_voice1.mp3",
-            g_continue_yes_voice2: "assets/sounds/scene_continue/g_continue_yes_voice2.mp3",
-            g_continue_no_voice0: "assets/sounds/scene_continue/g_continue_no_voice0.mp3",
-            g_continue_no_voice1: "assets/sounds/scene_continue/g_continue_no_voice1.mp3",
-            voice_congra: "assets/sounds/scene_clear/voice_congra.mp3",
-            title_bg: "assets/img/title_bg.jpg",
-            stage_loop0: "assets/img/stage/stage_loop0.png",
-            stage_loop1: "assets/img/stage/stage_loop1.png",
-            stage_loop2: "assets/img/stage/stage_loop2.png",
-            stage_loop3: "assets/img/stage/stage_loop3.png",
-            stage_loop4: "assets/img/stage/stage_loop4.png",
-            stage_end0: "assets/img/stage/stage_end0.png",
-            stage_end1: "assets/img/stage/stage_end1.png",
-            stage_end2: "assets/img/stage/stage_end2.png",
-            stage_end3: "assets/img/stage/stage_end3.png",
-            stage_end4: "assets/img/stage/stage_end4.png"
-        },
-        SCENE_NAME_LOAD: "LoadScene",
-        SCENE_NAME_TITLE: "TitleScene",
-        SCENE_NAME_HOWTOPLAY: "HowToPlayScene",
-        SCENE_NAME_DEMO: "DemoScene",
-        SCENE_NAME_ADV: "AdvScene",
-        SCENE_NAME_GAME: "GameScene",
-        SCENE_NAME_ENDING: "EndingScene",
-        SCENE_NAME_RESULT: "ResultScene",
-        STAGE_PROLOGUE_ID: 0,
-        STAGE_ENDING_ID: 4,
-        STAGE_SPENDING_ID: 5,
-        GAME_WIDTH: 256,
-        GAME_HEIGHT: 480,
-        GAME_CENTER: 128,
-        GAME_MIDDLE: 240,
-        BASE_ANIMATION_SPEED: .33,
-        STAGE_WIDTH: window.innerWidth,
-        STAGE_HEIGHT: window.innerHeight,
-        STAGE_CENTER: window.innerWidth / 2,
-        STAGE_MIDDLE: window.innerHeight / 2,
-        FPS: 30
+        LANG: LANG,
+        BASE_PATH: BASE_PATH,
+        boss_bison_bgm_info: BGM_INFO.boss_bison_bgm,
+        boss_barlog_bgm_info: BGM_INFO.boss_barlog_bgm,
+        boss_sagat_bgm_info: BGM_INFO.boss_sagat_bgm,
+        boss_vega_bgm_info: BGM_INFO.boss_vega_bgm,
+        boss_goki_bgm_info: BGM_INFO.boss_goki_bgm,
+        boss_fang_bgm_info: BGM_INFO.boss_fang_bgm,
+        RESOURCE: RESOURCE_PATHS,
+        SCENE_NAME_LOAD: SCENE_IDS.LOAD,
+        SCENE_NAME_TITLE: SCENE_IDS.TITLE,
+        SCENE_NAME_HOWTOPLAY: SCENE_IDS.HOWTOPLAY,
+        SCENE_NAME_DEMO: SCENE_IDS.DEMO,
+        SCENE_NAME_ADV: SCENE_IDS.ADV,
+        SCENE_NAME_GAME: SCENE_IDS.GAME,
+        SCENE_NAME_ENDING: SCENE_IDS.ENDING,
+        SCENE_NAME_RESULT: SCENE_IDS.RESULT,
+        STAGE_PROLOGUE_ID: STAGE_IDS.PROLOGUE,
+        STAGE_ENDING_ID: STAGE_IDS.ENDING,
+        STAGE_SPENDING_ID: STAGE_IDS.SPENDING,
+        GAME_WIDTH: GAME_DIMENSIONS.WIDTH,
+        GAME_HEIGHT: GAME_DIMENSIONS.HEIGHT,
+        GAME_CENTER: GAME_DIMENSIONS.CENTER_X,
+        GAME_MIDDLE: GAME_DIMENSIONS.CENTER_Y,
+        BASE_ANIMATION_SPEED: ANIMATION.BASE_SPEED,
+        STAGE_WIDTH: STAGE_DIMENSIONS.WIDTH,
+        STAGE_HEIGHT: STAGE_DIMENSIONS.HEIGHT,
+        STAGE_CENTER: STAGE_DIMENSIONS.CENTER_X,
+        STAGE_MIDDLE: STAGE_DIMENSIONS.CENTER_Y,
+        FPS: FPS
     };
     function n(t) {
         return (n = "function" == typeof Symbol && "symbol" == typeof Symbol.iterator ? function(t) {
@@ -348,17 +226,17 @@
         p(e, null, [{
             key: "CUSTOM_EVENT_DEAD",
             get: function() {
-                return "customEventdead"
+                return CUSTOM_EVENTS.DEAD
             }
         }, {
             key: "CUSTOM_EVENT_DEAD_COMPLETE",
             get: function() {
-                return "customEventdeadComplete"
+                return CUSTOM_EVENTS.DEAD_COMPLETE
             }
         }, {
             key: "CUSTOM_EVENT_PROJECTILE_ADD",
             get: function() {
-                return "customEventprojectileadd"
+                return CUSTOM_EVENTS.PROJECTILE_ADD
             }
         }]),
         p(e, [{
@@ -730,32 +608,32 @@
         P(e, null, [{
             key: "SHOOT_NAME_NORMAL",
             get: function() {
-                return "normal"
+                return PLAYER_STATES.SHOOT_NAME_NORMAL
             }
         }, {
             key: "SHOOT_NAME_BIG",
             get: function() {
-                return "big"
+                return PLAYER_STATES.SHOOT_NAME_BIG
             }
         }, {
             key: "SHOOT_NAME_3WAY",
             get: function() {
-                return "3way"
+                return PLAYER_STATES.SHOOT_NAME_3WAY
             }
         }, {
             key: "SHOOT_SPEED_NORMAL",
             get: function() {
-                return "speed_normal"
+                return PLAYER_STATES.SHOOT_SPEED_NORMAL
             }
         }, {
             key: "SHOOT_SPEED_HIGH",
             get: function() {
-                return "speed_high"
+                return PLAYER_STATES.SHOOT_SPEED_HIGH
             }
         }, {
             key: "BARRIER",
             get: function() {
-                return "barrier"
+                return PLAYER_STATES.BARRIER
             }
         }]),
         P(e, [{
@@ -3818,7 +3696,7 @@
                     throw new TypeError("Cannot call a class as a function")
             }(this, e),
             (o = ze(this, qe(e).call(this, t.anim.idle, t.explosion))).name = t.name,
-            o.unit.name = "boss",
+            o.unit.name = BOSS_STATES.UNIT_NAME,
             o.name = t.name,
             o.interval = t.interval,
             o.score = t.score,
@@ -4854,7 +4732,7 @@
         Io(e, null, [{
             key: "CUSTOM_EVENT_GOKI",
             get: function() {
-                return "customEventGoki"
+                return CUSTOM_EVENTS.GOKI
             }
         }]),
         Io(e, [{
@@ -6273,7 +6151,7 @@
         vi(e, null, [{
             key: "CUSTOM_EVENT_SP_FIRE",
             get: function() {
-                return "customEventCaFire"
+                return CUSTOM_EVENTS.SP_FIRE
             }
         }]),
         vi(e, [{
@@ -6590,12 +6468,12 @@
         ki(e, null, [{
             key: "EVENT_START",
             get: function() {
-                return "evenStart"
+                return CUSTOM_EVENTS.EVENT_START
             }
         }, {
             key: "EVENT_RESTART",
             get: function() {
-                return "evenRestart"
+                return CUSTOM_EVENTS.EVENT_RESTART
             }
         }]),
         ki(e, [{
@@ -7259,7 +7137,7 @@
                                 }, null, this)
                             } else
                                 this.playerDamage(1);
-                        (o.unit.x <= -50 || o.unit.x >= i.GAME_WIDTH + 33 || o.unit.y <= -33 || o.unit.y >= i.GAME_HEIGHT) && "boss" !== o.unit.name && (this.unitContainer.removeChild(o),
+                        (o.unit.x <= -50 || o.unit.x >= i.GAME_WIDTH + 33 || o.unit.y <= -33 || o.unit.y >= i.GAME_HEIGHT) && BOSS_STATES.UNIT_NAME !== o.unit.name && (this.unitContainer.removeChild(o),
                         this.enemyHitTestList.splice(t, 1))
                     }
                     for (var u = 0; u < this.itemHitTestList.length; u++) {
