@@ -220,7 +220,7 @@
 	"playerData": {
 		"name"			: "G",
 		"maxHp"			: 3,
-		"caDamage"		: 50,
+		"spDamage"		: 50,
 		"defaultShootName"  : "normal",
 		"defaultShootSpeed" : "speed_normal",
 		"texture"		: ["player00.gif", "player01.gif", "player02.gif", "player03.gif", "player04.gif", "player05.gif"],
@@ -257,7 +257,7 @@
 		"enemyA": {
 			"name"	: "soliderA",
 			"score"			: 100,
-			"cagage"			: 4,
+			"spgage"			: 4,
 			"hp"				: 1,
 			"speed"			: 0.8,
 			"interval"		: 300,
@@ -266,7 +266,7 @@
 			"shadowOffsetY": 10,
 			"bulletData"		: {
 				"score"			: 100,
-				"cagage"			: 2,
+				"spgage"			: 2,
 				"hp"				: 1,
 				"speed"			: 1,
 				"damage"			: 1,
@@ -278,14 +278,14 @@
 			"score"			: 200,
 			"hp"				: 3,
 			"speed"			: 0.7,
-			"cagage"			: 7,
+			"spgage"			: 7,
 			"interval"		: 60,
 			"texture"		: ["soliderB0.gif", "soliderB1.gif", "soliderB2.gif"],
 			"shadowReverse": true,
 			"shadowOffsetY": 10,
 			"bulletData"		: {
 				"score"			: 100,
-				"cagage"			: 2,
+				"spgage"			: 2,
 				"hp"				: 2,
 				"speed"			: 2,
 				"damage"			: 1,
@@ -295,7 +295,7 @@
 		"enemyC": {
 			"name"	: "soliderC",
 			"score"			: 200,
-			"cagage"			: 5,
+			"spgage"			: 5,
 			"hp"				: 1,
 			"speed"			: 0.8,
 			"interval"		: 170,
@@ -304,7 +304,7 @@
 			"shadowOffsetY": 30,
 			"bulletData"		: {
 				"score"			: 100,
-				"cagage"			: 1,
+				"spgage"			: 1,
 				"hp"				: 1,
 				"speed"			: 1.2,
 				"damage"			: 1,
@@ -314,7 +314,7 @@
 		"enemyD": {
 			"name"	: "tora",
 			"score"			: 200,
-			"cagage"			: 10,
+			"spgage"			: 10,
 			"hp"				: 5,
 			"speed"			: 1.5,
 			"interval"		: -1,
@@ -330,7 +330,7 @@
 		"enemyO": {
 			"name"			: "woodenbox",
 			"score"			: 100,
-			"cagage"			: 1,
+			"spgage"			: 1,
 			"hp"				: 5,
 			"speed"			: 0.7,
 			"interval"		: -1,
@@ -342,7 +342,7 @@
 		"enemyP": {
 			"name"			: "drum",
 			"score"			: 300,
-			"cagage"			: 1,
+			"spgage"			: 1,
 			"hp"				: 18,
 			"speed"			: 0.7,
 			"interval"		: -1,
@@ -354,7 +354,7 @@
 		"enemyQ": {
 			"name"			: "launchpad",
 			"score"			: 300,
-			"cagage"			: 1,
+			"spgage"			: 1,
 			"hp"				: 30,
 			"speed"			: 0.7,
 			"interval"		: 100,
@@ -363,7 +363,7 @@
 			"shadowOffsetY": 10,
 			"bulletData"		: {
 				"score"			: 400,
-				"cagage"			: 1,
+				"spgage"			: 1,
 				"hp"				: 1,
 				"speed"			: 3.8,
 				"damage"			: 1,
@@ -373,7 +373,7 @@
 		"enemyR": {
 			"name"			: "slotA",
 			"score"			: 400,
-			"cagage"			: 1,
+			"spgage"			: 1,
 			"hp"				: 20,
 			"speed"			: 0.7,
 			"interval"		: -1,
@@ -385,7 +385,7 @@
 		"enemyS": {
 			"name"	: "slotB",
 			"score"			: 200,
-			"cagage"			: 2,
+			"spgage"			: 2,
 			"hp"				: 20,
 			"speed"			: 0.7,
 			"interval"		: -1,
@@ -397,7 +397,7 @@
 		"enemyT": {
 			"name"			: "baraA",
 			"score"			: 300,
-			"cagage"			: 5,
+			"spgage"			: 5,
 			"hp"				: 10,
 			"speed"			: 0.7,
 			"interval"		: -1,
@@ -409,7 +409,7 @@
 		"enemyU": {
 			"name"			: "baraB",
 			"score"			: 300,
-			"cagage"			: 5,
+			"spgage"			: 5,
 			"hp"				: 10,
 			"speed"			: 0.7,
 			"interval"		: -1,
@@ -421,7 +421,7 @@
 		"enemyV": {
 			"name"			: "vegasamazou",
 			"score"			: 300,
-			"cagage"			: 0,
+			"spgage"			: 0,
 			"hp"				: "infinity",
 			"speed"			: 0.7,
 			"interval"		: -1,
@@ -440,7 +440,7 @@
 		"boss0": {
 			"name"			: "bison",
 			"score"			: 2200,
-			"cagage"			: 30,
+			"spgage"			: 30,
 			"hp"				: 150,
 			"interval"		: 100,
 			"shadowReverse": true,
@@ -454,7 +454,7 @@
 		"boss1": {
 			"name"			: "barlog",
 			"score"			: 3000,
-			"cagage"			: 30,
+			"spgage"			: 30,
 			"hp"				: 200,
 			"interval"		: 200,
 			"shadowReverse": false,
@@ -467,7 +467,7 @@
 			},
 			"bulletData"		: {
 				"score"			: 150,
-				"cagage"			: 5,
+				"spgage"			: 5,
 				"hp"				: 8,
 				"speed"			: 1.7,
 				"damage"			: 1,
@@ -477,7 +477,7 @@
 		"boss2": {
 			"name"			: "sagat",
 			"score"			: 4500,
-			"cagage"			: 30,
+			"spgage"			: 30,
 			"hp"				: 250,
 			"interval"		: 200,
 			"shadowReverse": true,
@@ -490,7 +490,7 @@
 			},
 			"bulletDataA"		: {
 				"score"			: 200,
-				"cagage"			: 2,
+				"spgage"			: 2,
 				"hp"				: 5,
 				"speed"			: 2.5,
 				"damage"			: 1,
@@ -498,7 +498,7 @@
 			},
 			"bulletDataB"		: {
 				"score"			: 500,
-				"cagage"			: 20,
+				"spgage"			: 20,
 				"hp"				: 18,
 				"speed"			: 1.8,
 				"damage"			: 1,
@@ -508,7 +508,7 @@
 		"boss3": {
 			"name"			: "vega",
 			"score"			: 6000,
-			"cagage"			: 30,
+			"spgage"			: 30,
 			"hp"				: 300,
 			"interval"		: 250,
 			"shadowReverse": true,
@@ -520,7 +520,7 @@
 			},
 			"bulletDataA"		: {
 				"score"			: 100,
-				"cagage"			: 10,
+				"spgage"			: 10,
 				"hp"				: 10,
 				"speed"			: 0.6,
 				"damage"			: 1,
@@ -528,7 +528,7 @@
 			},
 			"bulletDataB"		: {
 				"score"			: 100,
-				"cagage"			: 1,
+				"spgage"			: 1,
 				"hp"				: 2,
 				"speed"			: 1,
 				"damage"			: 1,
@@ -537,7 +537,7 @@
 		},
 		"bossExtra": {
 			"name"			: "goki",
-			"cagage"			: 30,
+			"spgage"			: 30,
 			"score"			: 8000,
 			"hp"				: 350,
 			"interval"		: 200,
@@ -553,7 +553,7 @@
 			},
 			"bulletDataA"		: {
 				"score"			: 100,
-				"cagage"			: 5,
+				"spgage"			: 5,
 				"hp"				: 5,
 				"speed"			: 2.3,
 				"damage"			: 1,
@@ -561,7 +561,7 @@
 			},
 			"bulletDataB"		: {
 				"score"			: 500,
-				"cagage"			: 10,
+				"spgage"			: 10,
 				"hp"				: 20,
 				"speed"			: 1.5,
 				"damage"			: 1,
@@ -570,7 +570,7 @@
 		},
 		"boss4": {
 			"name"			: "fang",
-			"cagage"			: 30,
+			"spgage"			: 30,
 			"score"			: 22222,
 			"hp"				: 500,
 			"interval"		: 120,
@@ -584,7 +584,7 @@
 			},
 			"bulletDataA"		: {
 				"score"			: 222,
-				"cagage"			: 5,
+				"spgage"			: 5,
 				"hp"				: 9,
 				"speed"			: 3,
 				"damage"			: 1,
@@ -592,7 +592,7 @@
 			},
 			"bulletDataB"		: {
 				"score"			: 222,
-				"cagage"			: 10,
+				"spgage"			: 10,
 				"hp"				: 15,
 				"speed"			: 0.5,
 				"damage"			: 1,
@@ -600,7 +600,7 @@
 			},
 			"bulletDataC"		: {
 				"score"			: 222,
-				"cagage"			: 5,
+				"spgage"			: 5,
 				"hp"				: 4,
 				"speed"			: 0.8,
 				"damage"			: 1,

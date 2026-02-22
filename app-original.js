@@ -131,8 +131,8 @@
             se_explosion: "assets/sounds/se_explosion.mp3",
             se_shoot: "assets/sounds/se_shoot.mp3",
             se_shoot_b: "assets/sounds/se_shoot_b.mp3",
-            se_ca: "assets/sounds/se_ca.mp3",
-            se_ca_explosion: "assets/sounds/se_ca_explosion.mp3",
+            se_sp: "assets/sounds/se_sp.mp3",
+            se_sp_explosion: "assets/sounds/se_sp_explosion.mp3",
             se_damage: "assets/sounds/se_damage.mp3",
             se_guard: "assets/sounds/se_guard.mp3",
             se_finish_akebono: "assets/sounds/se_finish_akebono.mp3",
@@ -152,7 +152,7 @@
             g_stage_voice_4: "assets/sounds/scene_game/g_stage_voice_4.mp3",
             g_damage_voice: "assets/sounds/g_damage_voice.mp3",
             g_powerup_voice: "assets/sounds/g_powerup_voice.mp3",
-            g_ca_voice: "assets/sounds/g_ca_voice.mp3",
+            g_sp_voice: "assets/sounds/g_sp_voice.mp3",
             boss_bison_bgm: "assets/sounds/boss_bison_bgm.mp3",
             boss_bison_voice_add: "assets/sounds/boss_bison_voice_add.mp3",
             boss_bison_voice_ko: "assets/sounds/boss_bison_voice_ko.mp3",
@@ -551,7 +551,7 @@
             o.speed = t.speed,
             o.hp = t.hp,
             o.score = t.score,
-            o.cagage = t.cagage,
+            o.spgage = t.spgage,
             o.guardTexture = t.guard,
             o.deadFlg = !1,
             o.shadow.visible = !1,
@@ -1109,7 +1109,7 @@
                 g.play("se_guard")
             }
         }, {
-            key: "caFire",
+            key: "spFire",
             value: function() {}
         }, {
             key: "onDamage",
@@ -1257,12 +1257,12 @@
         player: null,
         playerHp: 0,
         playerMaxHp: 0,
-        caDamage: 0,
+        spDamage: 0,
         combo: 0,
         maxCombo: 0,
         stageId: 0,
         akebonoCnt: 0,
-        cagage: 0,
+        spgage: 0,
         score: 0,
         continueCnt: 0,
         highScore: 0,
@@ -3711,7 +3711,7 @@
             o.score = t.score,
             o.hp = t.hp,
             o.speed = t.speed,
-            o.cagage = t.cagage,
+            o.spgage = t.spgage,
             o.tamaData = t.tamaData,
             o.itemName = t.itemName,
             o.itemTexture = t.itemTexture,
@@ -3897,7 +3897,7 @@
             o.interval = t.interval,
             o.score = t.score,
             o.hp = t.hp,
-            o.cagage = t.cagage,
+            o.spgage = t.spgage,
             o.animList = t.anim,
             o.tamaData = t.tamaData;
             for (var i = [], n = 0; n < 3; n++)
@@ -3959,7 +3959,7 @@
                     delay: .2,
                     tint: 16777215
                 }),
-                this.hp <= D.caDamage && (this.dengerousFlg || (this.unit.addChild(this.dengerousBalloon),
+                this.hp <= D.spDamage && (this.dengerousFlg || (this.unit.addChild(this.dengerousBalloon),
                 this.dengerousBalloon.play(),
                 TweenMax.to(this.dengerousBalloon.scale, 1, {
                     x: 1,
@@ -6094,14 +6094,14 @@
             t.hudCabtnBg0.x = -18,
             t.hudCabtnBg0.y = -18,
             t.hudCabtnBg0.alpha = 0,
-            t.caGageBarBg = new PIXI.Sprite(PIXI.Texture.fromFrame("hudCabtn100per.gif")),
-            t.caGageBarMask = new PIXI.Graphics,
-            t.caGageBarMask.drawRect(0, 0, 50, -50),
-            t.caGageBarMask.x = 8,
-            t.caGageBarMask.y = 58,
-            t.caGageBarMask.scale.y = 0,
-            t.caGageBar = new PIXI.Sprite(PIXI.Texture.fromFrame("hudCabtn0per.gif")),
-            t.caGageBar.mask = t.caGageBarMask,
+            t.spGageBarBg = new PIXI.Sprite(PIXI.Texture.fromFrame("hudCabtn100per.gif")),
+            t.spGageBarMask = new PIXI.Graphics,
+            t.spGageBarMask.drawRect(0, 0, 50, -50),
+            t.spGageBarMask.x = 8,
+            t.spGageBarMask.y = 58,
+            t.spGageBarMask.scale.y = 0,
+            t.spGageBar = new PIXI.Sprite(PIXI.Texture.fromFrame("hudCabtn0per.gif")),
+            t.spGageBar.mask = t.spGageBarMask,
             t.overCircle = new PIXI.Graphics,
             t.overCircle.beginFill(16777215),
             t.overCircle.drawCircle(33, 33, 28),
@@ -6120,7 +6120,7 @@
                 alpha: 0
             }),
             t.timeline.pause(),
-            t.hitArea = new PIXI.Rectangle(5,5,t.caGageBarBg.width - 10,t.caGageBarBg.height - 12),
+            t.hitArea = new PIXI.Rectangle(5,5,t.spGageBarBg.width - 10,t.spGageBarBg.height - 12),
             t
         }
         var o, i, n;
@@ -6177,7 +6177,7 @@
         }, {
             key: "setPercent",
             value: function(t) {
-                this.caGageBarMask.scale.y = t,
+                this.spGageBarMask.scale.y = t,
                 t >= 1 && (this.okFlg || this.onPrepearOk(),
                 this.okFlg = !0)
             }
@@ -6195,7 +6195,7 @@
                 this.isClear || this.onActive()
             }
         }, {
-            key: "caFire",
+            key: "spFire",
             value: function() {
                 this.onDeactive.bind(this)(),
                 this.okFlg = !1,
@@ -6225,9 +6225,9 @@
                 ui(ci(e.prototype), "castAdded", this).call(this),
                 this.addChild(this.hudCabtnBg1),
                 this.addChild(this.hudCabtnBg0),
-                this.addChild(this.caGageBarBg),
-                this.addChild(this.caGageBarMask),
-                this.addChild(this.caGageBar),
+                this.addChild(this.spGageBarBg),
+                this.addChild(this.spGageBarMask),
+                this.addChild(this.spGageBar),
                 this.addChild(this.overCircle)
             }
         }, {
@@ -6236,9 +6236,9 @@
                 ui(ci(e.prototype), "castRemoved", this).call(this),
                 this.removeChild(this.hudCabtnBg1),
                 this.removeChild(this.hudCabtnBg0),
-                this.removeChild(this.caGageBarBg),
-                this.removeChild(this.caGageBarMask),
-                this.removeChild(this.caGageBar),
+                this.removeChild(this.spGageBarBg),
+                this.removeChild(this.spGageBarMask),
+                this.removeChild(this.spGageBar),
                 this.removeChild(this.overCircle)
             }
         }]) && li(o.prototype, i),
@@ -6302,9 +6302,9 @@
             t.hpBar.x = 49,
             t.hpBar.y = 7,
             t.hpBar.scale.x = .5,
-            t.cagaBtn = new pi,
-            t.cagaBtn.x = i.GAME_WIDTH - 70,
-            t.cagaBtn.y = i.GAME_MIDDLE + 15,
+            t.spgaBtn = new pi,
+            t.spgaBtn.x = i.GAME_WIDTH - 70,
+            t.spgaBtn.y = i.GAME_MIDDLE + 15,
             t.scoreTitleTxt = new PIXI.Sprite(PIXI.Texture.fromFrame("smallScoreTxt.gif")),
             t.scoreTitleTxt.x = 30,
             t.scoreTitleTxt.y = 25,
@@ -6326,9 +6326,9 @@
             t._highScore = 0,
             t._comboCount = 0,
             t._maxComb = 0,
-            t._cagageCount = 0,
-            t.cagageFlg = !1,
-            t.caFireFlg = !1,
+            t._spgageCount = 0,
+            t.spgageFlg = !1,
+            t.spFireFlg = !1,
             t.scoreViewWrap = new PIXI.Container,
             t
         }
@@ -6345,7 +6345,7 @@
             e && _i(t, e)
         }(e, l),
         vi(e, null, [{
-            key: "CUSTOM_EVENT_CA_FIRE",
+            key: "CUSTOM_EVENT_SP_FIRE",
             get: function() {
                 return "customEventCaFire"
             }
@@ -6355,7 +6355,7 @@
             value: function(t) {
                 switch (t.keyCode) {
                 case 32:
-                    this.cagageFlg && this.caFire.bind(this)()
+                    this.spgageFlg && this.spFire.bind(this)()
                 }
                 t.preventDefault()
             }
@@ -6384,7 +6384,7 @@
                 this.comboBar.scale.x = this.comboTimeCnt / 100
             }
         }, {
-            key: "caPrepareOk",
+            key: "spPrepareOk",
             value: function() {
                 var t = new TimelineMax;
                 t.to(this.hpBar, .1, {
@@ -6395,16 +6395,16 @@
                     tint: 16777215,
                     ease: Linear.easeNone
                 }),
-                this.cagageFlg = !0
+                this.spgageFlg = !0
             }
         }, {
-            key: "caFire",
+            key: "spFire",
             value: function() {
-                this.cagageFlg && (g.play("se_ca"),
-                this.cagageCount = 0,
-                this.cagageFlg = !1,
-                this.cagaBtn.caFire(),
-                this.emit(e.CUSTOM_EVENT_CA_FIRE))
+                this.spgageFlg && (g.play("se_sp"),
+                this.spgageCount = 0,
+                this.spgageFlg = !1,
+                this.spgaBtn.spFire(),
+                this.emit(e.CUSTOM_EVENT_SP_FIRE))
             }
         }, {
             key: "onDamage",
@@ -6442,18 +6442,18 @@
                 })
             }
         }, {
-            key: "caBtnActive",
+            key: "spBtnActive",
             value: function() {
-                this.cagaBtn.onActive(),
-                this.cagaBtn.on("pointerup", this.caFire.bind(this)),
+                this.spgaBtn.onActive(),
+                this.spgaBtn.on("pointerup", this.spFire.bind(this)),
                 document.addEventListener("keyup", this.onKeyUpListener)
             }
         }, {
-            key: "caBtnDeactive",
+            key: "spBtnDeactive",
             value: function() {
-                arguments.length > 0 && void 0 !== arguments[0] && arguments[0] && (this.cagaBtn.isClear = !0),
-                this.cagaBtn.onDeactive(),
-                this.cagaBtn.off("pointerup", this.caFire.bind(this)),
+                arguments.length > 0 && void 0 !== arguments[0] && arguments[0] && (this.spgaBtn.isClear = !0),
+                this.spgaBtn.onDeactive(),
+                this.spgaBtn.off("pointerup", this.spFire.bind(this)),
                 document.removeEventListener("keyup", this.onKeyUpListener)
             }
         }, {
@@ -6464,13 +6464,13 @@
         }, {
             key: "castAdded",
             value: function(t) {
-                this.cagageFlg = !1,
-                this.caFireFlg = !1,
+                this.spgageFlg = !1,
+                this.spFireFlg = !1,
                 this.comboTimeCnt = 0,
                 this.addChild(this.hudBg),
                 this.addChild(this.hudDamageBg),
                 this.addChild(this.hpBar),
-                this.addChild(this.cagaBtn),
+                this.addChild(this.spgaBtn),
                 this.addChild(this.scoreTitleTxt),
                 this.addChild(this.scoreNumTxt),
                 this.addChild(this.comboBar),
@@ -6484,7 +6484,7 @@
                 this.removeChild(this.hudBg),
                 this.removeChild(this.hudDamageBg),
                 this.removeChild(this.hpBar),
-                this.removeChild(this.cagaBtn),
+                this.removeChild(this.spgaBtn),
                 this.removeChild(this.scoreTitleTxt),
                 this.removeChild(this.scoreNumTxt),
                 this.removeChild(this.comboBar),
@@ -6493,16 +6493,16 @@
                 this.onKeyUpListener = null
             }
         }, {
-            key: "cagageCount",
+            key: "spgageCount",
             get: function() {
-                return this._cagageCount
+                return this._spgageCount
             },
             set: function(t) {
-                this.caFireFlg || (0 == t ? this._cagageCount = t : this._cagageCount += t,
-                this._cagageCount >= 100 && (this._cagageCount = 100,
-                this.cagageFlg || (this.caPrepareOk(),
-                this.cagageFlg)),
-                this.cagaBtn.setPercent(this._cagageCount / 100))
+                this.spFireFlg || (0 == t ? this._spgageCount = t : this._spgageCount += t,
+                this._spgageCount >= 100 && (this._spgageCount = 100,
+                this.spgageFlg || (this.spPrepareOk(),
+                this.spgageFlg)),
+                this.spgaBtn.setPercent(this._spgageCount / 100))
             }
         }, {
             key: "scoreCount",
@@ -7175,10 +7175,10 @@
                 var r = PIXI.Texture.fromFrame("explosion0" + s + ".gif");
                 o.explosionTextures[s] = r
             }
-            o.caExplosionTextures = [];
+            o.spExplosionTextures = [];
             for (var h = 0; h < 8; h++) {
-                var l = PIXI.Texture.fromFrame("caExplosion0" + h + ".gif");
-                o.caExplosionTextures[h] = l
+                var l = PIXI.Texture.fromFrame("spExplosion0" + h + ".gif");
+                o.spExplosionTextures[h] = l
             }
             o.itemTextureList = {},
             o.itemTextureList.powerupBig = [PIXI.Texture.fromFrame("powerupBig0.gif"), PIXI.Texture.fromFrame("powerupBig1.gif")],
@@ -7207,7 +7207,7 @@
             o.addChildAt(o.bulletContainer, 2),
             // Set up HUD
             o.hud = new wi,
-            o.hud.on(wi.CUSTOM_EVENT_CA_FIRE, o.caFire.bind(Yi(Yi(o)))),
+            o.hud.on(wi.CUSTOM_EVENT_SP_FIRE, o.spFire.bind(Yi(Yi(o)))),
             o.addChildAt(o.hud, 3),
             // Set up title screen
             o.title = new Oi,
@@ -7216,11 +7216,11 @@
             // Set up cutin container
             o.cutinCont = new Hi,
             // Set up ca line
-            o.caLine = new PIXI.Graphics,
-            o.caLine.beginFill(16711680),
-            o.caLine.drawRect(0, 0, 3, 3),
-            o.caLine.pivot.y = 3,
-            o.caLine.endFill(),
+            o.spLine = new PIXI.Graphics,
+            o.spLine.beginFill(16711680),
+            o.spLine.drawRect(0, 0, 3, 3),
+            o.spLine.pivot.y = 3,
+            o.spLine.endFill(),
             // Set up cover
             o.cover = new PIXI.extras.TilingSprite(PIXI.Texture.fromFrame("stagebgOver.gif"),i.STAGE_WIDTH,i.STAGE_HEIGHT),
             o.addChildAt(o.cover, 4),
@@ -7292,12 +7292,12 @@
                             o.dead());
                         else if (B.Manager.interact.hitTestRectangle(o.unit, this.player.unit))
                             if ("goki" == o.name) {
-                                this.hud.caBtnDeactive(),
+                                this.hud.spBtnDeactive(),
                                 this.theWorldFlg = !0,
                                 this.boss && this.boss.onTheWorld(this.theWorldFlg),
                                 this.boss.shungokusatsu(this.player.unit, !0),
                                 this.player.alpha = 0,
-                                this.hud.cagaBtn.alpha = 0;
+                                this.hud.spgaBtn.alpha = 0;
                                 for (var h = 0; h < this.player.bulletList.length; h++) {
                                     var l = this.player.bulletList[h];
                                     this.player.removeChild(l)
@@ -7511,7 +7511,7 @@
             value: function(t) {
                 if (this.hud.comboCount = 1,
                 this.hud.scoreCount = t.score,
-                this.hud.cagageCount = t.cagage,
+                this.hud.spgageCount = t.spgage,
                 this.hud.scoreView(t),
                 t.itemName) {
                     var e = new Xe(t.itemTexture);
@@ -7542,7 +7542,7 @@
                     var t = new Eo(o);
                     t.on(Eo.CUSTOM_EVENT_GOKI, function e() {
                         this.theWorldFlg = !0,
-                        this.hud.caBtnDeactive();
+                        this.hud.spBtnDeactive();
                         for (var o = 0; o < this.player.bulletList.length; o++) {
                             var n = this.player.bulletList[o];
                             this.player.bulletRemove(n),
@@ -7555,7 +7555,7 @@
                         }),
                         a.addCallback(function() {
                             this.boss.shungokusatsu(t.unit),
-                            this.hud.cagaBtn.alpha = 0,
+                            this.hud.spgaBtn.alpha = 0,
                             this.player.alpha = 0;
                             for (var e = 0; e < this.player.bulletList.length; e++) {
                                 var o = this.player.bulletList[e];
@@ -7563,7 +7563,7 @@
                             }
                         }, "+=1.5", null, this),
                         a.addCallback(function() {
-                            this.hud.cagaBtn.alpha = 1,
+                            this.hud.spgaBtn.alpha = 1,
                             this.player.alpha = 1,
                             t.off(Eo.CUSTOM_EVENT_GOKI, e.bind(this)),
                             t.hp = 0,
@@ -7584,7 +7584,7 @@
                             this.unitContainer.removeChild(t),
                             this.enemyHitTestList.push(this.boss),
                             this.theWorldFlg = !1,
-                            this.hud.caBtnActive(),
+                            this.hud.spBtnActive(),
                             this.boss.shootStart()
                         }, "+=1", null, this)
                     }
@@ -7655,9 +7655,9 @@
                 this.theWorldFlg = !0,
                 this.hud.comboCount = 1,
                 this.hud.scoreCount = t.score,
-                this.hud.cagageCount = t.cagage,
+                this.hud.spgageCount = t.spgage,
                 this.hud.scoreView(t),
-                this.hud.caBtnDeactive();
+                this.hud.spBtnDeactive();
                 for (var e = 0; e < this.player.bulletList.length; e++) {
                     var o = this.player.bulletList[e];
                     this.player.removeChild(o)
@@ -7667,7 +7667,7 @@
                 TweenMax.delayedCall(2.5, function() {
                     this.stageClear()
                 }, null, this),
-                this.hud.caFireFlg ? (this.stageBg.akebonofinish(),
+                this.hud.spFireFlg ? (this.stageBg.akebonofinish(),
                 this.title.akebonofinish(),
                 D.akebonoCnt++) : this.title.stageClear()
             }
@@ -7702,16 +7702,16 @@
                 this.hud.comboCount = 0
             }
         }, {
-            key: "caFire",
+            key: "spFire",
             value: function() {
                 this.theWorldFlg = !0,
-                this.hud.caFireFlg = !0,
+                this.hud.spFireFlg = !0,
                 this.boss && this.boss.onTheWorld(this.theWorldFlg),
                 this.addChild(this.cutinCont),
                 this.cutinCont.start(),
-                this.caLine.x = this.player.unit.x + 12,
-                this.caLine.y = this.player.unit.y + 5,
-                this.unitContainer.addChild(this.caLine);
+                this.spLine.x = this.player.unit.x + 12,
+                this.spLine.y = this.player.unit.y + 5,
+                this.unitContainer.addChild(this.spLine);
                 for (var t = 0; t < this.player.bulletList.length; t++) {
                     var e = this.player.bulletList[t];
                     this.player.bulletRemove(e),
@@ -7719,22 +7719,22 @@
                 }
                 var o = new TimelineMax;
                 o.call(function() {
-                    g.play("g_ca_voice")
+                    g.play("g_sp_voice")
                 }, null, this, "+=0.2"),
                 o.call(function() {
                     this.removeChild(this.cutinCont)
                 }, null, this, "+=1.7"),
-                o.to(this.caLine, .3, {
+                o.to(this.spLine, .3, {
                     height: i.GAME_HEIGHT
                 }),
-                o.to(this.caLine, .3, {
+                o.to(this.spLine, .3, {
                     y: 0,
                     height: 0
                 }).call(function() {
                     for (var t = this, e = 0, o = 0, n = function(n) {
                         n % 8 == 0 && (e = o % 2 == 0 ? -30 : -45,
                         o++);
-                        var a = new PIXI.extras.AnimatedSprite(t.caExplosionTextures);
+                        var a = new PIXI.extras.AnimatedSprite(t.spExplosionTextures);
                         a.animationSpeed = .2,
                         a.loop = !1,
                         a.x = e,
@@ -7748,7 +7748,7 @@
                         TweenMax.delayedCall(.01 * n, function() {
                             this.unitContainer.addChild(a),
                             a.play(),
-                            n % 16 == 0 && g.play("se_ca_explosion")
+                            n % 16 == 0 && g.play("se_sp_explosion")
                         }, null, t)
                     }, a = 0; a < 64; a++)
                         n(a)
@@ -7758,20 +7758,20 @@
                     if (e.length >= 100)
                         for (var o = 0; o < e.length; o++) {
                             var n = e[o];
-                            n.unit.x >= -n.unit.width / 2 && n.unit.x <= i.GAME_WIDTH && n.unit.y >= 20 && n.unit.y <= i.GAME_HEIGHT && n.onDamage(D.caDamage)
+                            n.unit.x >= -n.unit.width / 2 && n.unit.x <= i.GAME_WIDTH && n.unit.y >= 20 && n.unit.y <= i.GAME_HEIGHT && n.onDamage(D.spDamage)
                         }
                     else
                         for (var a = function(o) {
                             var n = e[o];
                             n.unit.x >= -n.unit.width / 2 && n.unit.x <= i.GAME_WIDTH && n.unit.y >= 20 && n.unit.y <= i.GAME_HEIGHT && TweenMax.delayedCall(.005 * o, function() {
-                                n.onDamage(D.caDamage)
+                                n.onDamage(D.spDamage)
                             }, null, t)
                         }, s = 0; s < e.length; s++)
                             a(s)
                 }, null, this, "+=0.8").call(function() {
-                    this.unitContainer.removeChild(this.caLine),
+                    this.unitContainer.removeChild(this.spLine),
                     this.theWorldFlg = !1,
-                    this.hud.caFireFlg = !1,
+                    this.hud.spFireFlg = !1,
                     this.boss && (this.boss.hp <= 0 ? this.theWorldFlg = !0 : this.boss.onTheWorld(this.theWorldFlg))
                 }, null, this, "+=0.7")
             }
@@ -7789,10 +7789,10 @@
                 }, null, this) : g.bgmPlay(this.stageBgmName, e, o),
                 this.title.gameStart(D.stageId),
                 this.stageBg.init(D.stageId),
-                this.hud.caBtnDeactive(),
+                this.hud.spBtnDeactive(),
                 TweenMax.delayedCall(2.6, function() {
                     g.play(["g_stage_voice_" + String(D.stageId)]),
-                    this.hud.caBtnActive()
+                    this.hud.spBtnActive()
                 }
                 .bind(this));
                 var n = B.resource.recipe.data["stage" + D.stageId].enemylist.slice();
@@ -7811,7 +7811,7 @@
                 this.hud.highScore = D.highScore,
                 this.hud.comboCount = D.combo,
                 this.hud.maxCombo = D.maxCombo,
-                this.hud.cagageCount = D.cagage,
+                this.hud.spgageCount = D.spgage,
                 this.hud.comboTimeCnt = 0,
                 D.combo = 0,
                 this.enemyWaveFlg = !1,
@@ -7829,9 +7829,9 @@
                 F.dlog("GameScene.stageClear()"),
                 this.theWorldFlg = !0,
                 D.playerHp = this.player.hp,
-                D.cagage = this.hud.cagageCount,
+                D.spgage = this.hud.spgageCount,
                 D.score = this.hud.scoreCount,
-                this.hud.caBtnDeactive(!0),
+                this.hud.spBtnDeactive(!0),
                 D.stageId++,
                 this.sceneSwitch = 1,
                 this.player.shootStop(),
@@ -7846,7 +7846,7 @@
                 F.dlog("GameScene.gameOver()"),
                 this.theWorldFlg = !0,
                 D.score = this.hud.scoreCount,
-                this.hud.caBtnDeactive(),
+                this.hud.spBtnDeactive(),
                 this.boss && this.boss.onTheWorld(!0)
             }
         }, {
@@ -7865,7 +7865,7 @@
                 this.title.timeover(),
                 this.theWorldFlg = !0,
                 D.score = this.hud.scoreCount,
-                this.hud.caBtnDeactive(),
+                this.hud.spBtnDeactive(),
                 this.boss && this.boss.onTheWorld(!0),
                 TweenMax.delayedCall(2.5, function() {
                     this.removeChild(this.player),
@@ -8066,7 +8066,7 @@
                     blur: 0
                 }, "-=0.8"),
                 a.addCallback(function() {
-                    g.play("se_ca"),
+                    g.play("se_sp"),
                     this.congraTxt.x = i.GAME_CENTER,
                     this.congraTxt.y = i.GAME_MIDDLE - 60,
                     this.congraTxtEffect.x = this.congraTxt.x,
@@ -8550,7 +8550,7 @@
             value: function() {
                 F.dlog("TitleScene.sceneRemoved() Start."),
                 fn(dn(e.prototype), "sceneRemoved", this).call(this),
-                D.caDamage = B.resource.recipe.data.playerData.caDamage,
+                D.spDamage = B.resource.recipe.data.playerData.spDamage,
                 D.playerMaxHp = B.resource.recipe.data.playerData.maxHp,
                 D.playerHp = D.playerMaxHp,
                 D.shootMode = B.resource.recipe.data.playerData.defaultShootName,
@@ -8558,7 +8558,7 @@
                 D.combo = 0,
                 D.maxCombo = 0,
                 D.score = 0,
-                D.cagage = 0,
+                D.spgage = 0,
                 D.stageId = 0,
                 D.continueCnt = 0,
                 D.akebonoCnt = 0,
@@ -9033,8 +9033,8 @@
                         g.se_explosion.volume = .35,
                         g.se_shoot.volume = .3,
                         g.se_shoot_b.volume = .3,
-                        g.se_ca.volume = .8,
-                        g.se_ca_explosion.volume = .9,
+                        g.se_sp.volume = .8,
+                        g.se_sp_explosion.volume = .9,
                         g.se_damage.volume = .15,
                         g.se_guard.volume = .2,
                         g.se_finish_akebono.volume = .9,
@@ -9054,7 +9054,7 @@
                         g.g_stage_voice_4.volume = .55,
                         g.g_damage_voice.volume = .7,
                         g.g_powerup_voice.volume = .55,
-                        g.g_ca_voice.volume = .7,
+                        g.g_sp_voice.volume = .7,
                         g.boss_bison_bgm.volume = .4,
                         g.boss_bison_voice_add.volume = .65,
                         g.boss_bison_voice_ko.volume = .9,
