@@ -3570,7 +3570,7 @@ import { PLAYER_STATES, BOSS_STATES } from "./enums/player-boss-states.js";
                 this.unit.y += this.speed,
                 this.name) {
                 case "soliderA":
-                    this.unit.y >= i.GAME_HEIGHT / 1.5 && (this.unit.x += .005 * (D.player.unit.x - this.unit.x));
+                    this.unit.y >= i.GAME_HEIGHT / 1.5 && (D.player && D.player.unit || "undefined" != typeof globalThis && globalThis.__GAME_STATE__ && globalThis.__GAME_STATE__.player && globalThis.__GAME_STATE__.player.unit) && (this.unit.x += .005 * ((D.player && D.player.unit ? D.player.unit : globalThis.__GAME_STATE__.player.unit).x - this.unit.x));
                     break;
                 case "soliderB":
                     this.unit.y <= 10 && (this.unit.x >= i.GAME_WIDTH / 2 ? (this.unit.x = i.GAME_WIDTH,
@@ -4232,7 +4232,10 @@ import { PLAYER_STATES, BOSS_STATES } from "./enums/player-boss-states.js";
         }, {
             key: "shootStart",
             value: function() {
-                var t = D.player.unit
+                var t = D.player && D.player.unit ? D.player.unit : "undefined" != typeof globalThis && globalThis.__GAME_STATE__ && globalThis.__GAME_STATE__.player && globalThis.__GAME_STATE__.player.unit ? globalThis.__GAME_STATE__.player.unit : {
+                    x: i.GAME_CENTER,
+                    width: 0
+                }
                   , e = this.unit.width - this.unit.hitArea.width
                   , o = t.x + t.width / 2 - this.unit.width / 2;
                 o - e / 2 <= -e / 2 && (o = -e / 2),
@@ -4472,7 +4475,10 @@ import { PLAYER_STATES, BOSS_STATES } from "./enums/player-boss-states.js";
             key: "shootStart",
             value: function() {
                 this.tlShoot && this.tlShoot.kill();
-                var t = D.player.unit
+                var t = D.player && D.player.unit ? D.player.unit : "undefined" != typeof globalThis && globalThis.__GAME_STATE__ && globalThis.__GAME_STATE__.player && globalThis.__GAME_STATE__.player.unit ? globalThis.__GAME_STATE__.player.unit : {
+                    x: i.GAME_CENTER,
+                    width: 0
+                }
                   , e = this.unit.width - this.unit.hitArea.width
                   , o = t.x + t.width / 2 - this.unit.width / 2;
                 o - e / 2 <= -e / 2 && (o = -e / 2),
@@ -4760,7 +4766,10 @@ import { PLAYER_STATES, BOSS_STATES } from "./enums/player-boss-states.js";
             key: "shootStart",
             value: function() {
                 this.tlShoot && this.tlShoot.kill();
-                var t = D.player.unit
+                var t = D.player && D.player.unit ? D.player.unit : "undefined" != typeof globalThis && globalThis.__GAME_STATE__ && globalThis.__GAME_STATE__.player && globalThis.__GAME_STATE__.player.unit ? globalThis.__GAME_STATE__.player.unit : {
+                    x: i.GAME_CENTER,
+                    width: 0
+                }
                   , e = this.unit.width - this.unit.hitArea.width
                   , o = t.x + t.width / 2 - this.unit.width / 2;
                 o - e / 2 <= -e / 2 && (o = -e / 2),
@@ -5108,7 +5117,10 @@ import { PLAYER_STATES, BOSS_STATES } from "./enums/player-boss-states.js";
             key: "shootStart",
             value: function() {
                 this.tlShoot && this.tlShoot.kill();
-                var t = D.player.unit
+                var t = D.player && D.player.unit ? D.player.unit : "undefined" != typeof globalThis && globalThis.__GAME_STATE__ && globalThis.__GAME_STATE__.player && globalThis.__GAME_STATE__.player.unit ? globalThis.__GAME_STATE__.player.unit : {
+                    x: i.GAME_CENTER,
+                    width: 0
+                }
                   , e = this.unit.width - this.unit.hitArea.width
                   , o = t.x + t.width / 2 - this.unit.width / 2;
                 o - e / 2 <= -e / 2 && (o = -e / 2),
