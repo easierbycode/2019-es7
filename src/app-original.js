@@ -265,28 +265,36 @@ import { PLAYER_STATES, BOSS_STATES } from "./enums/player-boss-states.js";
     }()
       , g = {
         play: function(t) {
-            D.lowModeFlg || B.resource[t].sound.play()
+            if (!D.lowModeFlg) {
+                var e = B && B.resource && "object" == typeof B.resource ? B.resource : "undefined" != typeof globalThis && globalThis.__GAME_RESOURCES__ && "object" == typeof globalThis.__GAME_RESOURCES__ ? globalThis.__GAME_RESOURCES__ : null;
+                e && e[t] && e[t].sound && "function" == typeof e[t].sound.play && e[t].sound.play()
+            }
         },
         bgmPlay: function(t, e, o) {
             if (!D.lowModeFlg) {
-                var i, n = B.resource[t].sound, a = !1;
+                var i, n = (B && B.resource && "object" == typeof B.resource ? B.resource : "undefined" != typeof globalThis && globalThis.__GAME_RESOURCES__ && "object" == typeof globalThis.__GAME_RESOURCES__ ? globalThis.__GAME_RESOURCES__ : null), a = n && n[t] && n[t].sound ? n[t].sound : null, r = !1;
+                if (!a || "function" != typeof a.play)
+                    return;
                 !function t() {
-                    a ? ((i = n.play({
+                    r ? ((i = a.play({
                         start: e / 48e3,
                         end: o / 48e3
                     })).on("progress", s),
-                    i.on("end", t.bind(this))) : ((i = n.play({
+                    i.on("end", t.bind(this))) : ((i = a.play({
                         start: 0,
                         end: o / 48e3
                     })).on("end", t.bind(this)),
                     i.on("progress", s),
-                    a = !0)
+                    r = !0)
                 }()
             }
             function s(t) {}
         },
         stop: function(t) {
-            D.lowModeFlg || B.resource[t].sound.stop()
+            if (!D.lowModeFlg) {
+                var e = B && B.resource && "object" == typeof B.resource ? B.resource : "undefined" != typeof globalThis && globalThis.__GAME_RESOURCES__ && "object" == typeof globalThis.__GAME_RESOURCES__ ? globalThis.__GAME_RESOURCES__ : null;
+                e && e[t] && e[t].sound && "function" == typeof e[t].sound.stop && e[t].sound.stop()
+            }
         }
     };
     function b(t) {
