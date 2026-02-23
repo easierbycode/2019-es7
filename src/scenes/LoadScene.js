@@ -213,6 +213,19 @@ export class LoadScene extends BaseScene {
     }
 
     loadStart(lowModeFlg) {
+        if (typeof document !== "undefined") {
+            const element = document.documentElement;
+            const requestMethod = element.requestFullscreen ||
+                element.webkitRequestFullscreen ||
+                element.msRequestFullscreen;
+
+            if (requestMethod) {
+                requestMethod.call(element).catch((error) => {
+                    log("Fullscreen request failed: " + error.message);
+                });
+            }
+        }
+
         this.lowModeFlg = lowModeFlg;
         this.state.lowModeFlg = lowModeFlg;
 
