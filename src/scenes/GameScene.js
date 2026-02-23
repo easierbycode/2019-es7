@@ -30,7 +30,7 @@ import { CutinContainer } from "../ui/CutinContainer.js";
 import { BigNumberDisplay } from "../ui/BigNumberDisplay.js";
 
 const AnimatedSpriteClass = PIXI.AnimatedSprite || (PIXI.extras && PIXI.extras.AnimatedSprite);
-const TilingSpriteClass = PIXI.TilingSprite || (PIXI.extras && PIXI.extras.TilingSprite);
+const TilingSpriteClass = (PIXI.extras && PIXI.extras.TilingSprite) || PIXI.TilingSprite;
 
 function createAnimatedSprite(frames) {
     if (!AnimatedSpriteClass) {

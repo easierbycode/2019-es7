@@ -2,7 +2,7 @@ import { BaseCast } from "../game-objects/BaseCast.js";
 import { GAME_DIMENSIONS } from "../constants.js";
 
 const AnimatedSpriteClass = PIXI.AnimatedSprite || (PIXI.extras && PIXI.extras.AnimatedSprite);
-const TilingSpriteClass = PIXI.TilingSprite || (PIXI.extras && PIXI.extras.TilingSprite);
+const TilingSpriteClass = (PIXI.extras && PIXI.extras.TilingSprite) || PIXI.TilingSprite;
 
 function createTilingSprite(texture, width, height) {
     if (!TilingSpriteClass) {
