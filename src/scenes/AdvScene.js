@@ -4,6 +4,7 @@ import { EndingScene } from "./EndingScene.js";
 import { GAME_DIMENSIONS, LANG, SCENE_NAMES, STAGE_DIMENSIONS } from "../constants.js";
 import { gameState } from "../gameState.js";
 import { bgmPlay, play, stop } from "../soundManager.js";
+import { AdvNextButton } from "../ui/AdvNextButton.js";
 
 const ADV_SCENARIO_JA = {
     stage0: {
@@ -154,93 +155,6 @@ const ADV_SCENARIO_EN = {
         ],
     },
 };
-
-class AdvNextButton extends PIXI.Container {
-    constructor() {
-        super();
-
-        this.hitGra = new PIXI.Graphics();
-        this.hitGra.beginFill(0xff0000, 0);
-        this.hitGra.drawRect(0, 0, GAME_DIMENSIONS.WIDTH, GAME_DIMENSIONS.HEIGHT);
-        this.hitGra.endFill();
-        this.addChild(this.hitGra);
-
-        this.flashCover = new PIXI.Graphics();
-        this.flashCover.beginFill(0xffffff, 1);
-        this.flashCover.drawRect(0, 0, this.hitGra.width, this.hitGra.height);
-        this.flashCover.alpha = 0;
-        this.addChild(this.flashCover);
-
-        const style = new PIXI.TextStyle({
-            fontSize: 16,
-            fontFamily: "sans-serif",
-            fontWeight: "bold",
-            lineHeight: 18,
-            fill: 0xffffff,
-        });
-
-        this.actionText = new PIXI.Text("", style);
-        this.actionText.x = GAME_DIMENSIONS.WIDTH - this.actionText.width;
-        this.actionText.y = GAME_DIMENSIONS.HEIGHT - this.actionText.height - 20;
-        this.addChild(this.actionText);
-
-        this.interactive = true;
-        this.buttonMode = true;
-
-        this.on("added", this.handleAdded, this);
-        this.on("removed", this.handleRemoved, this);
-    }
-
-    nextPart() {
-        this.actionText.text = "Next▼";
-        this.actionText.x = GAME_DIMENSIONS.WIDTH - this.actionText.width - 10;
-    }
-
-    nextScene() {
-        this.actionText.text = "LET'S GO! >";
-        this.actionText.x = GAME_DIMENSIONS.WIDTH - this.actionText.width - 10;
-    }
-
-    onOver() {}
-
-    onOut() {}
-
-    onDown() {}
-
-    onUp() {}
-
-    handleAdded() {
-        this.tl = new TimelineMax({
-            repeat: -1,
-            yoyo: true,
-        });
-        this.tl.to(this.actionText, 0.4, {
-            delay: 0.2,
-            alpha: 0,
-        }).to(this.actionText, 0.8, {
-            alpha: 1,
-        });
-
-        this.on("pointerover", this.onOver, this);
-        this.on("pointerout", this.onOut, this);
-        this.on("pointerdown", this.onDown, this);
-        this.on("pointerupoutside", this.onOut, this);
-        this.on("pointerup", this.onUp, this);
-    }
-
-    handleRemoved() {
-        if (this.tl) {
-            this.tl.kill();
-            this.tl = null;
-        }
-
-        this.off("pointerover", this.onOver, this);
-        this.off("pointerout", this.onOut, this);
-        this.off("pointerdown", this.onDown, this);
-        this.off("pointerupoutside", this.onOut, this);
-        this.off("pointerup", this.onUp, this);
-    }
-}
 
 export class AdvScene extends BaseScene {
     constructor() {

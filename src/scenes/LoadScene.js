@@ -10,6 +10,8 @@ import {
 import { gameState } from "../gameState.js";
 import { globals } from "../globals.js";
 import { pauseAll, resumeAll, setInitialVolumes } from "../soundManager.js";
+import { ModeButton } from "../ui/ModeButton.js";
+import { RecommendButton } from "../ui/RecommendButton.js";
 
 function createLoader() {
     return PIXI.loaders && PIXI.loaders.Loader ? new PIXI.loaders.Loader() : new PIXI.Loader();
@@ -129,20 +131,22 @@ export class LoadScene extends BaseScene {
         this.modeTitle.y = 83;
         this.addChild(this.modeTitle);
 
-        this.playPcBtn = this.createFrameButton("playBtnPc0.gif", "playBtnPc1.gif", this.loadStart.bind(this, false));
+        this.playPcBtn = new ModeButton("playBtnPc0.gif", "playBtnPc1.gif");
         this.playPcBtn.x = 44;
         this.playPcBtn.y = this.modeTitle.y + this.modeTitle.height + 40;
         this.addChild(this.playPcBtn);
+        this.playPcBtn.on("pointerup", this.loadStart.bind(this, false));
 
         this.playPcTxt = new PIXI.Sprite(PIXI.Texture.fromFrame("playBtnPcTxt.gif"));
         this.playPcTxt.x = 44;
         this.playPcTxt.y = this.playPcBtn.y + this.playPcBtn.height + 2;
         this.addChild(this.playPcTxt);
 
-        this.playSpBtn = this.createFrameButton("playBtnSp0.gif", "playBtnSp1.gif", this.loadStart.bind(this, true));
+        this.playSpBtn = new ModeButton("playBtnSp0.gif", "playBtnSp1.gif");
         this.playSpBtn.x = 44;
         this.playSpBtn.y = this.playPcTxt.y + 20;
         this.addChild(this.playSpBtn);
+        this.playSpBtn.on("pointerup", this.loadStart.bind(this, true));
 
         this.playSpTxt = new PIXI.Sprite(PIXI.Texture.fromFrame("playBtnSpTxt.gif"));
         this.playSpTxt.x = 44;
@@ -150,14 +154,14 @@ export class LoadScene extends BaseScene {
         this.addChild(this.playSpTxt);
 
         const suffix = LANG === "ja" ? "" : "_en";
-        this.recommendBtn = this.createFrameButton(
+        this.recommendBtn = new RecommendButton(
             "recommendBtn0" + suffix + ".gif",
-            "recommendBtn1" + suffix + ".gif",
-            this.recommendModalOpen.bind(this)
+            "recommendBtn1" + suffix + ".gif"
         );
         this.recommendBtn.x = 40;
         this.recommendBtn.y = this.playSpTxt.y + 100;
         this.addChild(this.recommendBtn);
+        this.recommendBtn.on("pointerup", this.recommendModalOpen.bind(this));
 
         const modalTexture = PIXI.Texture.fromFrame("recommendModal" + suffix + ".gif");
         this.recommendModal = new PIXI.Sprite(modalTexture);
@@ -176,43 +180,6 @@ export class LoadScene extends BaseScene {
         this.recommendModalCloseBtn.buttonMode = true;
         this.recommendModalCloseBtn.on("pointerup", this.recommendModalClose.bind(this));
         this.recommendModal.addChild(this.recommendModalCloseBtn);
-    }
-
-    createFrameButton(defaultFrameName, downFrameName, onPointerUp) {
-        const defaultTexture = PIXI.Texture.fromFrame(defaultFrameName);
-        const downTexture = PIXI.Texture.fromFrame(downFrameName);
-        const sprite = new PIXI.Sprite(defaultTexture);
-
-        sprite.interactive = true;
-        sprite.buttonMode = true;
-        sprite.textureDefault = defaultTexture;
-        sprite.textureDown = downTexture;
-
-        sprite.on("pointerover", function onOver() {
-            this.alpha = 0.7;
-        });
-
-        sprite.on("pointerout", function onOut() {
-            this.alpha = 1;
-            this.texture = this.textureDefault;
-        });
-
-        sprite.on("pointerdown", function onDown() {
-            this.texture = this.textureDown;
-        });
-
-        sprite.on("pointerupoutside", function onUpOutside() {
-            this.alpha = 1;
-            this.texture = this.textureDefault;
-        });
-
-        sprite.on("pointerup", function onUp() {
-            this.alpha = 1;
-            this.texture = this.textureDefault;
-            onPointerUp();
-        });
-
-        return sprite;
     }
 
     recommendModalOpen() {

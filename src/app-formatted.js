@@ -24,6 +24,7 @@ export { TitleScene } from "./scenes/TitleScene.js";
 export { LoadScene } from "./scenes/LoadScene.js";
 export { gameState, loadHighScore, saveHighScore } from "./gameState.js";
 export { globals } from "./globals.js";
+export { HitTester } from "./HitTester.js";
 export {
     play,
     bgmPlay,

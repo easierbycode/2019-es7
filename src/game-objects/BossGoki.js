@@ -1,9 +1,2 @@
-import { BossGoki as BossGokiCore } from "../app-original.js";
-
-export class BossGoki extends BossGokiCore {
-    constructor(...args) {
-        super(...args);
-    }
-}
-
-export default BossGoki;
+export { BossGoki } from "../bosses/BossGoki.js";
+export { BossGoki as default } from "../bosses/BossGoki.js";

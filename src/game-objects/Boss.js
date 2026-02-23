@@ -1,9 +1,2 @@
-import { Boss as BossCore } from "../app-original.js";
-
-export class Boss extends BossCore {
-    constructor(...args) {
-        super(...args);
-    }
-}
-
-export default Boss;
+export { Boss } from "../bosses/Boss.js";
+export { Boss as default } from "../bosses/Boss.js";

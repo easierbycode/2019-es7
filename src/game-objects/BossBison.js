@@ -1,9 +1,2 @@
-import { BossBison as BossBisonCore } from "../app-original.js";
-
-export class BossBison extends BossBisonCore {
-    constructor(...args) {
-        super(...args);
-    }
-}
-
-export default BossBison;
+export { BossBison } from "../bosses/BossBison.js";
+export { BossBison as default } from "../bosses/BossBison.js";
