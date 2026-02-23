@@ -57,6 +57,12 @@ jobs:
           else
             sed -i '/<\/widget>/i \    <preference name="android-targetSdkVersion" value="35" \/>' cordova/config.xml
           fi
+          # Pin Gradle version to 8.12 to avoid failures with non-existent versions like 8.13
+          if grep -q "android-gradle-distribution-url" cordova/config.xml; then
+            sed -i 's|android-gradle-distribution-url" value=".*"|android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.12-bin.zip"|' cordova/config.xml
+          else
+            sed -i '/<\/widget>/i \    <preference name="android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.12-bin.zip" \/>' cordova/config.xml
+          fi
 
       - name: Ensure cordova vibration plugin is installed
         working-directory: cordova
@@ -76,6 +82,8 @@ jobs:
 
       - name: Build Cordova Android (APK)
         working-directory: cordova
+        env:
+          CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL: https://services.gradle.org/distributions/gradle-8.12-bin.zip
         run: cordova build android --debug --packageType=apk
 
       - name: Upload APK artifact
