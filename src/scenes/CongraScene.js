@@ -1,9 +1,5 @@
-import { CongraScene as CongraSceneCore } from "../app-original.js";
+import { EndingScene } from "./EndingScene.js";
 
-export class CongraScene extends CongraSceneCore {
-    constructor(...args) {
-        super(...args);
-    }
-}
+export class CongraScene extends EndingScene {}
 
 export default CongraScene;

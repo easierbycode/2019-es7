@@ -1,9 +1,5 @@
-import { GameoverScene as GameoverSceneCore } from "../app-original.js";
+import { EndingScene } from "./EndingScene.js";
 
-export class GameoverScene extends GameoverSceneCore {
-    constructor(...args) {
-        super(...args);
-    }
-}
+export class GameoverScene extends EndingScene {}
 
 export default GameoverScene;

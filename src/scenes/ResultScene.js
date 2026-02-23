@@ -1,9 +1,5 @@
-import { ResultScene as ResultSceneCore } from "../app-original.js";
+import { EndingScene } from "./EndingScene.js";
 
-export class ResultScene extends ResultSceneCore {
-    constructor(...args) {
-        super(...args);
-    }
-}
+export class ResultScene extends EndingScene {}
 
 export default ResultScene;

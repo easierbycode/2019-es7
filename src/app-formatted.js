@@ -1,3 +1,6 @@
+import { instantiateGame as instantiateLegacyGame, LoadScene as LegacyLoadScene } from "./app-original.js";
+import { LoadScene as ExtractedLoadScene } from "./scenes/LoadScene.js";
+
 export { BaseCast } from "./game-objects/BaseCast.js";
 export { BaseSpriteCast } from "./game-objects/BaseSpriteCast.js";
 export { BaseUnit } from "./game-objects/BaseUnit.js";
@@ -35,5 +38,54 @@ export {
     setInitialVolumes,
 } from "./soundManager.js";
 
-export { instantiateGame } from "./app-original.js";
-export { default } from "./app-original.js";
+function patchLegacyBootScene() {
+    if (LegacyLoadScene.prototype.__es7BootPatchApplied) {
+        return;
+    }
+
+    LegacyLoadScene.prototype.__es7BootPatchApplied = true;
+
+    const originalSceneAdded = LegacyLoadScene.prototype.sceneAdded;
+    const originalSceneRemoved = LegacyLoadScene.prototype.sceneRemoved;
+
+    LegacyLoadScene.prototype.sceneAdded = function patchedLegacyBootSceneAdded(...args) {
+        if (this.__es7BootForwarded) {
+            return;
+        }
+
+        const stage = this.parent;
+        if (!stage) {
+            return originalSceneAdded.apply(this, args);
+        }
+
+        this.__es7BootForwarded = true;
+        this.__es7SkipLegacySceneRemoved = true;
+
+        if (stage.children.indexOf(this) !== -1) {
+            stage.removeChild(this);
+        }
+
+        stage.addChild(new ExtractedLoadScene());
+    };
+
+    LegacyLoadScene.prototype.sceneRemoved = function patchedLegacyBootSceneRemoved(...args) {
+        if (this.__es7SkipLegacySceneRemoved) {
+            this.__es7SkipLegacySceneRemoved = false;
+            return;
+        }
+
+        return originalSceneRemoved.apply(this, args);
+    };
+}
+
+export function instantiateGame() {
+    patchLegacyBootScene();
+
+    const game = instantiateLegacyGame();
+    if (game) {
+        globalThis.__PHASER_GAME__ = game;
+    }
+    return game;
+}
+
+export default instantiateGame;
