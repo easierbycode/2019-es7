@@ -3760,8 +3760,9 @@
                 this.unit.y += this.speed,
                 this.name) {
                 case "soliderA":
-                    this.unit.y >= i.GAME_HEIGHT / 1.5 && (this.unit.x += .005 * (D.player.unit.x - this.unit.x));
-                    break;
+                    var e = D.player && D.player.unit ? D.player.unit : null;
+                    this.unit.y >= i.GAME_HEIGHT / 1.5 && e && (this.unit.x += .005 * (e.x - this.unit.x));
+                    break
                 case "soliderB":
                     this.unit.y <= 10 && (this.unit.x >= i.GAME_WIDTH / 2 ? (this.unit.x = i.GAME_WIDTH,
                     this.posName = "right") : (this.unit.x = -this.unit.width,

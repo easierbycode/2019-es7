@@ -294,6 +294,14 @@ export class GameScene extends BaseScene {
             return;
         }
 
+        if (!this.player || !this.player.unit) {
+            return;
+        }
+
+        if (gameState.player !== this.player) {
+            gameState.player = this.player;
+        }
+
         this.player.loop();
         this.hud.loop();
 
