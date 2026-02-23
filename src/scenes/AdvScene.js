@@ -175,6 +175,7 @@ export class AdvScene extends BaseScene {
         this.partNum = 0;
         this.stageKey = "";
         this.partText = "";
+        this.partTextCursor = 0;
         this.feedVektor = "d";
         this.partTextComp = false;
         this.resourceBgKey = "";
@@ -191,11 +192,9 @@ export class AdvScene extends BaseScene {
             return;
         }
 
-        const currentText = this.txt.text || "";
-        const index = currentText.length;
-
-        if (index <= this.partText.length - 1) {
-            this.txt.text = currentText + this.partText.charAt(index);
+        if (this.partTextCursor <= this.partText.length - 1) {
+            this.txt.text = (this.txt.text || "") + this.partText.charAt(this.partTextCursor);
+            this.partTextCursor += 1;
             return;
         }
 
@@ -282,8 +281,10 @@ export class AdvScene extends BaseScene {
         this.partNum = 0;
         this.stageKey = "stage" + String(gameState.stageId);
         this.partText = this.senario[this.stageKey].part[this.partNum].text;
+        this.partTextCursor = 0;
         this.feedVektor = "d";
         this.partTextComp = false;
+        this.txt.text = "";
 
         this.resourceBgKey = "advBg" + this.senario[this.stageKey].part[this.partNum].background + ".gif";
         this.bgSprite.texture = new PIXI.Texture.fromImage(this.resourceBgKey);
@@ -303,6 +304,7 @@ export class AdvScene extends BaseScene {
 
         this.txt.text = "";
         this.partTextComp = false;
+        this.partTextCursor = 0;
         this.partNum += 1;
 
         this.partText = this.senario[this.stageKey].part[this.partNum].text;
