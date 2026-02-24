@@ -214,15 +214,23 @@ export class LoadScene extends BaseScene {
 
     loadStart(lowModeFlg) {
         if (typeof document !== "undefined") {
-            const element = document.querySelector("#canvas canvas") || document.documentElement;
-            const requestMethod = element.requestFullscreen ||
-                element.webkitRequestFullscreen ||
-                element.msRequestFullscreen;
+            // Prefer Cordova fullscreen plugin (Android immersive mode)
+            if (window.AndroidFullScreen) {
+                window.AndroidFullScreen.immersiveMode(
+                    function () { log("Immersive fullscreen enabled"); },
+                    function () { log("Immersive fullscreen not available"); }
+                );
+            } else {
+                const element = document.querySelector("#canvas canvas") || document.documentElement;
+                const requestMethod = element.requestFullscreen ||
+                    element.webkitRequestFullscreen ||
+                    element.msRequestFullscreen;
 
-            if (requestMethod) {
-                requestMethod.call(element).catch((error) => {
-                    log("Fullscreen request failed: " + error.message);
-                });
+                if (requestMethod) {
+                    requestMethod.call(element).catch((error) => {
+                        log("Fullscreen request failed: " + error.message);
+                    });
+                }
             }
         }
 
