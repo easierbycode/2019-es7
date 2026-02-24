@@ -1,0 +1,42 @@
+<?xml version='1.0' encoding='utf-8'?>
+<widget id="com.example.sf2019" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>2019-es7</name>
+    <description>Street Fighter browser game</description>
+    <content src="index.html" />
+
+    <access origin="*" />
+    <allow-navigation href="*" />
+
+    <preference name="Fullscreen" value="true" />
+    <preference name="Orientation" value="portrait" />
+    <preference name="DisallowOverscroll" value="true" />
+    <preference name="StatusBarOverlaysWebView" value="false" />
+    <preference name="StatusBarStyle" value="default" />
+    <preference name="BackgroundColor" value="0xff000000" />
+    <preference name="KeepRunning" value="true" />
+
+    <!-- iOS: disable swipe-back/forward navigation gesture -->
+    <preference name="AllowBackForwardNavigationGestures" value="false" />
+    <!-- iOS: suppress the bounce/overscroll effect at viewport edges -->
+    <preference name="SuppressesIncrementalRendering" value="false" />
+    <preference name="KeyboardDisplayRequiresUserAction" value="true" />
+
+    <!-- Android: immersive sticky mode (hides nav/status bars) -->
+    <preference name="AndroidPersistentFileLocation" value="Compatibility" />
+
+    <platform name="android">
+        <preference name="FullScreen" value="true" />
+        <preference name="Orientation" value="portrait" />
+    </platform>
+
+    <platform name="ios">
+        <preference name="Orientation" value="portrait" />
+        <preference name="AllowBackForwardNavigationGestures" value="false" />
+        <preference name="DisallowOverscroll" value="true" />
+    </platform>
+
+    <!-- Plugins -->
+    <plugin name="cordova-plugin-screen-orientation" spec="^3.0.4" />
+    <plugin name="cordova-plugin-fullscreen" spec="^1.3.0" />
+    <plugin name="cordova-plugin-statusbar" spec="^4.0.0" />
+</widget>
