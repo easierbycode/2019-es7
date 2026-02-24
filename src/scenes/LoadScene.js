@@ -214,7 +214,7 @@ export class LoadScene extends BaseScene {
 
     loadStart(lowModeFlg) {
         if (typeof document !== "undefined") {
-            const element = document.documentElement;
+            const element = document.querySelector("#canvas canvas") || document.documentElement;
             const requestMethod = element.requestFullscreen ||
                 element.webkitRequestFullscreen ||
                 element.msRequestFullscreen;
