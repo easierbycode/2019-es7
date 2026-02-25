@@ -3,16 +3,102 @@ import { HitTester } from "./HitTester.js";
 
 let started = false;
 
-function setupCordovaPlugins() {
-    // Lock orientation to portrait via cordova-plugin-screen-orientation
+// ---------------------------------------------------------------------------
+// Orientation lock — requires fullscreen to be active on most mobile browsers
+// ---------------------------------------------------------------------------
+function lockPortrait() {
     if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
         window.screen.orientation.lock("portrait").catch(function () {});
     }
+}
 
+// ---------------------------------------------------------------------------
+// Fullscreen helpers
+// ---------------------------------------------------------------------------
+function enterFullscreen(element) {
+    var el = element || document.documentElement;
+    var rfs = el.requestFullscreen
+        || el.webkitRequestFullscreen
+        || el.msRequestFullscreen;
+
+    if (!rfs) { return; }
+
+    var promise = rfs.call(el, { navigationUI: "hide" });
+    if (promise && promise.then) {
+        promise.then(function () {
+            lockPortrait();
+        }).catch(function () {});
+    } else {
+        // Older browsers that don't return a promise
+        lockPortrait();
+    }
+}
+
+function isFullscreen() {
+    return !!(document.fullscreenElement
+        || document.webkitFullscreenElement
+        || document.msFullscreenElement);
+}
+
+// Re-enter fullscreen whenever the user accidentally exits (swipe, gesture, etc.)
+function onFullscreenChange() {
+    if (!isFullscreen()) {
+        // Small delay avoids a rapid toggle loop on some browsers
+        setTimeout(function () {
+            if (!isFullscreen()) {
+                enterFullscreen(document.querySelector("#canvas canvas") || document.documentElement);
+            }
+        }, 300);
+    }
+}
+
+document.addEventListener("fullscreenchange", onFullscreenChange, false);
+document.addEventListener("webkitfullscreenchange", onFullscreenChange, false);
+
+// ---------------------------------------------------------------------------
+// Edge-swipe prevention
+// Intercept touches that start near the left/right edges of the screen so
+// that iOS Safari / Android Chrome cannot interpret them as back/forward
+// navigation gestures.
+// ---------------------------------------------------------------------------
+(function preventEdgeSwipe() {
+    var EDGE_PX = 30; // threshold in CSS pixels
+
+    document.addEventListener("touchstart", function (e) {
+        if (!e.touches || e.touches.length === 0) { return; }
+        var x = e.touches[0].clientX;
+        var w = window.innerWidth;
+        if (x < EDGE_PX || x > w - EDGE_PX) {
+            e.preventDefault();
+        }
+    }, { passive: false, capture: true });
+
+    // Also block touchmove near edges to prevent partial swipe recognition
+    document.addEventListener("touchmove", function (e) {
+        if (!e.touches || e.touches.length === 0) { return; }
+        var x = e.touches[0].clientX;
+        var w = window.innerWidth;
+        if (x < EDGE_PX || x > w - EDGE_PX) {
+            e.preventDefault();
+        }
+    }, { passive: false, capture: true });
+})();
+
+// Prevent the browser history-back gesture on overscroll
+window.addEventListener("popstate", function () {
+    // Push state back so the user stays on the game page
+    history.pushState(null, "", location.href);
+});
+history.pushState(null, "", location.href);
+
+// ---------------------------------------------------------------------------
+// Cordova-specific plugin setup
+// ---------------------------------------------------------------------------
+function setupCordovaPlugins() {
     // Enable Android immersive fullscreen via cordova-plugin-fullscreen
     if (window.AndroidFullScreen) {
         window.AndroidFullScreen.immersiveMode(
-            function () {},
+            function () { lockPortrait(); },
             function () {}
         );
     }
@@ -22,12 +108,12 @@ function setupCordovaPlugins() {
         window.StatusBar.hide();
     }
 
-    // Disable iOS swipe-back navigation at the webview level
-    if (window.cordova && window.cordova.plugins && window.cordova.plugins.webViewConfig) {
-        window.cordova.plugins.webViewConfig.setAllowBackForwardNavigationGestures(false);
-    }
+    lockPortrait();
 }
 
+// ---------------------------------------------------------------------------
+// Boot
+// ---------------------------------------------------------------------------
 function onDeviceReady() {
     if (started) {
         return;
