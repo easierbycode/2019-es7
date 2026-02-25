@@ -217,19 +217,34 @@ export class LoadScene extends BaseScene {
             // Prefer Cordova fullscreen plugin (Android immersive mode)
             if (window.AndroidFullScreen) {
                 window.AndroidFullScreen.immersiveMode(
-                    function () { log("Immersive fullscreen enabled"); },
+                    function () {
+                        log("Immersive fullscreen enabled");
+                        // Lock orientation after immersive mode is active
+                        if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
+                            window.screen.orientation.lock("portrait").catch(function () {});
+                        }
+                    },
                     function () { log("Immersive fullscreen not available"); }
                 );
             } else {
+                // Browser fullscreen — lock orientation in the success callback
                 const element = document.querySelector("#canvas canvas") || document.documentElement;
-                const requestMethod = element.requestFullscreen ||
-                    element.webkitRequestFullscreen ||
-                    element.msRequestFullscreen;
+                const requestMethod = element.requestFullscreen
+                    || element.webkitRequestFullscreen
+                    || element.msRequestFullscreen;
 
                 if (requestMethod) {
-                    requestMethod.call(element).catch((error) => {
-                        log("Fullscreen request failed: " + error.message);
-                    });
+                    var promise = requestMethod.call(element, { navigationUI: "hide" });
+                    if (promise && promise.then) {
+                        promise.then(function () {
+                            log("Fullscreen entered");
+                            if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
+                                window.screen.orientation.lock("portrait").catch(function () {});
+                            }
+                        }).catch(function (error) {
+                            log("Fullscreen request failed: " + error.message);
+                        });
+                    }
                 }
             }
         }
