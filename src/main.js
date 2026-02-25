@@ -62,19 +62,25 @@ document.addEventListener("webkitfullscreenchange", onFullscreenChange, false);
 // navigation gestures.
 // ---------------------------------------------------------------------------
 (function preventEdgeSwipe() {
-    var EDGE_PX = 30; // threshold in CSS pixels
+    var EDGE_PX = 50; // wider threshold catches more gesture recognition windows
+    var touchStartedAtEdge = false;
 
     document.addEventListener("touchstart", function (e) {
         if (!e.touches || e.touches.length === 0) { return; }
         var x = e.touches[0].clientX;
         var w = window.innerWidth;
-        if (x < EDGE_PX || x > w - EDGE_PX) {
+        touchStartedAtEdge = (x < EDGE_PX || x > w - EDGE_PX);
+        if (touchStartedAtEdge) {
             e.preventDefault();
         }
     }, { passive: false, capture: true });
 
-    // Also block touchmove near edges to prevent partial swipe recognition
+    // Block the entire gesture (not just per-event position) if it started at an edge
     document.addEventListener("touchmove", function (e) {
+        if (touchStartedAtEdge) {
+            e.preventDefault();
+            return;
+        }
         if (!e.touches || e.touches.length === 0) { return; }
         var x = e.touches[0].clientX;
         var w = window.innerWidth;
@@ -82,6 +88,14 @@ document.addEventListener("webkitfullscreenchange", onFullscreenChange, false);
             e.preventDefault();
         }
     }, { passive: false, capture: true });
+
+    document.addEventListener("touchend", function () {
+        touchStartedAtEdge = false;
+    }, { passive: true, capture: true });
+
+    document.addEventListener("touchcancel", function () {
+        touchStartedAtEdge = false;
+    }, { passive: true, capture: true });
 })();
 
 // Prevent the browser history-back gesture on overscroll
@@ -91,15 +105,35 @@ window.addEventListener("popstate", function () {
 });
 history.pushState(null, "", location.href);
 
+// Re-lock orientation whenever the device reports a rotation — the lock can
+// be silently dropped by the OS during fullscreen transitions.
+window.addEventListener("orientationchange", function () {
+    lockPortrait();
+    setTimeout(function () {
+        lockPortrait();
+        if (!isFullscreen()) {
+            enterFullscreen(document.querySelector("#canvas canvas") || document.documentElement);
+        }
+    }, 200);
+}, false);
+
 // ---------------------------------------------------------------------------
 // Cordova-specific plugin setup
 // ---------------------------------------------------------------------------
 function setupCordovaPlugins() {
-    // Enable Android immersive fullscreen via cordova-plugin-fullscreen
+    // Enable Android immersive sticky fullscreen via cordova-plugin-fullscreen.
+    // immersiveStickyMode (vs immersiveMode) auto-hides system bars after a
+    // brief appearance instead of staying visible — far better for games.
     if (window.AndroidFullScreen) {
-        window.AndroidFullScreen.immersiveMode(
+        window.AndroidFullScreen.immersiveStickyMode(
             function () { lockPortrait(); },
-            function () {}
+            function () {
+                // Fall back to regular immersive mode if sticky isn't available
+                window.AndroidFullScreen.immersiveMode(
+                    function () { lockPortrait(); },
+                    function () {}
+                );
+            }
         );
     }
 
@@ -110,6 +144,33 @@ function setupCordovaPlugins() {
 
     lockPortrait();
 }
+
+// ---------------------------------------------------------------------------
+// Cordova lifecycle — re-apply fullscreen and orientation when app resumes
+// ---------------------------------------------------------------------------
+document.addEventListener("resume", function () {
+    if (window.cordova) {
+        setupCordovaPlugins();
+    }
+    // Re-enter web fullscreen in case it was dropped while backgrounded
+    setTimeout(function () {
+        if (!isFullscreen()) {
+            enterFullscreen(document.querySelector("#canvas canvas") || document.documentElement);
+        }
+    }, 300);
+}, false);
+
+// Android back button / back-swipe gesture: prevent app exit and
+// re-assert immersive mode so fullscreen is not abandoned.
+document.addEventListener("backbutton", function (e) {
+    e.preventDefault();
+    if (window.AndroidFullScreen) {
+        window.AndroidFullScreen.immersiveStickyMode(
+            function () { lockPortrait(); },
+            function () {}
+        );
+    }
+}, false);
 
 // ---------------------------------------------------------------------------
 // Boot

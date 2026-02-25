@@ -16,6 +16,11 @@
             touch-action: none;
             -webkit-overflow-scrolling: auto;
             -ms-touch-action: none;
+            /* Prevent text/element selection on swipe gestures */
+            user-select: none;
+            -webkit-user-select: none;
+            /* Suppress iOS long-press callout (copy/paste bubble) */
+            -webkit-touch-callout: none;
         }
 
         #canvas {
