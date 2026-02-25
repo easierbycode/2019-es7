@@ -71,9 +71,11 @@ jobs:
         working-directory: cordova
         run: |
           cordova plugin add cordova-plugin-screen-orientation || true
-          cordova plugin add cordova-plugin-fullscreen || true
           cordova plugin add cordova-plugin-statusbar || true
           cordova plugin add cordova-plugin-vibration || true
+
+      - name: Copy hooks into Cordova project
+        run: cp -r hooks cordova/hooks
 
       - name: Prepare Cordova www
         run: |
