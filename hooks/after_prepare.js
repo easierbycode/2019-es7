@@ -61,6 +61,7 @@ module.exports = function (context) {
 
     // ---- Add required imports --------------------------------------------------
     const importsToAdd = [
+        "",
         "import android.os.Build",
         "import android.view.View",
         "import android.view.WindowInsets",
@@ -68,10 +69,11 @@ module.exports = function (context) {
     ].join("\n");
 
     // Insert right after the existing CordovaActivity import line
-    src = src.replace(
-        /(import\s+org\.apache\.cordova\.\*)/,
-        "$1\n" + importsToAdd
-    );
+    if (src.includes("import org.apache.cordova.*")) {
+        src = src.replace("import org.apache.cordova.*", "import org.apache.cordova.*" + importsToAdd);
+    } else {
+        src = src.replace("import org.apache.cordova.CordovaActivity", "import org.apache.cordova.CordovaActivity" + importsToAdd);
+    }
 
     // ---- Add enterImmersiveMode() + onWindowFocusChanged() ---------------------
     const methodBlock = `

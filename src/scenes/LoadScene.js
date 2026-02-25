@@ -225,7 +225,12 @@ export class LoadScene extends BaseScene {
                     },
                     function () { log("Immersive fullscreen not available"); }
                 );
-            } else if (!window.cordova) {
+            } else if (window.cordova) {
+                // Fallback for Cordova without the plugin: still attempt orientation lock
+                if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
+                    window.screen.orientation.lock("portrait").catch(function () {});
+                }
+            } else {
                 // Browser fullscreen — only attempt when NOT running inside Cordova
                 // (Cordova handles fullscreen natively via config.xml preferences)
                 const element = document.querySelector("#canvas canvas") || document.documentElement;

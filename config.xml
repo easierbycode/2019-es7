@@ -30,6 +30,11 @@
         <preference name="FullScreen" value="true" />
         <preference name="Orientation" value="portrait" />
         <preference name="AndroidLaunchMode" value="singleTask" />
+
+        <config-file target="AndroidManifest.xml" parent="/*">
+            <uses-permission android:name="android.permission.VIBRATE" />
+        </config-file>
+
         <!-- Handle config changes in-app so orientation change doesn't restart the activity -->
         <edit-config file="AndroidManifest.xml" target="/manifest/application/activity" mode="merge">
             <activity android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
@@ -46,6 +51,4 @@
     </platform>
 
     <!-- Plugins -->
-    <plugin name="cordova-plugin-statusbar" spec="^4.0.0" />
-    <plugin name="cordova-plugin-vibration" spec="^3.1.1" />
 </widget>
