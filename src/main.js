@@ -94,14 +94,18 @@ history.pushState(null, "", location.href);
 // ---------------------------------------------------------------------------
 // Cordova-specific plugin setup
 // ---------------------------------------------------------------------------
-function setupCordovaPlugins() {
-    // Enable Android immersive fullscreen via cordova-plugin-fullscreen
+function enterImmersiveSticky() {
     if (window.AndroidFullScreen) {
         window.AndroidFullScreen.immersiveMode(
             function () { lockPortrait(); },
             function () {}
         );
     }
+}
+
+function setupCordovaPlugins() {
+    // Enable Android immersive fullscreen via cordova-plugin-fullscreen
+    enterImmersiveSticky();
 
     // Hide status bar via cordova-plugin-statusbar
     if (window.StatusBar) {
@@ -109,6 +113,18 @@ function setupCordovaPlugins() {
     }
 
     lockPortrait();
+
+    // Re-enter immersive mode whenever the app resumes from background
+    document.addEventListener("resume", function () {
+        enterImmersiveSticky();
+        if (window.StatusBar) { window.StatusBar.hide(); }
+        lockPortrait();
+    }, false);
+
+    // Prevent the Android back gesture / button from closing the app
+    document.addEventListener("backbutton", function (e) {
+        e.preventDefault();
+    }, false);
 }
 
 // ---------------------------------------------------------------------------

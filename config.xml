@@ -27,6 +27,13 @@
     <platform name="android">
         <preference name="FullScreen" value="true" />
         <preference name="Orientation" value="portrait" />
+        <preference name="AndroidLaunchMode" value="singleTask" />
+        <!-- Handle config changes in-app so orientation change doesn't restart the activity -->
+        <edit-config file="AndroidManifest.xml" target="/manifest/application/activity" mode="merge">
+            <activity android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+                      android:screenOrientation="portrait"
+                      xmlns:android="http://schemas.android.com/apk/res/android" />
+        </edit-config>
     </platform>
 
     <platform name="ios">

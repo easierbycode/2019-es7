@@ -49,6 +49,9 @@ jobs:
             cordova platform add android@latest
           fi
 
+      - name: Copy project config.xml into Cordova project
+        run: cp config.xml cordova/config.xml
+
       - name: Update config.xml for Android 15/16
         run: |
           # Set target-sdk to 35 (Android 15) for stable latest support
@@ -64,9 +67,12 @@ jobs:
             sed -i '/<\/widget>/i \    <preference name="android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.12-bin.zip" \/>' cordova/config.xml
           fi
 
-      - name: Ensure cordova vibration plugin is installed
+      - name: Install Cordova plugins
         working-directory: cordova
         run: |
+          cordova plugin add cordova-plugin-screen-orientation || true
+          cordova plugin add cordova-plugin-fullscreen || true
+          cordova plugin add cordova-plugin-statusbar || true
           cordova plugin add cordova-plugin-vibration || true
 
       - name: Prepare Cordova www
