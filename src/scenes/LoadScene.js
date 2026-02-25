@@ -214,20 +214,20 @@ export class LoadScene extends BaseScene {
 
     loadStart(lowModeFlg) {
         if (typeof document !== "undefined") {
-            // Prefer Cordova fullscreen plugin (Android immersive mode)
+            // Prefer Cordova fullscreen plugin (Android immersive sticky mode)
             if (window.AndroidFullScreen) {
                 window.AndroidFullScreen.immersiveMode(
                     function () {
                         log("Immersive fullscreen enabled");
-                        // Lock orientation after immersive mode is active
                         if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
                             window.screen.orientation.lock("portrait").catch(function () {});
                         }
                     },
                     function () { log("Immersive fullscreen not available"); }
                 );
-            } else {
-                // Browser fullscreen — lock orientation in the success callback
+            } else if (!window.cordova) {
+                // Browser fullscreen — only attempt when NOT running inside Cordova
+                // (Cordova handles fullscreen natively via config.xml preferences)
                 const element = document.querySelector("#canvas canvas") || document.documentElement;
                 const requestMethod = element.requestFullscreen
                     || element.webkitRequestFullscreen
