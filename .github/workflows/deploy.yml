@@ -67,13 +67,6 @@ jobs:
             sed -i '/<\/widget>/i \    <preference name="android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.12-bin.zip" \/>' cordova/config.xml
           fi
 
-      - name: Install Cordova plugins
-        working-directory: cordova
-        run: |
-          cordova plugin add cordova-plugin-screen-orientation || true
-          cordova plugin add cordova-plugin-statusbar || true
-          cordova plugin add cordova-plugin-vibration || true
-
       - name: Copy hooks into Cordova project
         run: cp -r hooks cordova/hooks
 
