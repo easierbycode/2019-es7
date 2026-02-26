@@ -120,7 +120,8 @@ jobs:
 
       - name: Copy APK to dist
         run: |
-          find apk-tmp -name "*.apk" -exec cp {} dist/game.apk \;
+          cp apk-tmp/*.apk dist/game.apk
+          ls -l dist/game.apk
           rm -rf apk-tmp
 
       - name: Create downloadable zip of built site
