@@ -45,7 +45,8 @@
         <preference name="DisallowOverscroll" value="true" />
     </platform>
 
-    <!-- Plugins -->
-    <plugin name="cordova-plugin-statusbar" spec="^4.0.0" />
-    <plugin name="cordova-plugin-vibration" spec="^3.1.1" />
+    <!-- Plugins removed: cordova-plugin-statusbar and cordova-plugin-vibration
+         are incompatible with cordova-android 13+ (Kotlin-based MainActivity).
+         Status bar hiding is handled natively via hooks/after_prepare.js.
+         Vibration is available via the Web Vibration API (navigator.vibrate). -->
 </widget>
