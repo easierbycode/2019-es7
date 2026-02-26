@@ -96,19 +96,13 @@ history.pushState(null, "", location.href);
 // ---------------------------------------------------------------------------
 // Immersive sticky mode (hiding status + nav bars, re-hiding after swipe) is
 // handled natively by the patched MainActivity.kt (see hooks/after_prepare.js).
-// The JS side only needs to lock portrait and hide the status bar plugin.
+// The JS side only needs to lock portrait orientation.
 
 function setupCordovaPlugins() {
-    // Hide status bar via cordova-plugin-statusbar
-    if (window.StatusBar) {
-        window.StatusBar.hide();
-    }
-
     lockPortrait();
 
     // Re-apply after the app resumes from background
     document.addEventListener("resume", function () {
-        if (window.StatusBar) { window.StatusBar.hide(); }
         lockPortrait();
     }, false);
 
