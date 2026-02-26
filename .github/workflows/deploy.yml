@@ -60,6 +60,12 @@ jobs:
           else
             sed -i '/<\/widget>/i \    <preference name="android-targetSdkVersion" value="35" \/>' cordova/config.xml
           fi
+          # Set compile-sdk to 35 so AAPT2 can handle appcompat-1.7.0 HalfFloat colors
+          if grep -q "android-compileSdkVersion" cordova/config.xml; then
+            sed -i 's/android-compileSdkVersion" value="[0-9]*"/android-compileSdkVersion" value="35"/' cordova/config.xml
+          else
+            sed -i '/<\/widget>/i \    <preference name="android-compileSdkVersion" value="35" \/>' cordova/config.xml
+          fi
           # Pin Gradle version to 8.12 to avoid failures with non-existent versions like 8.13
           if grep -q "android-gradle-distribution-url" cordova/config.xml; then
             sed -i 's|android-gradle-distribution-url" value=".*"|android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.12-bin.zip"|' cordova/config.xml
