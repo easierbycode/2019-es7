@@ -12,7 +12,7 @@
     <preference name="DisallowOverscroll" value="true" />
     <preference name="StatusBarOverlaysWebView" value="false" />
     <preference name="StatusBarStyle" value="default" />
-    <preference name="BackgroundColor" value="0xff000000" />
+    <preference name="BackgroundColor" value="#ff000000" />
     <preference name="KeepRunning" value="true" />
 
     <!-- iOS: disable swipe-back/forward navigation gesture -->
@@ -23,6 +23,8 @@
 
     <preference name="AndroidPersistentFileLocation" value="Compatibility" />
     <preference name="android-compileSdkVersion" value="35" />
+    <!-- Pin appcompat to 1.6.1 to avoid AAPT2 resource parsing failures seen with 1.7.0 in CI -->
+    <preference name="AndroidXAppCompatVersion" value="1.6.1" />
 
     <!-- Immersive sticky mode is applied via hooks/after_prepare.js (patches MainActivity.kt) -->
     <hook type="after_prepare" src="hooks/after_prepare.js" />
