@@ -87,11 +87,29 @@ jobs:
           # Inject cordova.js into index.html
           sed -i 's/<\/head>/<script src="cordova.js"><\/script><\/head>/' cordova/www/index.html
 
+      - name: Prepare Cordova Android
+        working-directory: cordova
+        run: cordova prepare android
+
+      - name: Force compileSdkVersion 35 for AAPT2 compatibility
+        run: |
+          CONFIG=cordova/platforms/android/cdv-gradle-config.json
+          echo "=== Before patch ==="
+          cat "$CONFIG"
+          node -e "
+            const fs = require('fs');
+            const c = JSON.parse(fs.readFileSync('$CONFIG', 'utf8'));
+            c.COMPILE_SDK_VERSION = 35;
+            fs.writeFileSync('$CONFIG', JSON.stringify(c, null, 2));
+          "
+          echo "=== After patch ==="
+          cat "$CONFIG"
+
       - name: Build Cordova Android (APK)
         working-directory: cordova
         env:
           CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL: https://services.gradle.org/distributions/gradle-8.12-bin.zip
-        run: cordova build android --debug --packageType=apk
+        run: cordova compile android --debug --packageType=apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
