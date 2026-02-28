@@ -56,6 +56,26 @@ document.addEventListener("fullscreenchange", onFullscreenChange, false);
 document.addEventListener("webkitfullscreenchange", onFullscreenChange, false);
 
 // ---------------------------------------------------------------------------
+// Android: enter fullscreen on the very first touch, before mode select.
+// Android 17+ ignores requestFullscreen calls that happen too late after
+// the originating user gesture, so we capture the earliest possible tap.
+// ---------------------------------------------------------------------------
+(function androidEarlyFullscreen() {
+    if (typeof navigator === "undefined" || !navigator.userAgent) { return; }
+    if (!/android/i.test(navigator.userAgent)) { return; }
+    if (window.cordova) { return; } // Cordova handles fullscreen natively
+
+    function onFirstTouch() {
+        document.removeEventListener("touchstart", onFirstTouch, true);
+        document.removeEventListener("click", onFirstTouch, true);
+        enterFullscreen(document.querySelector("#canvas canvas") || document.documentElement);
+    }
+
+    document.addEventListener("touchstart", onFirstTouch, { capture: true, once: true });
+    document.addEventListener("click", onFirstTouch, { capture: true, once: true });
+})();
+
+// ---------------------------------------------------------------------------
 // Edge-swipe prevention
 // Intercept touches that start near the left/right edges of the screen so
 // that iOS Safari / Android Chrome cannot interpret them as back/forward
