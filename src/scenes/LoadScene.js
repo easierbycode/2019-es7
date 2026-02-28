@@ -7,7 +7,8 @@ import {
     SCENE_NAMES,
     GAME_DIMENSIONS,
 } from "../constants.js";
-import { gameState } from "../gameState.js";
+import { initializeFirebaseScores } from "../firebaseScores.js";
+import { gameState, loadHighScore as loadStoredHighScore } from "../gameState.js";
 import { globals } from "../globals.js";
 import { pauseAll, resumeAll, setInitialVolumes } from "../soundManager.js";
 import { ModeButton } from "../ui/ModeButton.js";
@@ -42,6 +43,12 @@ function log(message) {
     if (typeof console !== "undefined" && console.log) {
         console.log(message);
     }
+}
+
+function waitFor(milliseconds) {
+    return new Promise((resolve) => {
+        setTimeout(resolve, milliseconds);
+    });
 }
 
 export class LoadScene extends BaseScene {
@@ -87,18 +94,7 @@ export class LoadScene extends BaseScene {
     }
 
     loadHighScore() {
-        if (typeof document === "undefined" || typeof document.cookie !== "string") {
-            return;
-        }
-
-        const cookies = document.cookie.split(";");
-        for (let i = 0; i < cookies.length; i++) {
-            const cookie = cookies[i].trim();
-            if (cookie.indexOf("afc2019_highScore=") === 0) {
-                const value = cookie.substring("afc2019_highScore=".length);
-                this.state.highScore = value;
-            }
-        }
+        loadStoredHighScore();
     }
 
     loop() {
@@ -309,9 +305,14 @@ export class LoadScene extends BaseScene {
             }
         }
 
-        TweenMax.to([this.loadingG, this.loadingBg], 0.2, {
-            alpha: 0,
-            onComplete: this.removeSceneFromStage.bind(this),
+        Promise.race([
+            initializeFirebaseScores().catch(() => {}),
+            waitFor(1500),
+        ]).finally(() => {
+            TweenMax.to([this.loadingG, this.loadingBg], 0.2, {
+                alpha: 0,
+                onComplete: this.removeSceneFromStage.bind(this),
+            });
         });
     }
 

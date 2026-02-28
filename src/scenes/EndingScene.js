@@ -2,6 +2,14 @@ import { BaseScene } from "./BaseScene.js";
 import { TitleScene } from "./TitleScene.js";
 import { GAME_DIMENSIONS, LANG, SCENE_NAMES } from "../constants.js";
 import { gameState, saveHighScore } from "../gameState.js";
+import { submitHighScore } from "../firebaseScores.js";
+import {
+    createScoreTextStyle,
+    getDisplayedHighScore,
+    getHighScoreSyncText,
+    getHighScoreSyncTint,
+    getWorldBestLabel,
+} from "../highScoreUi.js";
 import { play } from "../soundManager.js";
 import { TwitterButton } from "../ui/TwitterButton.js";
 import { GotoTitleButton } from "../ui/GotoTitleButton.js";
@@ -68,7 +76,20 @@ export class EndingScene extends BaseScene {
         this.continueFlg = false;
     }
 
-    loop() {}
+    loop() {
+        this.refreshHighScoreUi();
+    }
+
+    refreshHighScoreUi() {
+        if (this.worldBestText) {
+            this.worldBestText.text = getWorldBestLabel() + " " + String(getDisplayedHighScore());
+        }
+
+        if (this.scoreSyncText) {
+            this.scoreSyncText.text = getHighScoreSyncText();
+            this.scoreSyncText.tint = getHighScoreSyncTint();
+        }
+    }
 
     run() {
         const bgFrames = [
@@ -145,10 +166,24 @@ export class EndingScene extends BaseScene {
         this.bigNumTxt.setNum(Number(gameState.score || 0));
         this.scoreContainer.addChild(this.bigNumTxt);
 
+        this.worldBestText = new PIXI.Text("", createScoreTextStyle({
+            fontSize: 11,
+        }));
+        this.worldBestText.x = this.scoreContainer.x;
+        this.worldBestText.y = this.scoreContainer.y + 28;
+        this.addChild(this.worldBestText);
+
+        this.scoreSyncText = new PIXI.Text("", createScoreTextStyle({
+            fontSize: 8,
+        }));
+        this.scoreSyncText.x = this.scoreContainer.x;
+        this.scoreSyncText.y = this.worldBestText.y + 16;
+        this.addChild(this.scoreSyncText);
+
         this.twitterBtn = new TwitterButton();
         this.twitterBtn.scale.set(0);
         this.twitterBtn.x = GAME_DIMENSIONS.CENTER_X;
-        this.twitterBtn.y = GAME_DIMENSIONS.CENTER_Y + 15;
+        this.twitterBtn.y = GAME_DIMENSIONS.CENTER_Y + 28;
         this.twitterBtn.on("pointerup", this._onTweetUp);
         this.addChild(this.twitterBtn);
 
@@ -223,6 +258,14 @@ export class EndingScene extends BaseScene {
             y: 1,
             ease: Elastic.easeOut,
         }, "-=0.25");
+
+        this.refreshHighScoreUi();
+
+        if (Number(gameState.score || 0) >= Number(gameState.highScore || 0)
+            || gameState.scoreSyncStatus === "loading"
+            || gameState.scoreSyncStatus === "error") {
+            submitHighScore(Number(gameState.score || 0)).catch(() => {});
+        }
     }
 
     nextSceneAnim() {

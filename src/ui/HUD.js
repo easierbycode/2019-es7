@@ -1,6 +1,14 @@
 import { BaseCast } from "../game-objects/BaseCast.js";
+import { gameState } from "../gameState.js";
 import { CUSTOM_EVENTS } from "../events/custom-events.js";
 import { GAME_DIMENSIONS } from "../constants.js";
+import {
+    createScoreTextStyle,
+    getDisplayedHighScore,
+    getHighScoreSyncText,
+    getHighScoreSyncTint,
+    getWorldBestLabel,
+} from "../highScoreUi.js";
 import { play } from "../soundManager.js";
 import { SmallNumberDisplay } from "./SmallNumberDisplay.js";
 import { ComboNumberDisplay } from "./ComboNumberDisplay.js";
@@ -38,6 +46,20 @@ export class HUD extends BaseCast {
         this.scoreNumTxt.y = this.scoreTitleTxt.y;
         this.scoreNumTxt.setNum(99);
 
+        this.worldBestText = new PIXI.Text("", createScoreTextStyle({
+            fontSize: 9,
+        }));
+        this.worldBestText.x = 30;
+        this.worldBestText.y = 40;
+
+        this.scoreSyncText = new PIXI.Text("", createScoreTextStyle({
+            fontSize: 7,
+            align: "right",
+        }));
+        this.scoreSyncText.anchor.set(1, 0);
+        this.scoreSyncText.x = GAME_DIMENSIONS.WIDTH - 8;
+        this.scoreSyncText.y = 8;
+
         this.comboBar = new PIXI.Sprite(PIXI.Texture.fromFrame("comboBar.gif"));
         this.comboBar.x = 149;
         this.comboBar.y = 32;
@@ -61,6 +83,10 @@ export class HUD extends BaseCast {
         this.spFireFlg = false;
 
         this.scoreViewWrap = new PIXI.Container();
+
+        this._lastDisplayedHighScore = -1;
+        this._lastScoreSyncText = "";
+        this._lastScoreSyncTint = -1;
 
         this._onKeyUpListener = this.onKeyUp.bind(this);
         this._onSpBtnUp = this.spFire.bind(this);
@@ -100,6 +126,27 @@ export class HUD extends BaseCast {
         }
 
         this.comboBar.scale.x = this.comboTimeCnt / 100;
+        this.refreshHighScoreUi();
+    }
+
+    refreshHighScoreUi() {
+        const displayedHighScore = Math.max(getDisplayedHighScore(), this._highScore, gameState.score || 0);
+        if (displayedHighScore !== this._lastDisplayedHighScore) {
+            this.worldBestText.text = getWorldBestLabel() + " " + String(displayedHighScore);
+            this._lastDisplayedHighScore = displayedHighScore;
+        }
+
+        const scoreSyncText = getHighScoreSyncText();
+        if (scoreSyncText !== this._lastScoreSyncText) {
+            this.scoreSyncText.text = scoreSyncText;
+            this._lastScoreSyncText = scoreSyncText;
+        }
+
+        const scoreSyncTint = getHighScoreSyncTint();
+        if (scoreSyncTint !== this._lastScoreSyncTint) {
+            this.scoreSyncText.tint = scoreSyncTint;
+            this._lastScoreSyncTint = scoreSyncTint;
+        }
     }
 
     spPrepareOk() {
@@ -188,9 +235,13 @@ export class HUD extends BaseCast {
         this.addChild(this.spgaBtn);
         this.addChild(this.scoreTitleTxt);
         this.addChild(this.scoreNumTxt);
+        this.addChild(this.worldBestText);
+        this.addChild(this.scoreSyncText);
         this.addChild(this.comboBar);
         this.addChild(this.comboNumTxt);
         this.addChildAt(this.scoreViewWrap, 5);
+
+        this.refreshHighScoreUi();
     }
 
     castRemoved() {
@@ -202,6 +253,8 @@ export class HUD extends BaseCast {
         this.removeChild(this.spgaBtn);
         this.removeChild(this.scoreTitleTxt);
         this.removeChild(this.scoreNumTxt);
+        this.removeChild(this.worldBestText);
+        this.removeChild(this.scoreSyncText);
         this.removeChild(this.comboBar);
         this.removeChild(this.comboNumTxt);
         this.removeChild(this.scoreViewWrap);
@@ -260,6 +313,7 @@ export class HUD extends BaseCast {
 
     set highScore(value) {
         this._highScore = value;
+        this.refreshHighScoreUi();
     }
 
     get comboCount() {

@@ -3,7 +3,15 @@ import { GameScene } from "./GameScene.js";
 import { TitleScene } from "./TitleScene.js";
 import { LANG, GAME_DIMENSIONS, STAGE_DIMENSIONS } from "../constants.js";
 import { gameState, saveHighScore } from "../gameState.js";
+import { submitHighScore } from "../firebaseScores.js";
 import { globals } from "../globals.js";
+import {
+    createScoreTextStyle,
+    getDisplayedHighScore,
+    getHighScoreSyncText,
+    getHighScoreSyncTint,
+    getWorldBestLabel,
+} from "../highScoreUi.js";
 import { play, bgmPlay, stop } from "../soundManager.js";
 import { ContinueYesButton } from "../ui/ContinueYesButton.js";
 import { ContinueNoButton } from "../ui/ContinueNoButton.js";
@@ -103,7 +111,20 @@ export class ContinueScene extends BaseScene {
         this._onGotoTitleUp = this.nextSceneAnim.bind(this);
     }
 
-    loop() {}
+    loop() {
+        this.refreshHighScoreUi();
+    }
+
+    refreshHighScoreUi() {
+        if (this.worldBestText) {
+            this.worldBestText.text = getWorldBestLabel() + " " + String(getDisplayedHighScore());
+        }
+
+        if (this.scoreSyncText) {
+            this.scoreSyncText.text = getHighScoreSyncText();
+            this.scoreSyncText.tint = getHighScoreSyncTint();
+        }
+    }
 
     onCountDown() {
         if (this.countDown < 0) {
@@ -291,9 +312,25 @@ export class ContinueScene extends BaseScene {
                 this.bigNumTxt.setNum(Number(gameState.score || 0));
                 this.addChild(this.bigNumTxt);
 
+                this.worldBestText = new PIXI.Text("", createScoreTextStyle({
+                    fontSize: 10,
+                }));
+                this.worldBestText.x = this.scoreTitleTxt.x;
+                this.worldBestText.y = this.scoreTitleTxt.y + 22;
+                this.addChild(this.worldBestText);
+
+                this.scoreSyncText = new PIXI.Text("", createScoreTextStyle({
+                    fontSize: 8,
+                }));
+                this.scoreSyncText.x = this.scoreTitleTxt.x;
+                this.scoreSyncText.y = this.worldBestText.y + 14;
+                this.addChild(this.scoreSyncText);
+
+                this.refreshHighScoreUi();
+
                 this.twText = new TwitterButton();
                 this.twText.x = GAME_DIMENSIONS.CENTER_X;
-                this.twText.y = this.scoreTitleTxt.y + this.twText.height / 2 + 20;
+                this.twText.y = this.scoreSyncText.y + this.twText.height / 2 + 16;
                 this.twText.on("pointerup", this._onTweetUp);
                 this.addChild(this.twText);
 
@@ -346,6 +383,12 @@ export class ContinueScene extends BaseScene {
             const voiceIndex = Math.floor(Math.random() * 2);
             play("g_continue_no_voice" + String(voiceIndex));
         }, null, this, "+=0");
+
+        if (Number(gameState.score || 0) >= Number(gameState.highScore || 0)
+            || gameState.scoreSyncStatus === "loading"
+            || gameState.scoreSyncStatus === "error") {
+            submitHighScore(Number(gameState.score || 0)).catch(() => {});
+        }
 
         removeChildIfPresent(this, this.yesText);
         removeChildIfPresent(this, this.noText);

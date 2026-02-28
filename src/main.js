@@ -1,4 +1,5 @@
 import { instantiateGame } from "./app-formatted.js";
+import { initializeFirebaseScores } from "./firebaseScores.js";
 import { HitTester } from "./HitTester.js";
 
 let started = false;
@@ -126,6 +127,8 @@ function onDeviceReady() {
     if (window.cordova) {
         setupCordovaPlugins();
     }
+
+    initializeFirebaseScores().catch(() => {});
 
     const game = instantiateGame();
     globalThis.__PHASER_GAME__ = game;

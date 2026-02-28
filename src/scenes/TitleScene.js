@@ -8,6 +8,13 @@ import {
 } from "../constants.js";
 import { gameState } from "../gameState.js";
 import { globals } from "../globals.js";
+import {
+    createScoreTextStyle,
+    getDisplayedHighScore,
+    getHighScoreSyncText,
+    getHighScoreSyncTint,
+    getWorldBestLabel,
+} from "../highScoreUi.js";
 import { play as playSound } from "../soundManager.js";
 import { StartButton } from "../ui/StartButton.js";
 import { HowtoButton } from "../ui/HowtoButton.js";
@@ -50,6 +57,9 @@ export class TitleScene extends BaseScene {
         this.transitioning = false;
         this.staffrollPanel = null;
         this.fadeOutBlack = null;
+        this._lastDisplayedHighScore = -1;
+        this._lastScoreSyncText = "";
+        this._lastScoreSyncTint = -1;
         this._onStartUp = this.titleStart.bind(this);
         this._onTweetUp = this.tweet.bind(this);
         this._onStaffrollUp = this.showStaffroll.bind(this);
@@ -61,6 +71,8 @@ export class TitleScene extends BaseScene {
         if (this.bg) {
             this.bg.tilePosition.x += 0.5;
         }
+
+        this.refreshHighScoreUi();
     }
 
     run() {
@@ -105,14 +117,28 @@ export class TitleScene extends BaseScene {
 
         this.scoreTitleTxt = new PIXI.Sprite(frameTexture("hiScoreTxt.gif"));
         this.scoreTitleTxt.x = 32;
-        this.scoreTitleTxt.y = this.copyright.y - 66;
+        this.scoreTitleTxt.y = this.copyright.y - 58;
         this.addChild(this.scoreTitleTxt);
+
+        this.worldBestLabel = new PIXI.Text(getWorldBestLabel(), createScoreTextStyle({
+            fontSize: 11,
+        }));
+        this.worldBestLabel.x = this.scoreTitleTxt.x;
+        this.worldBestLabel.y = this.scoreTitleTxt.y - 16;
+        this.addChild(this.worldBestLabel);
 
         this.bigNumTxt = new BigNumberDisplay(10);
         this.bigNumTxt.x = this.scoreTitleTxt.x + this.scoreTitleTxt.width + 3;
         this.bigNumTxt.y = this.scoreTitleTxt.y - 2;
-        this.bigNumTxt.setNum(this.state.highScore || 0);
+        this.bigNumTxt.setNum(getDisplayedHighScore());
         this.addChild(this.bigNumTxt);
+
+        this.scoreSyncText = new PIXI.Text("", createScoreTextStyle({
+            fontSize: 8,
+        }));
+        this.scoreSyncText.x = this.scoreTitleTxt.x;
+        this.scoreSyncText.y = this.scoreTitleTxt.y + 22;
+        this.addChild(this.scoreSyncText);
 
         this.twitterBtn = new TwitterButton();
         this.twitterBtn.x = GAME_DIMENSIONS.CENTER_X;
@@ -145,6 +171,27 @@ export class TitleScene extends BaseScene {
         this.addChild(this.fadeOutBlack);
 
         this.startIntroAnimation();
+        this.refreshHighScoreUi();
+    }
+
+    refreshHighScoreUi() {
+        const displayedHighScore = getDisplayedHighScore();
+        if (displayedHighScore !== this._lastDisplayedHighScore && this.bigNumTxt) {
+            this.bigNumTxt.setNum(displayedHighScore);
+            this._lastDisplayedHighScore = displayedHighScore;
+        }
+
+        const scoreSyncText = getHighScoreSyncText();
+        if (scoreSyncText !== this._lastScoreSyncText && this.scoreSyncText) {
+            this.scoreSyncText.text = scoreSyncText;
+            this._lastScoreSyncText = scoreSyncText;
+        }
+
+        const scoreSyncTint = getHighScoreSyncTint();
+        if (scoreSyncTint !== this._lastScoreSyncTint && this.scoreSyncText) {
+            this.scoreSyncText.tint = scoreSyncTint;
+            this._lastScoreSyncTint = scoreSyncTint;
+        }
     }
 
     startIntroAnimation() {

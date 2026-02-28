@@ -50,6 +50,21 @@
     <script src="./src/lib/pixi.min.js"></script>
     <script src="./src/lib/TweenMax.min.js"></script>
     <script src="./src/lib/pixi-sound.min.js"></script>
+    <script>
+        window.firebaseConfig = window.firebaseConfig || {
+            apiKey: "AIzaSyAHY_agipyNEXvY2J4jDgnlk9kLeM6O37Y",
+            authDomain: "evil-invaders.firebaseapp.com",
+            databaseURL: "https://evil-invaders-default-rtdb.firebaseio.com",
+            projectId: "evil-invaders",
+            storageBucket: "evil-invaders.firebasestorage.app",
+            messagingSenderId: "149257705855",
+            appId: "1:149257705855:web:3f048481dfc66cef61224a",
+        };
+        window.__FIREBASE_CONFIG__ = window.__FIREBASE_CONFIG__ || window.firebaseConfig;
+        window.__FIREBASE_DATABASE_PATH__ = window.__FIREBASE_DATABASE_PATH__ || "leaderboards/globalHighScore";
+    </script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
 </head>
 <body>
     <div id="baseUrl" hidden>./</div>
