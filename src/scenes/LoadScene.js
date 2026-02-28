@@ -64,8 +64,8 @@ export class LoadScene extends BaseScene {
         this.recommendModalCloseBtn = null;
         this.loadingBgFlipCnt = 0;
         this.lowModeFlg = false;
-        this._secretTapCount = 0;
-        this._secretTapTimer = null;
+        this._isAndroid = typeof navigator !== "undefined"
+            && navigator.userAgent && /android/i.test(navigator.userAgent);
 
         const loadingFrames = [
             PIXI.Texture.fromImage(this.baseUrl + "assets/img/loading/loading0.gif"),
@@ -131,10 +131,11 @@ export class LoadScene extends BaseScene {
         this.modeTitle = new PIXI.Sprite(PIXI.Texture.fromFrame("modeSelectTxt.gif"));
         this.modeTitle.x = 44;
         this.modeTitle.y = 83;
-        this.modeTitle.interactive = true;
-        this.modeTitle.buttonMode = false;
-        this.modeTitle.on("pointerup", this.onSecretTap.bind(this));
         this.addChild(this.modeTitle);
+
+        if (!this._isAndroid) {
+            this.setDownloadBtnVisible(true);
+        }
 
         this.playPcBtn = new ModeButton("playBtnPc0.gif", "playBtnPc1.gif");
         this.playPcBtn.x = 44;
@@ -217,21 +218,6 @@ export class LoadScene extends BaseScene {
         this.recommendModal.scale.set(0, 0);
     }
 
-    onSecretTap() {
-        this._secretTapCount += 1;
-        if (this._secretTapTimer) {
-            clearTimeout(this._secretTapTimer);
-        }
-        if (this._secretTapCount >= 5) {
-            this._secretTapCount = 0;
-            this.setDownloadBtnVisible(true);
-        } else {
-            this._secretTapTimer = setTimeout(function () {
-                this._secretTapCount = 0;
-            }.bind(this), 1500);
-        }
-    }
-
     setDownloadBtnVisible(visible) {
         if (typeof document === "undefined") { return; }
         var btn = document.getElementById("downloadBtn");
@@ -244,37 +230,22 @@ export class LoadScene extends BaseScene {
         this.setDownloadBtnVisible(false);
 
         if (typeof document !== "undefined") {
-            // Prefer Cordova fullscreen plugin (Android immersive sticky mode)
-            if (window.AndroidFullScreen) {
-                window.AndroidFullScreen.immersiveMode(
-                    function () {
-                        log("Immersive fullscreen enabled");
+            var element = document.querySelector("#canvas canvas") || document.documentElement;
+            var requestMethod = element.requestFullscreen
+                || element.webkitRequestFullscreen
+                || element.msRequestFullscreen;
+
+            if (requestMethod) {
+                var promise = requestMethod.call(element, { navigationUI: "hide" });
+                if (promise && promise.then) {
+                    promise.then(function () {
+                        log("Fullscreen entered");
                         if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
                             window.screen.orientation.lock("portrait").catch(function () {});
                         }
-                    },
-                    function () { log("Immersive fullscreen not available"); }
-                );
-            } else if (!window.cordova) {
-                // Browser fullscreen — only attempt when NOT running inside Cordova
-                // (Cordova handles fullscreen natively via config.xml preferences)
-                const element = document.querySelector("#canvas canvas") || document.documentElement;
-                const requestMethod = element.requestFullscreen
-                    || element.webkitRequestFullscreen
-                    || element.msRequestFullscreen;
-
-                if (requestMethod) {
-                    var promise = requestMethod.call(element, { navigationUI: "hide" });
-                    if (promise && promise.then) {
-                        promise.then(function () {
-                            log("Fullscreen entered");
-                            if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
-                                window.screen.orientation.lock("portrait").catch(function () {});
-                            }
-                        }).catch(function (error) {
-                            log("Fullscreen request failed: " + error.message);
-                        });
-                    }
+                    }).catch(function (error) {
+                        log("Fullscreen request failed: " + error.message);
+                    });
                 }
             }
         }
@@ -392,11 +363,6 @@ export class LoadScene extends BaseScene {
     }
 
     destroy(options) {
-        if (this._secretTapTimer) {
-            clearTimeout(this._secretTapTimer);
-            this._secretTapTimer = null;
-        }
-
         if (typeof document !== "undefined") {
             document.removeEventListener("visibilitychange", this.onVisibilityChange);
         }
