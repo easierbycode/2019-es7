@@ -64,6 +64,8 @@ export class LoadScene extends BaseScene {
         this.recommendModalCloseBtn = null;
         this.loadingBgFlipCnt = 0;
         this.lowModeFlg = false;
+        this._secretTapCount = 0;
+        this._secretTapTimer = null;
 
         const loadingFrames = [
             PIXI.Texture.fromImage(this.baseUrl + "assets/img/loading/loading0.gif"),
@@ -129,6 +131,9 @@ export class LoadScene extends BaseScene {
         this.modeTitle = new PIXI.Sprite(PIXI.Texture.fromFrame("modeSelectTxt.gif"));
         this.modeTitle.x = 44;
         this.modeTitle.y = 83;
+        this.modeTitle.interactive = true;
+        this.modeTitle.buttonMode = false;
+        this.modeTitle.on("pointerup", this.onSecretTap.bind(this));
         this.addChild(this.modeTitle);
 
         this.playPcBtn = new ModeButton("playBtnPc0.gif", "playBtnPc1.gif");
@@ -212,7 +217,32 @@ export class LoadScene extends BaseScene {
         this.recommendModal.scale.set(0, 0);
     }
 
+    onSecretTap() {
+        this._secretTapCount += 1;
+        if (this._secretTapTimer) {
+            clearTimeout(this._secretTapTimer);
+        }
+        if (this._secretTapCount >= 5) {
+            this._secretTapCount = 0;
+            this.setDownloadBtnVisible(true);
+        } else {
+            this._secretTapTimer = setTimeout(function () {
+                this._secretTapCount = 0;
+            }.bind(this), 1500);
+        }
+    }
+
+    setDownloadBtnVisible(visible) {
+        if (typeof document === "undefined") { return; }
+        var btn = document.getElementById("downloadBtn");
+        if (btn) {
+            btn.style.display = visible ? "" : "none";
+        }
+    }
+
     loadStart(lowModeFlg) {
+        this.setDownloadBtnVisible(false);
+
         if (typeof document !== "undefined") {
             // Prefer Cordova fullscreen plugin (Android immersive sticky mode)
             if (window.AndroidFullScreen) {
@@ -362,6 +392,11 @@ export class LoadScene extends BaseScene {
     }
 
     destroy(options) {
+        if (this._secretTapTimer) {
+            clearTimeout(this._secretTapTimer);
+            this._secretTapTimer = null;
+        }
+
         if (typeof document !== "undefined") {
             document.removeEventListener("visibilitychange", this.onVisibilityChange);
         }
