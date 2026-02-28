@@ -326,6 +326,16 @@ export class AdvScene extends BaseScene {
             this.nextBtn.buttonMode = false;
         }
 
+        if (typeof document !== "undefined" && !document.fullscreenElement
+            && !document.webkitFullscreenElement && !document.msFullscreenElement) {
+            var el = document.querySelector("#canvas canvas") || document.documentElement;
+            var rfs = el.requestFullscreen || el.webkitRequestFullscreen || el.msRequestFullscreen;
+            if (rfs) {
+                var promise = rfs.call(el, { navigationUI: "hide" });
+                if (promise && promise.catch) { promise.catch(function () {}); }
+            }
+        }
+
         if (this.parent) {
             this.parent.removeChild(this);
             return;
