@@ -21,7 +21,9 @@ export class BigNumberDisplay extends BaseCast {
     }
 
     setNum(num) {
-        const text = String(num);
+        const maxValue = Math.pow(10, this.maxDigit) - 1;
+        const clamped = Math.min(Math.max(0, Math.floor(num)) || 0, maxValue);
+        const text = String(clamped);
         for (let i = 0; i < this.maxDigit; i += 1) {
             const digit = text.substr(i, 1);
             if (digit) {
