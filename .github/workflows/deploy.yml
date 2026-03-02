@@ -81,7 +81,9 @@ jobs:
           rm -rf cordova/www/*
           cp -r assets cordova/www/
           cp -r src cordova/www/
+          cp -r icons cordova/www/ || true
           cp index.html cordova/www/
+          cp manifest.json cordova/www/ || true
           cp favicon.ico cordova/www/ || true
           cp app-original.js cordova/www/ || true
           # Inject cordova.js into index.html
@@ -132,7 +134,9 @@ jobs:
           mkdir dist
           cp -r assets dist/
           cp -r src dist/
+          cp -r icons dist/ || true
           cp index.html dist/
+          cp manifest.json dist/ || true
           cp favicon.ico dist/ || true
           cp app-original.js dist/ || true
 
