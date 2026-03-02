@@ -44,7 +44,11 @@ function onFullscreenChange() {
     if (!isFullscreen()) {
         setTimeout(function () {
             if (!isFullscreen()) {
-                enterFullscreen(document.querySelector("#canvas canvas") || document.documentElement);
+                enterFullscreen(
+                    document.querySelector("#phaser-canvas canvas")
+                    || document.querySelector("#canvas canvas")
+                    || document.documentElement
+                );
             }
         }, 300);
     }
@@ -61,12 +65,22 @@ if (document.fullscreenEnabled || document.webkitFullscreenEnabled) {
 // ---------------------------------------------------------------------------
 function fitCanvas() {
     var c = document.querySelector("#canvas canvas");
-    if (!c) { return; }
-    var vw = window.innerWidth;
-    var vh = window.innerHeight;
-    var scale = Math.min(vw / 256, vh / 480);
-    c.style.width = Math.floor(256 * scale) + "px";
-    c.style.height = Math.floor(480 * scale) + "px";
+    if (c) {
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+        var scale = Math.min(vw / 256, vh / 480);
+        c.style.width = Math.floor(256 * scale) + "px";
+        c.style.height = Math.floor(480 * scale) + "px";
+    }
+
+    var pc = document.querySelector("#phaser-canvas canvas");
+    if (pc) {
+        var vw2 = window.innerWidth;
+        var vh2 = window.innerHeight;
+        var scale2 = Math.min(vw2 / 256, vh2 / 480);
+        pc.style.width = Math.floor(256 * scale2) + "px";
+        pc.style.height = Math.floor(480 * scale2) + "px";
+    }
 }
 
 window.addEventListener("resize", fitCanvas);

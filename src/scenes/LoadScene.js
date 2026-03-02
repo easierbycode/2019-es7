@@ -13,6 +13,7 @@ import { globals } from "../globals.js";
 import { pauseAll, resumeAll, setInitialVolumes } from "../soundManager.js";
 import { ModeButton } from "../ui/ModeButton.js";
 import { RecommendButton } from "../ui/RecommendButton.js";
+import { createPhaserGame } from "../phaser/PhaserGame.js";
 
 function createLoader() {
     return PIXI.loaders && PIXI.loaders.Loader ? new PIXI.loaders.Loader() : new PIXI.Loader();
@@ -137,7 +138,7 @@ export class LoadScene extends BaseScene {
         this.playPcBtn.x = 44;
         this.playPcBtn.y = this.modeTitle.y + this.modeTitle.height + 40;
         this.addChild(this.playPcBtn);
-        this.playPcBtn.on("pointerup", this.loadStart.bind(this, false));
+        this.playPcBtn.on("pointerup", this.launchPhaser.bind(this));
 
         this.playPcTxt = new PIXI.Sprite(PIXI.Texture.fromFrame("playBtnPcTxt.gif"));
         this.playPcTxt.x = 44;
@@ -220,6 +221,24 @@ export class LoadScene extends BaseScene {
         if (btn) {
             btn.style.display = visible ? "" : "none";
         }
+    }
+
+    launchPhaser() {
+        this.setDownloadBtnVisible(false);
+
+        var iosBanner = document.getElementById("iosInstallBanner");
+        if (iosBanner) { iosBanner.style.display = "none"; }
+
+        this.state.lowModeFlg = false;
+
+        log("Launching Phaser 4 game...");
+
+        Promise.race([
+            initializeFirebaseScores().catch(() => {}),
+            waitFor(1500),
+        ]).finally(() => {
+            createPhaserGame();
+        });
     }
 
     loadStart(lowModeFlg) {
