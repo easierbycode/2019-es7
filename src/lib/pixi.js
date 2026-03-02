@@ -24100,7 +24100,7 @@ TextMetrics._canvas = canvas;
  * @type {CanvasRenderingContext2D}
  * @private
  */
-TextMetrics._context = canvas.getContext('2d');
+TextMetrics._context = canvas.getContext('2d', { willReadFrequently: true });
 
 /**
  * Cache of PIXI.TextMetrics~FontMetrics objects.
