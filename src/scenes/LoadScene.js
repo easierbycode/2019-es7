@@ -229,11 +229,25 @@ export class LoadScene extends BaseScene {
         var iosBanner = document.getElementById("iosInstallBanner");
         if (iosBanner) { iosBanner.style.display = "none"; }
 
-        // Request fullscreen via Phaser ScaleManager (handles vendor prefixes,
-        // fires RESIZE to sync PIXI canvas, and is a no-op on iOS Safari).
-        var sm = globalThis.__PHASER_SCALE__;
-        if (sm && !sm.isFullscreen) {
-            sm.startFullscreen({ navigationUI: "hide" });
+        if (typeof document !== "undefined") {
+            var element = document.querySelector("#canvas canvas") || document.documentElement;
+            var requestMethod = element.requestFullscreen
+                || element.webkitRequestFullscreen
+                || element.msRequestFullscreen;
+
+            if (requestMethod) {
+                var promise = requestMethod.call(element, { navigationUI: "hide" });
+                if (promise && promise.then) {
+                    promise.then(function () {
+                        log("Fullscreen entered");
+                        if (window.screen && window.screen.orientation && window.screen.orientation.lock) {
+                            window.screen.orientation.lock("portrait").catch(function () {});
+                        }
+                    }).catch(function (error) {
+                        log("Fullscreen request failed: " + error.message);
+                    });
+                }
+            }
         }
 
         this.lowModeFlg = lowModeFlg;
