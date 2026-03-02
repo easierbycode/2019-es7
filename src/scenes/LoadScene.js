@@ -15,6 +15,19 @@ import { ModeButton } from "../ui/ModeButton.js";
 import { RecommendButton } from "../ui/RecommendButton.js";
 import { createPhaserGame } from "../phaser/PhaserGame.js";
 
+const PHASER_URL = "https://cdn.jsdelivr.net/npm/phaser@4.0.0-rc.6/dist/phaser.min.js";
+
+function loadScript(src) {
+    return new Promise(function (resolve, reject) {
+        var script = document.createElement("script");
+        script.src = src;
+        script.async = true;
+        script.onload = resolve;
+        script.onerror = function () { reject(new Error("Failed to load " + src)); };
+        document.head.appendChild(script);
+    });
+}
+
 function createLoader() {
     return PIXI.loaders && PIXI.loaders.Loader ? new PIXI.loaders.Loader() : new PIXI.Loader();
 }
@@ -233,12 +246,16 @@ export class LoadScene extends BaseScene {
 
         log("Launching Phaser 4 game...");
 
-        Promise.race([
-            initializeFirebaseScores().catch(() => {}),
-            waitFor(1500),
-        ]).finally(() => {
-            createPhaserGame();
-        });
+        (window.Phaser ? Promise.resolve() : loadScript(PHASER_URL))
+            .then(function () {
+                return Promise.race([
+                    initializeFirebaseScores().catch(function () {}),
+                    waitFor(1500),
+                ]);
+            })
+            .finally(function () {
+                createPhaserGame();
+            });
     }
 
     loadStart(lowModeFlg) {
