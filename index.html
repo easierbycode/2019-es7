@@ -4,12 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>2019-es7</title>
+
+    <!-- PWA manifest & iOS standalone mode -->
+    <link rel="manifest" href="./manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Evil Invaders" />
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <meta name="theme-color" content="#000000" />
     <style>
         html, body {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
+            height: 100dvh;
             background: #000;
             overflow: hidden;
             overscroll-behavior: none;
@@ -21,6 +30,7 @@
         #canvas {
             width: 100%;
             height: 100%;
+            height: 100dvh;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -47,6 +57,7 @@
         }
     </style>
 
+    <script src="./src/lib/phaser.min.js"></script>
     <script src="./src/lib/pixi.min.js"></script>
     <script src="./src/lib/TweenMax.min.js"></script>
     <script src="./src/lib/pixi-sound.min.js"></script>
@@ -68,11 +79,28 @@
 </head>
 <body>
     <div id="baseUrl" hidden>./</div>
+    <!-- Hidden host for Phaser ScaleManager (calculates FIT sizing for PIXI canvas) -->
+    <div id="phaserHost" style="position:absolute; top:0; left:0; width:100%; height:100%; height:100dvh; pointer-events:none; opacity:0; z-index:-1;"></div>
     <div id="canvas"></div>
 
     <script type="module" src="./src/main.js"></script>
     <div id="downloadBtn" style="position: fixed; bottom: 10px; right: 10px; z-index: 1000; display: none;">
         <a href="https://EasierByCode.com/2019-es7/game.apk" style="color: #888; text-decoration: none; font-family: sans-serif; font-size: 10px; background: rgba(0,0,0,0.3); padding: 2px 5px; border-radius: 3px;">🪬DOWNLOAD🪬</a>
+    </div>
+
+    <!-- iOS "Add to Home Screen" prompt (shown via JS for iOS Safari only) -->
+    <div id="iosInstallBanner" style="display:none; position:fixed; bottom:0; left:0; right:0;
+        z-index:2000; background:rgba(0,0,0,0.85); color:#fff; font-family:sans-serif;
+        font-size:12px; padding:10px 12px; text-align:center; border-top:1px solid #333;
+        backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);">
+        <span style="display:inline-block; max-width:280px; line-height:1.4;">
+            For fullscreen: tap
+            <span style="font-size:16px; vertical-align:middle;">&#x1F4E4;</span>
+            then <strong>&ldquo;Add to Home Screen&rdquo;</strong>
+        </span>
+        <button id="iosInstallDismiss" style="position:absolute; top:4px; right:8px;
+            background:none; border:none; color:#888; font-size:18px; cursor:pointer;
+            padding:4px 8px; line-height:1;">&times;</button>
     </div>
 </body>
 </html>
