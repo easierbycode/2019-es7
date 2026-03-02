@@ -6,8 +6,9 @@ function ensureGameState() {
 }
 
 export function normalizeScore(value) {
+    const MAX_SANE_SCORE = 999999999;
     const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed > MAX_SANE_SCORE) {
         return 0;
     }
     return Math.max(0, Math.floor(parsed));

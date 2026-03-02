@@ -14,23 +14,62 @@ function lockPortrait() {
 }
 
 // ---------------------------------------------------------------------------
-// Fullscreen — delegated to Phaser 4 ScaleManager
+// Fullscreen helpers
 // ---------------------------------------------------------------------------
-// enterFullscreen() is called from LoadScene, AdvScene, and the Android
-// early-touch handler.  It delegates to the Phaser wrapper's ScaleManager
-// which handles vendor prefixes, fullscreen target, and resize events.
-// On iOS (where the Fullscreen API does not exist) Phaser fires
-// FULLSCREEN_UNSUPPORTED — the PWA standalone path covers that case.
-// ---------------------------------------------------------------------------
-function enterFullscreen() {
-    var sm = globalThis.__PHASER_SCALE__;
-    if (sm) {
-        if (!sm.isFullscreen) {
-            sm.startFullscreen({ navigationUI: "hide" });
-        }
+function enterFullscreen(element) {
+    var el = element || document.documentElement;
+    var rfs = el.requestFullscreen
+        || el.webkitRequestFullscreen
+        || el.msRequestFullscreen;
+
+    if (!rfs) { return; }
+
+    var promise = rfs.call(el, { navigationUI: "hide" });
+    if (promise && promise.then) {
+        promise.then(function () {
+            lockPortrait();
+        }).catch(function () {});
+    } else {
         lockPortrait();
     }
 }
+
+function isFullscreen() {
+    return !!(document.fullscreenElement
+        || document.webkitFullscreenElement
+        || document.msFullscreenElement);
+}
+
+function onFullscreenChange() {
+    if (!isFullscreen()) {
+        setTimeout(function () {
+            if (!isFullscreen()) {
+                enterFullscreen(document.querySelector("#canvas canvas") || document.documentElement);
+            }
+        }, 300);
+    }
+    fitCanvas();
+}
+
+if (document.fullscreenEnabled || document.webkitFullscreenEnabled) {
+    document.addEventListener("fullscreenchange", onFullscreenChange, false);
+    document.addEventListener("webkitfullscreenchange", onFullscreenChange, false);
+}
+
+// ---------------------------------------------------------------------------
+// Canvas FIT scaling — scales 256x480 to fill viewport, maintaining aspect ratio
+// ---------------------------------------------------------------------------
+function fitCanvas() {
+    var c = document.querySelector("#canvas canvas");
+    if (!c) { return; }
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    var scale = Math.min(vw / 256, vh / 480);
+    c.style.width = Math.floor(256 * scale) + "px";
+    c.style.height = Math.floor(480 * scale) + "px";
+}
+
+window.addEventListener("resize", fitCanvas);
 
 // ---------------------------------------------------------------------------
 // Edge-swipe prevention
@@ -159,65 +198,8 @@ function onDeviceReady() {
         interaction.hitTestRectangle = HitTester.hitTestFunc;
     }
 
-    // ------------------------------------------------------------------
-    // Phaser 4 wrapper — uses ScaleManager for FIT scaling & fullscreen
-    // ------------------------------------------------------------------
-    // Phaser creates its own invisible canvas inside #phaserHost.
-    // Its ScaleManager calculates the correct CSS dimensions for a
-    // 256x480 game in the current viewport.  We mirror those dimensions
-    // to the PIXI canvas on every RESIZE event.
-    // ------------------------------------------------------------------
-    if (typeof Phaser !== "undefined" && !window.cordova) {
-        var phaserGame = new Phaser.Game({
-            parent: "phaserHost",
-            width: 256,
-            height: 480,
-            type: Phaser.CANVAS,
-            banner: false,
-            transparent: true,
-            audio: { noAudio: true },
-            scale: {
-                mode: Phaser.Scale.FIT,
-                autoCenter: Phaser.Scale.CENTER_BOTH,
-            },
-            scene: [],
-        });
-
-        // Expose the ScaleManager globally so enterFullscreen() and
-        // scene code (LoadScene, AdvScene) can use it.
-        globalThis.__PHASER_SCALE__ = phaserGame.scale;
-
-        // Sync PIXI canvas CSS size whenever Phaser recalculates
-        function syncPixiCanvas() {
-            var pixiCanvas = document.querySelector("#canvas canvas");
-            var sm = phaserGame.scale;
-            if (!pixiCanvas || !sm || !sm.displaySize) { return; }
-            pixiCanvas.style.width = sm.displaySize.width + "px";
-            pixiCanvas.style.height = sm.displaySize.height + "px";
-        }
-
-        phaserGame.scale.on(Phaser.Scale.Events.RESIZE, syncPixiCanvas);
-        phaserGame.scale.on(Phaser.Scale.Events.ENTER_FULLSCREEN, function () {
-            lockPortrait();
-            syncPixiCanvas();
-        });
-        phaserGame.scale.on(Phaser.Scale.Events.LEAVE_FULLSCREEN, function () {
-            // Re-enter fullscreen after accidental exit (swipe, etc.)
-            setTimeout(function () {
-                if (!phaserGame.scale.isFullscreen) {
-                    phaserGame.scale.startFullscreen({ navigationUI: "hide" });
-                }
-            }, 300);
-        });
-
-        // Initial sync after Phaser has booted and measured the parent
-        phaserGame.events.once("ready", function () {
-            syncPixiCanvas();
-        });
-        // Also sync after a short delay in case "ready" fires before
-        // the PIXI canvas exists in the DOM
-        setTimeout(syncPixiCanvas, 200);
-    }
+    // Scale canvas to fill viewport after PIXI creates it
+    fitCanvas();
 }
 
 document.addEventListener("deviceready", onDeviceReady, false);
