@@ -163,6 +163,7 @@ export class PhaserGameScene extends Phaser.Scene {
         var name = bossNames[stageId] || "bison";
         var key = "boss_" + name + "_bgm";
         this.stageBgmName = key;
+        this.playBgm(key, 0.4);
     }
 
     createPlayer() {
@@ -630,10 +631,11 @@ export class PhaserGameScene extends Phaser.Scene {
         this.bossProjCnt = 0;
 
         // Store all projectile data variants for boss-specific patterns
-        this.bossProjData = bossData.bulletData || bossData.projectileData || null;
         this.bossProjDataA = bossData.bulletDataA || bossData.projectileDataA || null;
         this.bossProjDataB = bossData.bulletDataB || bossData.projectileDataB || null;
         this.bossProjDataC = bossData.bulletDataC || bossData.projectileDataC || null;
+        // Fall back to bulletDataA when bulletData is absent (stages 2-4)
+        this.bossProjData = bossData.bulletData || bossData.projectileData || this.bossProjDataA;
 
         var bossFrames = (bossData.anim && bossData.anim.idle) || bossData.texture || [];
         var bossFrame = bossFrames[0] || "bison_idle0.gif";
@@ -657,9 +659,6 @@ export class PhaserGameScene extends Phaser.Scene {
         var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
         var voiceKey = "boss_" + (bossNames[stageId] || "bison") + "_voice_add";
         this.playSound(voiceKey, 0.7);
-
-        var bgmKey = "boss_" + (bossNames[stageId] || "bison") + "_bgm";
-        this.playBgm(bgmKey, 0.4);
 
         this.tweens.add({
             targets: this.bossSprite,
@@ -707,32 +706,32 @@ export class PhaserGameScene extends Phaser.Scene {
             }
             break;
         case 2:
-            // Sagat: alternating aimed and spread patterns
+            // Sagat: alternating aimed and spread with two projectile types
             this.bossProjCnt++;
             if (this.bossProjCnt % 4 === 0) {
-                this.bossShootSpread(this.bossProjData, 5, 20);
+                this.bossShootSpread(this.bossProjDataB || this.bossProjData, 5, 20);
             } else {
-                this.bossShootAimed(this.bossProjData);
+                this.bossShootAimed(this.bossProjDataA || this.bossProjData);
             }
             break;
         case 3:
-            // Vega: radial burst every 3rd shot, else aimed
+            // Vega: radial burst every 5th shot, else aimed with two projectile types
             this.bossProjCnt++;
             if (this.bossProjCnt % 5 === 0) {
-                this.bossShootRadial(this.bossProjData, 12);
+                this.bossShootRadial(this.bossProjDataB || this.bossProjData, 12);
             } else {
-                this.bossShootAimed(this.bossProjData);
+                this.bossShootAimed(this.bossProjDataA || this.bossProjData);
             }
             break;
         case 4:
-            // Fang: rapid spread + radial combo
+            // Fang: rapid spread + radial combo with two projectile types
             this.bossProjCnt++;
             if (this.bossProjCnt % 6 === 0) {
-                this.bossShootRadial(this.bossProjData, 18);
+                this.bossShootRadial(this.bossProjDataB || this.bossProjData, 18);
             } else if (this.bossProjCnt % 3 === 0) {
-                this.bossShootSpread(this.bossProjData, 5, 15);
+                this.bossShootSpread(this.bossProjDataA || this.bossProjData, 5, 15);
             } else {
-                this.bossShootAimed(this.bossProjData);
+                this.bossShootAimed(this.bossProjDataA || this.bossProjData);
             }
             break;
         default:
@@ -1274,8 +1273,9 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         if (this.bossTimerStartFlg) {
-            this.bossTimerFrameCnt++;
-            if (this.bossTimerFrameCnt % 60 === 0) {
+            this.bossTimerFrameCnt += delta;
+            if (this.bossTimerFrameCnt >= 1000) {
+                this.bossTimerFrameCnt -= 1000;
                 this.bossTimerCountDown--;
                 if (this.bossTimerCountDown <= 0) {
                     this.bossTimerStartFlg = false;
