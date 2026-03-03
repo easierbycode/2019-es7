@@ -1,4 +1,4 @@
-// src/phaser/PhaserGame.js
+// src/phaser/PhaserGame.js  ← corrected & ready for Phaser 4.0.0-rc.6
 
 import { GAME_DIMENSIONS } from "../constants.js";
 
@@ -10,22 +10,18 @@ import { PhaserContinueScene } from "./ContinueScene.js";
 import { PhaserEndingScene } from "./EndingScene.js";
 
 export function createPhaserGame() {
-    // Switch from old PIXI to Phaser (exactly as you had it)
+    // Hide old PIXI canvas, show new Phaser one
     const pixiCanvas = document.getElementById("canvas");
-    const phaserCanvas = document.getElementById("phaser-canvas");
+    const phaserContainer = document.getElementById("phaser-canvas");
 
-    if (pixiCanvas) {
-        pixiCanvas.style.display = "none";
-    }
-    if (phaserCanvas) {
-        phaserCanvas.style.display = "flex";
-    }
+    if (pixiCanvas) pixiCanvas.style.display = "none";
+    if (phaserContainer) phaserContainer.style.display = "flex";
 
     const phaserConfig = {
-        type: Phaser.AUTO,                    // Phaser is global from the CDN script
+        type: Phaser.AUTO,
         width: GAME_DIMENSIONS.WIDTH,
         height: GAME_DIMENSIONS.HEIGHT,
-        parent: "phaser-canvas",              // ← FIXED to match your HTML
+        parent: "phaser-canvas",           // ← FIXED (matches your HTML)
         backgroundColor: "#000000",
         fps: { 
             target: 30, 
@@ -46,9 +42,9 @@ export function createPhaserGame() {
     };
 
     const game = new Phaser.Game(phaserConfig);
-    globalThis.__PHASER_4_GAME__ = game;   // handy for console debugging
+    globalThis.__PHASER_4_GAME__ = game;   // useful for console debugging
 
-    console.log("🚀 Phaser 4 game started successfully");
+    console.log("✅ Phaser 4 game started successfully (all scenes ready)");
     return game;
 }
 
