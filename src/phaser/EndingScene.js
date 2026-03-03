@@ -30,10 +30,10 @@ export class PhaserEndingScene extends Phaser.Scene {
 
         this.playSound("voice_congra", 0.7);
 
-        var congraTitle = this.add.sprite(GCX, 60, "game_ui", "congraTitle.gif");
+        var congraTitle = this.add.sprite(GCX, 60, "game_ui", "congraTxt0.gif");
         congraTitle.setOrigin(0.5);
 
-        var congraFace = this.add.sprite(GCX, 160, "game_ui", "congraFace.gif");
+        var congraFace = this.add.sprite(GCX, 160, "game_ui", "congraBg0.gif");
         congraFace.setOrigin(0.5);
 
         var scoreLabel = LANG === "ja" ? "スコア" : "SCORE";
