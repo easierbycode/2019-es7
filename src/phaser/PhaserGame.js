@@ -18,30 +18,28 @@ export function createPhaserGame() {
         phaserContainer.style.display = "flex";
     }
 
-    var config = {
-        type: Phaser.AUTO,
-        width: GAME_DIMENSIONS.WIDTH,
-        height: GAME_DIMENSIONS.HEIGHT,
-        parent: "phaser-canvas",
-        backgroundColor: "#000000",
-        pixelArt: true,
-        antialias: false,
-        roundPixels: true,
-        scale: {
-            mode: Phaser.Scale.FIT,
-            autoCenter: Phaser.Scale.CENTER_BOTH,
-        },
-        scene: [
-            BootScene,
-            PhaserTitleScene,
-            PhaserAdvScene,
-            PhaserGameScene,
-            PhaserContinueScene,
-            PhaserEndingScene,
-        ],
-    };
+    
+const phaserConfig = {
+    type: Phaser.AUTO,
+    width: GAME_DIMENSIONS.WIDTH,      // from constants.js
+    height: GAME_DIMENSIONS.HEIGHT,
+    parent: "phaser-container",
+    backgroundColor: "#000000",
+    fps: { target: 30, forceSetTimeOut: true },
+    scale: {
+        mode: Phaser.Scale.FIT,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
+    scene: [
+        BootScene,           // ← this is now the starting scene (loading)
+        PhaserTitleScene,    // ← your beautiful animated title
+        // PhaserAdvScene,
+        // PhaserGameScene,
+        // etc.
+    ]
+};
 
-    var game = new Phaser.Game(config);
+    var game = new Phaser.Game(phaserConfig);
     globalThis.__PHASER_4_GAME__ = game;
 
     return game;
