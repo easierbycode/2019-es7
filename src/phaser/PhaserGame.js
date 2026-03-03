@@ -23,7 +23,7 @@ const phaserConfig = {
     type: Phaser.AUTO,
     width: GAME_DIMENSIONS.WIDTH,      // from constants.js
     height: GAME_DIMENSIONS.HEIGHT,
-    parent: "phaser-container",
+    parent: "phaser-canvas",
     backgroundColor: "#000000",
     fps: { target: 30, forceSetTimeOut: true },
     scale: {
