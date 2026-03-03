@@ -24,6 +24,34 @@ function rectOverlap(a, b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
+// Boss movement pattern definitions per stage
+var BOSS_PATTERNS = {
+    // Bison: slow horizontal drift
+    0: function (boss, time) {
+        boss.x = GCX + Math.sin(time * 0.0008) * 50;
+    },
+    // Barlog: aggressive horizontal charge
+    1: function (boss, time) {
+        boss.x = GCX + Math.sin(time * 0.002) * 80;
+        boss.y = 80 + Math.sin(time * 0.001) * 20;
+    },
+    // Sagat: slow weave
+    2: function (boss, time) {
+        boss.x = GCX + Math.sin(time * 0.001) * 60;
+        boss.y = 80 + Math.cos(time * 0.0007) * 15;
+    },
+    // Vega: fast darting movement
+    3: function (boss, time) {
+        boss.x = GCX + Math.sin(time * 0.003) * 70;
+        boss.y = 80 + Math.sin(time * 0.002) * 30;
+    },
+    // Fang: figure-8 pattern
+    4: function (boss, time) {
+        boss.x = GCX + Math.sin(time * 0.0015) * 60;
+        boss.y = 80 + Math.sin(time * 0.003) * 25;
+    },
+};
+
 export class PhaserGameScene extends Phaser.Scene {
     constructor() {
         super({ key: "PhaserGameScene" });
@@ -49,18 +77,21 @@ export class PhaserGameScene extends Phaser.Scene {
         this.gameStarted = false;
         this.stageCleared = false;
         this.playerDead = false;
+        this.bossEntering = false;
 
-        this.scoreCount = 0;
+        this.scoreCount = gameState.score || 0;
         this.comboCount = 0;
+        this.maxCombo = gameState.maxCombo || 0;
         this.comboTimeCnt = 0;
-        this.spGauge = 0;
+        this.spGauge = gameState.spgage || 0;
         this.spFired = false;
+        this.spFiredDuringBoss = false;
 
         var stageId = gameState.stageId || 0;
         this.stageKey = "stage" + String(stageId);
 
         var enemyList = this.recipe[this.stageKey] ? this.recipe[this.stageKey].enemylist : [];
-        this.stageEnemyPositionList = enemyList || [];
+        this.stageEnemyPositionList = (enemyList || []).slice().reverse();
 
         this.stageBg = this.add.tileSprite(0, 0, GW, GH, "stage_loop" + stageId);
         this.stageBg.setOrigin(0, 0);
@@ -91,6 +122,8 @@ export class PhaserGameScene extends Phaser.Scene {
         this.bossInterval = 0;
         this.bossIntervalCnt = 0;
         this.bossName = "";
+        this.bossStageId = stageId;
+        this.bossProjCnt = 0;
 
         this.showTitle();
 
@@ -104,8 +137,25 @@ export class PhaserGameScene extends Phaser.Scene {
         this.shootMode = gameState.shootMode || "normal";
         this.shootSpeed = gameState.shootSpeed || "speed_normal";
 
+        // Keyboard controls for PC mode
+        this.cursors = this.input.keyboard.createCursorKeys();
+        this.wasd = this.input.keyboard.addKeys({
+            up: Phaser.Input.Keyboard.KeyCodes.W,
+            down: Phaser.Input.Keyboard.KeyCodes.S,
+            left: Phaser.Input.Keyboard.KeyCodes.A,
+            right: Phaser.Input.Keyboard.KeyCodes.D,
+            sp: Phaser.Input.Keyboard.KeyCodes.SPACE,
+        });
+        this.keyMoveSpeed = 3;
+
         this.stageBgmName = "";
         this.playBossBgm(stageId);
+
+        // Play stage voice after round title
+        var self = this;
+        this.time.delayedCall(2600, function () {
+            self.playSound("g_stage_voice_" + String(stageId), 0.7);
+        });
     }
 
     playBossBgm(stageId) {
@@ -152,7 +202,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this.scoreText = this.add.text(
             this.scoreLabel.x + this.scoreLabel.width + 2,
             25,
-            "0",
+            String(this.scoreCount),
             { fontFamily: "Arial", fontSize: "12px", fontStyle: "bold", color: "#ffffff", stroke: "#000000", strokeThickness: 2 }
         );
         this.scoreText.setDepth(101);
@@ -199,6 +249,14 @@ export class PhaserGameScene extends Phaser.Scene {
         this.bossTimerText.setOrigin(0.5, 0);
         this.bossTimerText.setDepth(101);
         this.bossTimerText.setVisible(false);
+
+        // Boss HP bar (hidden until boss appears)
+        this.bossHpBarBg = this.add.graphics();
+        this.bossHpBarBg.setDepth(101);
+        this.bossHpBarBg.setVisible(false);
+        this.bossHpBarFg = this.add.graphics();
+        this.bossHpBarFg.setDepth(101);
+        this.bossHpBarFg.setVisible(false);
     }
 
     createCover() {
@@ -278,12 +336,69 @@ export class PhaserGameScene extends Phaser.Scene {
         this.playerSprite.x = clamp(pointer.x, 16, GW - 16);
     }
 
+    handleKeyboardInput() {
+        if (!this.gameStarted || this.playerDead || this.theWorldFlg) {
+            return;
+        }
+
+        var moveX = 0;
+        var moveY = 0;
+
+        if (this.cursors.left.isDown || this.wasd.left.isDown) {
+            moveX = -this.keyMoveSpeed;
+        } else if (this.cursors.right.isDown || this.wasd.right.isDown) {
+            moveX = this.keyMoveSpeed;
+        }
+
+        if (this.cursors.up.isDown || this.wasd.up.isDown) {
+            moveY = -this.keyMoveSpeed;
+        } else if (this.cursors.down.isDown || this.wasd.down.isDown) {
+            moveY = this.keyMoveSpeed;
+        }
+
+        if (moveX !== 0 || moveY !== 0) {
+            this.playerSprite.x = clamp(this.playerSprite.x + moveX, 16, GW - 16);
+            this.playerSprite.y = clamp(this.playerSprite.y + moveY, 50, GH - 20);
+        }
+
+        // Space bar triggers SP
+        if (Phaser.Input.Keyboard.JustDown(this.wasd.sp)) {
+            this.onSpFire();
+        }
+    }
+
     updateSpGauge() {
         this.spGaugeBar.clear();
         this.spGaugeBar.fillStyle(0x333333, 0.7);
         this.spGaugeBar.fillRect(GW - 70, GCY + 35, 60, 8);
         this.spGaugeBar.fillStyle(this.spGauge >= 100 ? 0xff0000 : 0x00aaff, 1);
         this.spGaugeBar.fillRect(GW - 70, GCY + 35, 60 * Math.min(this.spGauge / 100, 1), 8);
+    }
+
+    updateBossHpBar() {
+        if (!this.bossActive || !this.bossSprite || !this.bossSprite.active) {
+            this.bossHpBarBg.setVisible(false);
+            this.bossHpBarFg.setVisible(false);
+            return;
+        }
+
+        var barW = 120;
+        var barH = 6;
+        var barX = GCX - barW / 2;
+        var barY = 52;
+
+        this.bossHpBarBg.setVisible(true);
+        this.bossHpBarBg.clear();
+        this.bossHpBarBg.fillStyle(0x333333, 0.8);
+        this.bossHpBarBg.fillRect(barX, barY, barW, barH);
+
+        var hpRatio = Math.max(0, this.bossHp / this.bossMaxHp);
+        var color = hpRatio > 0.5 ? 0xff4444 : hpRatio > 0.25 ? 0xff8800 : 0xff0000;
+
+        this.bossHpBarFg.setVisible(true);
+        this.bossHpBarFg.clear();
+        this.bossHpBarFg.fillStyle(color, 1);
+        this.bossHpBarFg.fillRect(barX, barY, barW * hpRatio, barH);
     }
 
     onSpFire() {
@@ -295,6 +410,7 @@ export class PhaserGameScene extends Phaser.Scene {
 
     doSpFire() {
         this.spFired = true;
+        this.spFiredDuringBoss = this.bossActive;
         this.spGauge = 0;
         this.updateSpGauge();
         this.playSound("se_sp", 0.8);
@@ -326,23 +442,37 @@ export class PhaserGameScene extends Phaser.Scene {
             self.spExplosions();
         });
 
+        this.time.delayedCall(1500, function () {
+            // Apply SP damage to all enemies including boss
+            var spDamage = self.recipe.playerData.spDamage || 50;
+            for (var e = self.enemies.length - 1; e >= 0; e--) {
+                var en = self.enemies[e];
+                if (en && en.active) {
+                    var isBoss = en.getData("type") === "boss";
+                    if (isBoss) {
+                        var ehp = en.getData("hp") - spDamage;
+                        en.setData("hp", ehp);
+                        self.bossHp = ehp;
+                        if (ehp <= 0) {
+                            self.bossDie(en);
+                        }
+                    } else {
+                        self.enemyDie(en, true);
+                    }
+                }
+            }
+        });
+
         this.time.delayedCall(2500, function () {
             self.theWorldFlg = false;
             self.spFired = false;
-
-            for (var e = self.enemies.length - 1; e >= 0; e--) {
-                var en = self.enemies[e];
-                if (en && en.active && en.getData("type") !== "boss") {
-                    self.enemyDie(en, true);
-                }
-            }
         });
     }
 
     spExplosions() {
         var self = this;
         var count = 0;
-        var interval = this.time.addEvent({
+        this.time.addEvent({
             delay: 60,
             repeat: 15,
             callback: function () {
@@ -480,9 +610,11 @@ export class PhaserGameScene extends Phaser.Scene {
     bossAdd() {
         if (this.bossActive) return;
         this.bossActive = true;
+        this.bossEntering = true;
         this.enemyWaveFlg = false;
 
         var stageId = gameState.stageId || 0;
+        this.bossStageId = stageId;
         var bossData = this.recipe.bossData ? this.recipe.bossData["boss" + String(stageId)] : null;
         if (!bossData) {
             this.stageClear();
@@ -495,6 +627,13 @@ export class PhaserGameScene extends Phaser.Scene {
         this.bossInterval = bossData.interval || 60;
         this.bossIntervalCnt = 0;
         this.bossName = bossData.name || "boss";
+        this.bossProjCnt = 0;
+
+        // Store all projectile data variants for boss-specific patterns
+        this.bossProjData = bossData.bulletData || bossData.projectileData || null;
+        this.bossProjDataA = bossData.bulletDataA || bossData.projectileDataA || null;
+        this.bossProjDataB = bossData.bulletDataB || bossData.projectileDataB || null;
+        this.bossProjDataC = bossData.bulletDataC || bossData.projectileDataC || null;
 
         var bossFrames = (bossData.anim && bossData.anim.idle) || bossData.texture || [];
         var bossFrame = bossFrames[0] || "bison_idle0.gif";
@@ -507,7 +646,9 @@ export class PhaserGameScene extends Phaser.Scene {
         this.bossSprite.setData("frames", bossFrames);
         this.bossSprite.setData("animIdx", 0);
         this.bossSprite.setData("animTimer", 0);
-        this.bossSprite.setData("projData", bossData.bulletData || bossData.projectileData || null);
+        this.bossSprite.setData("projData", this.bossProjData);
+        this.bossSprite.setData("score", this.bossScore);
+        this.bossSprite.setData("spgage", bossData.spgage || 5);
 
         this.enemies.push(this.bossSprite);
 
@@ -526,6 +667,7 @@ export class PhaserGameScene extends Phaser.Scene {
             duration: 2000,
             ease: "Quint.easeOut",
             onComplete: function () {
+                self.bossEntering = false;
                 self.bossTimerCountDown = 99;
                 self.bossTimerFrameCnt = 0;
 
@@ -545,6 +687,133 @@ export class PhaserGameScene extends Phaser.Scene {
         });
     }
 
+    bossShoot() {
+        if (!this.bossSprite || !this.bossSprite.active || this.bossEntering) return;
+
+        var stageId = this.bossStageId;
+
+        switch (stageId) {
+        case 0:
+            // Bison: aimed shot at player
+            this.bossShootAimed(this.bossProjData);
+            break;
+        case 1:
+            // Barlog: spread of 3 bullets + occasional aimed shot
+            this.bossProjCnt++;
+            if (this.bossProjCnt % 3 === 0) {
+                this.bossShootSpread(this.bossProjData, 3, 30);
+            } else {
+                this.bossShootAimed(this.bossProjData);
+            }
+            break;
+        case 2:
+            // Sagat: alternating aimed and spread patterns
+            this.bossProjCnt++;
+            if (this.bossProjCnt % 4 === 0) {
+                this.bossShootSpread(this.bossProjData, 5, 20);
+            } else {
+                this.bossShootAimed(this.bossProjData);
+            }
+            break;
+        case 3:
+            // Vega: radial burst every 3rd shot, else aimed
+            this.bossProjCnt++;
+            if (this.bossProjCnt % 5 === 0) {
+                this.bossShootRadial(this.bossProjData, 12);
+            } else {
+                this.bossShootAimed(this.bossProjData);
+            }
+            break;
+        case 4:
+            // Fang: rapid spread + radial combo
+            this.bossProjCnt++;
+            if (this.bossProjCnt % 6 === 0) {
+                this.bossShootRadial(this.bossProjData, 18);
+            } else if (this.bossProjCnt % 3 === 0) {
+                this.bossShootSpread(this.bossProjData, 5, 15);
+            } else {
+                this.bossShootAimed(this.bossProjData);
+            }
+            break;
+        default:
+            this.bossShootAimed(this.bossProjData);
+            break;
+        }
+    }
+
+    bossShootAimed(projData) {
+        if (!projData || !this.bossSprite) return;
+
+        var frames = projData.texture || [];
+        var frameKey = frames[0] || "normalProjectile0.gif";
+        var speed = projData.speed || 1;
+
+        var bullet = this.add.sprite(this.bossSprite.x, this.bossSprite.y + 20, "game_asset", frameKey);
+        bullet.setOrigin(0.5);
+        bullet.setDepth(41);
+        bullet.setData("speed", speed);
+        bullet.setData("damage", projData.damage || 1);
+
+        var dx = this.playerSprite.x - this.bossSprite.x;
+        var dy = this.playerSprite.y - this.bossSprite.y;
+        var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+        bullet.setData("rotX", dx / dist);
+        bullet.setData("rotY", dy / dist);
+
+        this.enemyBullets.push(bullet);
+    }
+
+    bossShootSpread(projData, count, angleDeg) {
+        if (!projData || !this.bossSprite) return;
+
+        var frames = projData.texture || [];
+        var frameKey = frames[0] || "normalProjectile0.gif";
+        var speed = projData.speed || 1;
+
+        var dx = this.playerSprite.x - this.bossSprite.x;
+        var dy = this.playerSprite.y - this.bossSprite.y;
+        var baseAngle = Math.atan2(dy, dx);
+        var spreadRad = angleDeg * Math.PI / 180;
+        var half = Math.floor(count / 2);
+
+        for (var i = 0; i < count; i++) {
+            var offset = (i - half) * (spreadRad / Math.max(count - 1, 1));
+            var angle = baseAngle + offset;
+
+            var bullet = this.add.sprite(this.bossSprite.x, this.bossSprite.y + 20, "game_asset", frameKey);
+            bullet.setOrigin(0.5);
+            bullet.setDepth(41);
+            bullet.setData("speed", speed);
+            bullet.setData("damage", projData.damage || 1);
+            bullet.setData("rotX", Math.cos(angle));
+            bullet.setData("rotY", Math.sin(angle));
+
+            this.enemyBullets.push(bullet);
+        }
+    }
+
+    bossShootRadial(projData, count) {
+        if (!projData || !this.bossSprite) return;
+
+        var frames = projData.texture || [];
+        var frameKey = frames[0] || "normalProjectile0.gif";
+        var speed = (projData.speed || 1) * 0.8;
+
+        for (var i = 0; i < count; i++) {
+            var angle = (i / count) * Math.PI * 2;
+            var bullet = this.add.sprite(this.bossSprite.x, this.bossSprite.y, "game_asset", frameKey);
+            bullet.setOrigin(0.5);
+            bullet.setDepth(41);
+            bullet.setData("speed", speed);
+            bullet.setData("damage", projData.damage || 1);
+            bullet.setData("rotX", Math.cos(angle));
+            bullet.setData("rotY", Math.sin(angle));
+
+            this.enemyBullets.push(bullet);
+        }
+    }
+
     enemyDie(enemy, isSp) {
         if (!enemy || !enemy.active) return;
 
@@ -552,6 +821,9 @@ export class PhaserGameScene extends Phaser.Scene {
         var spgage = enemy.getData("spgage") || 1;
 
         this.comboCount++;
+        if (this.comboCount > this.maxCombo) {
+            this.maxCombo = this.comboCount;
+        }
         var ratio = Math.max(1, Math.ceil(this.comboCount / 10));
         this.scoreCount += score * ratio;
         this.comboTimeCnt = 100;
@@ -629,6 +901,8 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     playerDamage(amount) {
+        if (this.barrierActive) return;
+
         this.playerHp -= amount;
         if (this.playerHp <= 0) {
             this.playerHp = 0;
@@ -637,16 +911,25 @@ export class PhaserGameScene extends Phaser.Scene {
 
         this.hpBar.setScale(Math.max(0, this.playerHp / this.playerMaxHp), 1);
         this.playSound("se_damage", 0.15);
+        this.playSound("g_damage_voice", 0.5);
 
         this.cameras.main.shake(150, 0.01);
 
-        var self = this;
         this.tweens.add({
             targets: this.hudBg,
             alpha: 0.5,
             duration: 100,
             yoyo: true,
             repeat: 2,
+        });
+
+        // Flash player sprite on damage
+        this.tweens.add({
+            targets: this.playerSprite,
+            alpha: 0.3,
+            duration: 80,
+            yoyo: true,
+            repeat: 3,
         });
     }
 
@@ -658,9 +941,13 @@ export class PhaserGameScene extends Phaser.Scene {
         this.showExplosion(this.playerSprite.x, this.playerSprite.y);
         this.playerSprite.setVisible(false);
 
+        gameState.maxCombo = Math.max(gameState.maxCombo || 0, this.maxCombo);
+
         var self = this;
         this.time.delayedCall(2000, function () {
             gameState.score = self.scoreCount;
+            gameState.spgage = self.spGauge;
+            self.stopAllSounds();
             self.scene.start("PhaserContinueScene");
         });
     }
@@ -671,6 +958,13 @@ export class PhaserGameScene extends Phaser.Scene {
         this.gameStarted = false;
 
         gameState.score = this.scoreCount;
+        gameState.playerHp = this.playerHp;
+        gameState.spgage = this.spGauge;
+        gameState.maxCombo = Math.max(gameState.maxCombo || 0, this.maxCombo);
+
+        if (this.spFiredDuringBoss) {
+            gameState.akebonoCnt = (gameState.akebonoCnt || 0) + 1;
+        }
 
         var self = this;
 
@@ -696,6 +990,21 @@ export class PhaserGameScene extends Phaser.Scene {
 
     timeoverComplete() {
         gameState.score = this.scoreCount;
+        gameState.maxCombo = Math.max(gameState.maxCombo || 0, this.maxCombo);
+
+        // Show TIME OVER text
+        var timeOverText = this.add.text(GCX, GCY, "TIME OVER", {
+            fontFamily: "sans-serif",
+            fontSize: "22px",
+            fontStyle: "bold",
+            color: "#ff4444",
+            stroke: "#000000",
+            strokeThickness: 3,
+        });
+        timeOverText.setOrigin(0.5);
+        timeOverText.setDepth(200);
+
+        this.gameStarted = false;
 
         var self = this;
         this.time.delayedCall(2500, function () {
@@ -744,8 +1053,12 @@ export class PhaserGameScene extends Phaser.Scene {
         if (!this.gameStarted) return;
         if (this.playerDead || this.stageCleared) return;
 
+        // Handle keyboard input every frame
+        this.handleKeyboardInput();
+
         if (this.theWorldFlg) {
             this.updateHUD();
+            this.updateBossHpBar();
             return;
         }
 
@@ -796,9 +1109,17 @@ export class PhaserGameScene extends Phaser.Scene {
                     this.enemyShoot(enemy);
                 }
             } else {
+                // Boss movement patterns
+                if (!this.bossEntering) {
+                    var pattern = BOSS_PATTERNS[this.bossStageId];
+                    if (pattern) {
+                        pattern(enemy, time);
+                    }
+                }
+
                 this.bossIntervalCnt++;
                 if (this.bossInterval > 0 && this.bossIntervalCnt % this.bossInterval === 0) {
-                    this.enemyShoot(enemy);
+                    this.bossShoot();
                 }
 
                 if (!this.bossSprite || !this.bossSprite.active) {
@@ -833,6 +1154,10 @@ export class PhaserGameScene extends Phaser.Scene {
                     var dmg = pb.getData("damage") || 1;
                     var ehp = enemy.getData("hp") - dmg;
                     enemy.setData("hp", ehp);
+
+                    if (isBoss) {
+                        this.bossHp = ehp;
+                    }
 
                     if (this.shootMode !== "big") {
                         pb.destroy();
@@ -891,6 +1216,17 @@ export class PhaserGameScene extends Phaser.Scene {
                 eBullet.destroy();
                 this.enemyBullets.splice(eb, 1);
                 continue;
+            }
+
+            if (this.barrierActive && this.barrierSprite) {
+                var barRect2 = { x: this.barrierSprite.x - 20, y: this.barrierSprite.y - 20, w: 40, h: 40 };
+                var ebRect0 = { x: eBullet.x - eBullet.width / 2, y: eBullet.y - eBullet.height / 2, w: eBullet.width, h: eBullet.height };
+                if (rectOverlap(ebRect0, barRect2)) {
+                    this.playSound("se_guard", 0.3);
+                    eBullet.destroy();
+                    this.enemyBullets.splice(eb, 1);
+                    continue;
+                }
             }
 
             var ebRect = { x: eBullet.x - eBullet.width / 2, y: eBullet.y - eBullet.height / 2, w: eBullet.width, h: eBullet.height };
@@ -980,6 +1316,7 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         this.updateHUD();
+        this.updateBossHpBar();
     }
 
     enemyShoot(enemy) {
@@ -1014,6 +1351,9 @@ export class PhaserGameScene extends Phaser.Scene {
         this.theWorldFlg = true;
 
         this.comboCount++;
+        if (this.comboCount > this.maxCombo) {
+            this.maxCombo = this.comboCount;
+        }
         var ratio = Math.max(1, Math.ceil(this.comboCount / 10));
         this.scoreCount += this.bossScore * ratio;
 
@@ -1032,6 +1372,8 @@ export class PhaserGameScene extends Phaser.Scene {
 
         this.bossSprite = null;
         this.bossActive = false;
+        this.bossHpBarBg.setVisible(false);
+        this.bossHpBarFg.setVisible(false);
 
         for (var eb = this.enemyBullets.length - 1; eb >= 0; eb--) {
             if (this.enemyBullets[eb] && this.enemyBullets[eb].active) {
