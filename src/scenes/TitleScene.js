@@ -108,7 +108,7 @@ export class TitleScene extends BaseScene {
         this.startBtn.buttonMode = false;
         this.startBtn.alpha = 0;
         this.addChild(this.startBtn);
-        this.startBtn.on("pointerup", this._onStartUp);
+        this.startBtn.on("pointertap", this._onStartUp);
 
         this.copyright = new PIXI.Sprite(frameTexture("titleCopyright.gif"));
         this.copyright.x = 0;
@@ -144,7 +144,7 @@ export class TitleScene extends BaseScene {
         this.twitterBtn.x = GAME_DIMENSIONS.CENTER_X;
         this.twitterBtn.y = this.copyright.y - this.twitterBtn.height / 2 - 14;
         this.addChild(this.twitterBtn);
-        this.twitterBtn.on("pointerup", this._onTweetUp);
+        this.twitterBtn.on("pointertap", this._onTweetUp);
 
         this.howtoBtn = new HowtoButton();
         this.howtoBtn.x = 15;
@@ -157,7 +157,7 @@ export class TitleScene extends BaseScene {
         this.staffrollBtn.y = 10;
         this.staffrollBtn.scale.y = 0;
         this.addChild(this.staffrollBtn);
-        this.staffrollBtn.on("pointerup", this._onStaffrollUp);
+        this.staffrollBtn.on("pointertap", this._onStaffrollUp);
 
         const coverTexture = frameTexture("stagebgOver.gif");
         this.cover = new PIXI.extras.TilingSprite(coverTexture, STAGE_DIMENSIONS.WIDTH, STAGE_DIMENSIONS.HEIGHT);
@@ -350,13 +350,13 @@ export class TitleScene extends BaseScene {
         }
 
         if (this.startBtn) {
-            this.startBtn.off("pointerup", this._onStartUp);
+            this.startBtn.off("pointertap", this._onStartUp);
         }
         if (this.twitterBtn) {
-            this.twitterBtn.off("pointerup", this._onTweetUp);
+            this.twitterBtn.off("pointertap", this._onTweetUp);
         }
         if (this.staffrollBtn) {
-            this.staffrollBtn.off("pointerup", this._onStaffrollUp);
+            this.staffrollBtn.off("pointertap", this._onStaffrollUp);
         }
 
         if (this.staffrollPanel && this.staffrollPanel.parent) {
