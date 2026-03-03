@@ -103,6 +103,15 @@ export class PhaserTitleScene extends Phaser.Scene {
             self.titleStart();
         });
 
+        // Full-screen tap zone so any click/tap starts the game
+        this.tapZone = this.add.zone(0, 0, GAME_DIMENSIONS.WIDTH, GAME_DIMENSIONS.HEIGHT);
+        this.tapZone.setOrigin(0, 0);
+        this.tapZone.setInteractive();
+        this.tapZone.on("pointerup", function () {
+            self.titleStart();
+        });
+        this.tapZone.setDepth(-1);
+
         this.fadeRect = this.add.graphics();
         this.fadeRect.fillStyle(0x000000, 1);
         this.fadeRect.fillRect(0, 0, GAME_DIMENSIONS.WIDTH, GAME_DIMENSIONS.HEIGHT);
@@ -112,8 +121,13 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.startIntroAnimation();
 
         // Keyboard: Enter or Space to start
-        this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        try {
+            this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+            this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        } catch (e) {
+            this.enterKey = null;
+            this.spaceKey = null;
+        }
     }
 
     startIntroAnimation() {
@@ -273,10 +287,12 @@ export class PhaserTitleScene extends Phaser.Scene {
         }
 
         // Keyboard start
-        if (!this.transitioning) {
-            if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-                this.titleStart();
-            }
+        if (!this.transitioning && this.enterKey && this.spaceKey) {
+            try {
+                if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+                    this.titleStart();
+                }
+            } catch (e) {}
         }
     }
 }

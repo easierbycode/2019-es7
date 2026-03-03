@@ -158,9 +158,26 @@ export class PhaserAdvScene extends Phaser.Scene {
             self.onNextPress();
         });
 
+        // Full-screen tap zone so any click/tap advances dialogue
+        var self2 = this;
+        this.tapZone = this.add.zone(0, 0, GAME_DIMENSIONS.WIDTH, GAME_DIMENSIONS.HEIGHT);
+        this.tapZone.setOrigin(0, 0);
+        this.tapZone.setInteractive();
+        this.tapZone.on("pointerup", function () {
+            if (self2.partTextComp) {
+                self2.onNextPress();
+            }
+        });
+        this.tapZone.setDepth(-1);
+
         // Keyboard: Enter/Space to advance dialogue
-        this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
-        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        try {
+            this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+            this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+        } catch (e) {
+            this.enterKey = null;
+            this.spaceKey = null;
+        }
     }
 
     playSound(key, volume) {
@@ -238,11 +255,13 @@ export class PhaserAdvScene extends Phaser.Scene {
 
     update(time, delta) {
         // Keyboard advance
-        if (this.partTextComp && this.nextBtn && this.nextBtn.visible) {
-            if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
-                this.onNextPress();
-                return;
-            }
+        if (this.partTextComp && this.nextBtn && this.nextBtn.visible && this.enterKey && this.spaceKey) {
+            try {
+                if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+                    this.onNextPress();
+                    return;
+                }
+            } catch (e) {}
         }
 
         if (this.partTextComp || !this.txt) {

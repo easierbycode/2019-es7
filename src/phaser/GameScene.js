@@ -138,14 +138,19 @@ export class PhaserGameScene extends Phaser.Scene {
         this.shootSpeed = gameState.shootSpeed || "speed_normal";
 
         // Keyboard controls for PC mode
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.wasd = this.input.keyboard.addKeys({
-            up: Phaser.Input.Keyboard.KeyCodes.W,
-            down: Phaser.Input.Keyboard.KeyCodes.S,
-            left: Phaser.Input.Keyboard.KeyCodes.A,
-            right: Phaser.Input.Keyboard.KeyCodes.D,
-            sp: Phaser.Input.Keyboard.KeyCodes.SPACE,
-        });
+        try {
+            this.cursors = this.input.keyboard.createCursorKeys();
+            this.wasd = this.input.keyboard.addKeys({
+                up: Phaser.Input.Keyboard.KeyCodes.W,
+                down: Phaser.Input.Keyboard.KeyCodes.S,
+                left: Phaser.Input.Keyboard.KeyCodes.A,
+                right: Phaser.Input.Keyboard.KeyCodes.D,
+                sp: Phaser.Input.Keyboard.KeyCodes.SPACE,
+            });
+        } catch (e) {
+            this.cursors = null;
+            this.wasd = null;
+        }
         this.keyMoveSpeed = 3;
 
         this.stageBgmName = "";
@@ -341,6 +346,9 @@ export class PhaserGameScene extends Phaser.Scene {
         if (!this.gameStarted || this.playerDead || this.theWorldFlg) {
             return;
         }
+        if (!this.cursors || !this.wasd) {
+            return;
+        }
 
         var moveX = 0;
         var moveY = 0;
@@ -363,9 +371,11 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         // Space bar triggers SP
-        if (Phaser.Input.Keyboard.JustDown(this.wasd.sp)) {
-            this.onSpFire();
-        }
+        try {
+            if (Phaser.Input.Keyboard.JustDown(this.wasd.sp)) {
+                this.onSpFire();
+            }
+        } catch (e) {}
     }
 
     updateSpGauge() {
