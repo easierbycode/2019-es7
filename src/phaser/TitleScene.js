@@ -22,17 +22,17 @@ export class PhaserTitleScene extends Phaser.Scene {
         );
         this.bg.setOrigin(0, 0);
 
-        this.titleG = this.add.sprite(0, 0, "title_ui", "titleG.gif");
+        this.titleG = this.add.sprite(0, 0, "game_ui", "titleG.gif");
         this.titleG.setOrigin(0, 0);
         this.titleG.setPosition(GAME_DIMENSIONS.WIDTH, 100);
 
-        this.logo = this.add.sprite(0, 0, "title_ui", "logo.gif");
+        this.logo = this.add.sprite(0, 0, "game_ui", "logo.gif");
         this.logo.setOrigin(0.5);
         this.logo.setPosition(this.logo.width / 2, -this.logo.height / 2);
         this.logo.setScale(2);
 
         var subtitleKey = "subTitle" + (LANG === "ja" ? "" : "En") + ".gif";
-        this.subTitle = this.add.sprite(0, 0, "title_ui", subtitleKey);
+        this.subTitle = this.add.sprite(0, 0, "game_ui", subtitleKey);
         this.subTitle.setOrigin(0.5);
         this.subTitle.setPosition(this.subTitle.width / 2, -this.logo.height / 2);
         this.subTitle.setScale(3);
@@ -43,17 +43,17 @@ export class PhaserTitleScene extends Phaser.Scene {
 
         this.startText = this.add.sprite(
             GAME_DIMENSIONS.CENTER_X, 330,
-            "title_ui", "titleStartText.gif"
+            "game_ui", "titleStartText.gif"
         );
         this.startText.setOrigin(0.5);
         this.startText.setAlpha(0);
         this.startText.setInteractive({ useHandCursor: true });
 
-        this.copyright = this.add.sprite(0, 0, "title_ui", "titleCopyright.gif");
+        this.copyright = this.add.sprite(0, 0, "game_ui", "titleCopyright.gif");
         this.copyright.setOrigin(0, 0);
         this.copyright.y = GAME_DIMENSIONS.HEIGHT - this.copyright.height - 6;
 
-        this.scoreTitleImg = this.add.sprite(32, 0, "title_ui", "hiScoreTxt.gif");
+        this.scoreTitleImg = this.add.sprite(32, 0, "game_ui", "hiScoreTxt.gif");
         this.scoreTitleImg.setOrigin(0, 0);
         this.scoreTitleImg.y = this.copyright.y - 58;
 
