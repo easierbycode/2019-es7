@@ -161,7 +161,8 @@ export class LoadScene extends BaseScene {
         this.playSpBtn.x = 44;
         this.playSpBtn.y = this.playPcTxt.y + 20;
         this.addChild(this.playSpBtn);
-        this.playSpBtn.on("pointerup", this.loadStart.bind(this, true));
+        // Keep SP mode on PIXI while still loading full assets (including audio).
+        this.playSpBtn.on("pointerup", this.loadStart.bind(this, false));
 
         this.playSpTxt = new PIXI.Sprite(PIXI.Texture.fromFrame("playBtnSpTxt.gif"));
         this.playSpTxt.x = 44;
