@@ -157,6 +157,10 @@ export class PhaserAdvScene extends Phaser.Scene {
         this.nextBtn.on("pointerup", function () {
             self.onNextPress();
         });
+
+        // Keyboard: Enter/Space to advance dialogue
+        this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     }
 
     playSound(key, volume) {
@@ -233,6 +237,14 @@ export class PhaserAdvScene extends Phaser.Scene {
     }
 
     update(time, delta) {
+        // Keyboard advance
+        if (this.partTextComp && this.nextBtn && this.nextBtn.visible) {
+            if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+                this.onNextPress();
+                return;
+            }
+        }
+
         if (this.partTextComp || !this.txt) {
             return;
         }

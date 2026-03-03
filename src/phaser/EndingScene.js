@@ -54,14 +54,23 @@ export class PhaserEndingScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         if (isNewRecord) {
-            this.add.text(GCX, 290, "NEW RECORD!", {
+            var recordText = this.add.text(GCX, 290, "NEW RECORD!", {
                 fontFamily: "sans-serif",
                 fontSize: "16px",
                 fontStyle: "bold",
                 color: "#ff4444",
                 stroke: "#000000",
                 strokeThickness: 2,
-            }).setOrigin(0.5);
+            });
+            recordText.setOrigin(0.5);
+            this.tweens.add({
+                targets: recordText,
+                scaleX: 1.1,
+                scaleY: 1.1,
+                duration: 500,
+                yoyo: true,
+                repeat: -1,
+            });
         }
 
         this.add.text(GCX, 320, getWorldBestLabel() + " " + String(getDisplayedHighScore()), {
@@ -98,21 +107,108 @@ export class PhaserEndingScene extends Phaser.Scene {
             color: "#ffffff",
         }).setOrigin(0.5);
 
-        var titleBtn = this.add.text(GCX, GH - 50, "TITLE", {
+        // Staff roll button
+        var staffBtn = this.add.text(GCX - 50, GH - 50, "STAFF", {
             fontFamily: "sans-serif",
-            fontSize: "18px",
+            fontSize: "14px",
+            fontStyle: "bold",
+            color: "#ffffff",
+            backgroundColor: "#444444",
+            padding: { x: 12, y: 6 },
+        });
+        staffBtn.setOrigin(0.5);
+        staffBtn.setInteractive({ useHandCursor: true });
+
+        var self = this;
+        staffBtn.on("pointerup", function () {
+            self.showStaffRoll();
+        });
+
+        // Title button
+        var titleBtn = this.add.text(GCX + 50, GH - 50, "TITLE", {
+            fontFamily: "sans-serif",
+            fontSize: "14px",
             fontStyle: "bold",
             color: "#ffffff",
             backgroundColor: "#333333",
-            padding: { x: 20, y: 8 },
+            padding: { x: 12, y: 6 },
         });
         titleBtn.setOrigin(0.5);
         titleBtn.setInteractive({ useHandCursor: true });
 
-        var self = this;
         titleBtn.on("pointerup", function () {
             self.stopAllSounds();
             self.scene.start("PhaserTitleScene");
+        });
+
+        this.staffRollContainer = null;
+    }
+
+    showStaffRoll() {
+        if (this.staffRollContainer) return;
+
+        var self = this;
+
+        this.staffRollContainer = this.add.container(0, 0);
+        this.staffRollContainer.setDepth(500);
+
+        var bg = this.add.rectangle(GCX, GCY, GW, GH, 0x000000, 0.92);
+        this.staffRollContainer.add(bg);
+
+        var staffG = this.add.sprite(GCX, 55, "game_ui", "staffrollG0");
+        staffG.setOrigin(0.5);
+        this.staffRollContainer.add(staffG);
+
+        try {
+            if (!this.anims.exists("staffroll_waking")) {
+                this.anims.create({
+                    key: "staffroll_waking",
+                    frames: this.anims.generateFrameNames("game_ui", {
+                        prefix: "staffrollG",
+                        start: 0,
+                        end: 7,
+                        suffix: "",
+                    }),
+                    frameRate: 8,
+                    repeat: -1,
+                });
+            }
+            staffG.play("staffroll_waking");
+        } catch (e) {}
+
+        try {
+            var namePanel = this.add.sprite(15, 90, "game_ui", "staffrollName");
+            namePanel.setOrigin(0, 0);
+            this.staffRollContainer.add(namePanel);
+        } catch (e) {}
+
+        var closeText = this.add.text(GCX, GH - 30, "TAP TO CLOSE", {
+            fontFamily: "sans-serif",
+            fontSize: "12px",
+            fontStyle: "bold",
+            color: "#888888",
+        });
+        closeText.setOrigin(0.5);
+        this.staffRollContainer.add(closeText);
+
+        this.staffRollContainer.setAlpha(0);
+        this.tweens.add({
+            targets: this.staffRollContainer,
+            alpha: 1,
+            duration: 400,
+        });
+
+        bg.setInteractive();
+        bg.on("pointerup", function () {
+            self.tweens.add({
+                targets: self.staffRollContainer,
+                alpha: 0,
+                duration: 300,
+                onComplete: function () {
+                    self.staffRollContainer.destroy();
+                    self.staffRollContainer = null;
+                },
+            });
         });
     }
 

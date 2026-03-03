@@ -110,6 +110,10 @@ export class PhaserTitleScene extends Phaser.Scene {
 
         this.playTitleVoice = false;
         this.startIntroAnimation();
+
+        // Keyboard: Enter or Space to start
+        this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+        this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     }
 
     startIntroAnimation() {
@@ -266,6 +270,13 @@ export class PhaserTitleScene extends Phaser.Scene {
         }
         if (this.scoreSyncLabel) {
             this.scoreSyncLabel.setText(getHighScoreSyncText());
+        }
+
+        // Keyboard start
+        if (!this.transitioning) {
+            if (Phaser.Input.Keyboard.JustDown(this.enterKey) || Phaser.Input.Keyboard.JustDown(this.spaceKey)) {
+                this.titleStart();
+            }
         }
     }
 }
