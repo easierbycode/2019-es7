@@ -28,38 +28,6 @@
             font-family: sans-serif;
             color: #0f0;
         }
-        #mode-selector {
-            position: fixed;
-            inset: 0;
-            background: #111;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 9999;
-            text-align: center;
-        }
-        #mode-selector h1 {
-            font-size: 2.8rem;
-            margin-bottom: 1.5rem;
-            color: #0f0;
-        }
-        .mode-btn {
-            padding: 1.2rem 2.8rem;
-            font-size: 1.6rem;
-            margin: 1rem;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            min-width: 220px;
-        }
-        #btn-phaser { background: #0a0; color: #000; }
-        #btn-pixi   { background: #0044cc; color: #fff; }
-        #status {
-            margin-top: 2rem;
-            font-size: 1.3rem;
-            opacity: 0.8;
-        }
         #canvas, #phaser-canvas {
             width: 100%;
             height: 100%;
@@ -129,16 +97,8 @@
 <body>
     <div id="baseUrl" hidden>./</div>
 
-    <!-- Mode selector (shown first) -->
-    <div id="mode-selector">
-        <h1>EVIL INVADERS</h1>
-        <button id="btn-phaser" class="mode-btn">Phaser 4 (Modern)</button>
-        <button id="btn-pixi"   class="mode-btn">PIXI (Classic/Fast)</button>
-        <div id="status">Choose your renderer to start...</div>
-    </div>
-
-    <!-- Game containers (hidden until mode selected) -->
-    <div id="canvas" style="display:none;"></div>
+    <!-- Game containers -->
+    <div id="canvas"></div>
     <div id="phaser-canvas" style="display:none;"></div>
 
     <!-- Download & iOS banner -->
@@ -154,102 +114,13 @@
         <button id="iosInstallDismiss" style="position:absolute; top:4px; right:8px; background:none; border:none; color:#888; font-size:18px; cursor:pointer; padding:4px 8px; line-height:1;">×</button>
     </div>
 
-    <script type="module">
-        // ────────────────────────────────────────────────
-        // Dynamic library loader + mode isolation
-        // ────────────────────────────────────────────────
+    <!-- Libraries (loaded before game boot) -->
+    <script src="./src/lib/pixi.min.js"></script>
+    <script src="./src/lib/pixi-sound.min.js"></script>
+    <script src="./src/lib/TweenMax.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
 
-        const PHASER_URL = 'https://cdn.jsdelivr.net/npm/phaser@4.0.0-rc.6/dist/phaser.min.js';
-        const PIXI_URL   = './src/lib/pixi.min.js';           // local version (or use CDN: https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.4.0/pixi.min.js)
-        const PIXI_SOUND_URL = './src/lib/pixi-sound.min.js';
-        const TWEEN_URL  = './src/lib/TweenMax.min.js';       // still needed by both?
-
-        const status = document.getElementById('status');
-        const modeSelector = document.getElementById('mode-selector');
-        const canvasDiv = document.getElementById('canvas');
-        const phaserCanvasDiv = document.getElementById('phaser-canvas');
-
-        async function loadScript(src) {
-            return new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = src;
-                script.async = true;
-                script.onload = resolve;
-                script.onerror = () => reject(new Error(`Failed to load ${src}`));
-                document.head.appendChild(script);
-            });
-        }
-
-        async function loadFirebase() {
-            if (window.firebase) return; // already loaded
-            await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js');
-            await loadScript('https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js');
-        }
-
-        async function startPhaser() {
-            status.textContent = 'Loading Phaser 4...';
-            try {
-                await loadScript(PHASER_URL);
-                await loadFirebase();
-                await loadScript(TWEEN_URL); // if Phaser code needs it
-
-                modeSelector.style.display = 'none';
-                phaserCanvasDiv.style.display = 'flex';
-                canvasDiv.style.display = 'none';
-
-                // Import and run your Phaser bootstrap
-                const { initGame } = await import('./src/main.js'); // adjust if you split files
-                initGame('phaser', phaserCanvasDiv.id);             // pass mode + container id
-            } catch (err) {
-                status.textContent = 'Error: ' + err.message;
-                console.error(err);
-            }
-        }
-
-        async function startPixi() {
-            status.textContent = 'Loading PIXI...';
-            try {
-                // Prevent Phaser audio pollution if previously attempted
-                if (window.Phaser) {
-                    // Phaser might have created an audio context → try to release
-                    if (window.Howler) window.Howler.unload?.();
-                    if (window.game?.sound) window.game.sound = null;
-                }
-
-                await loadScript(PIXI_URL);
-                await loadScript(PIXI_SOUND_URL);
-                await loadScript(TWEEN_URL);
-                await loadFirebase();
-
-                modeSelector.style.display = 'none';
-                canvasDiv.style.display = 'flex';
-                phaserCanvasDiv.style.display = 'none';
-
-                // Import and run your PIXI bootstrap
-                const { initGame } = await import('./src/main.js');
-                initGame('pixi', 'canvas'); // pass mode + container id
-            } catch (err) {
-                status.textContent = 'Error: ' + err.message;
-                console.error(err);
-            }
-        }
-
-        // Button bindings
-        document.getElementById('btn-phaser').onclick = startPhaser;
-        document.getElementById('btn-pixi').onclick   = startPixi;
-
-        // Optional: auto-select via ?mode=phaser or ?mode=pixi
-        const params = new URLSearchParams(location.search);
-        const mode = params.get('mode')?.toLowerCase();
-        if (mode === 'phaser') startPhaser();
-        else if (mode === 'pixi') startPixi();
-
-        // iOS install banner dismiss
-        document.getElementById('iosInstallDismiss')?.addEventListener('click', () => {
-            document.getElementById('iosInstallBanner').style.display = 'none';
-        });
-    </script>
-
-    <script type="module" src="./src/main.js"></script>  <!-- keep for side-effects if needed, but main logic should be in exported initGame -->
+    <script type="module" src="./src/main.js"></script>
 </body>
 </html>
