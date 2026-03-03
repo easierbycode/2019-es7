@@ -13,7 +13,6 @@ import { globals } from "../globals.js";
 import { pauseAll, resumeAll, setInitialVolumes } from "../soundManager.js";
 import { ModeButton } from "../ui/ModeButton.js";
 import { RecommendButton } from "../ui/RecommendButton.js";
-import { createPhaserGame } from "../phaser/PhaserGame.js";
 
 const PHASER_URL = "https://cdn.jsdelivr.net/npm/phaser@4.0.0-rc.6/dist/phaser.min.js";
 
@@ -248,13 +247,18 @@ export class LoadScene extends BaseScene {
 
         (window.Phaser ? Promise.resolve() : loadScript(PHASER_URL))
             .then(function () {
+                return import("../phaser/PhaserGame.js");
+            })
+            .then(function (module) {
                 return Promise.race([
                     initializeFirebaseScores().catch(function () {}),
                     waitFor(1500),
-                ]);
+                ]).then(function () {
+                    module.createPhaserGame();
+                });
             })
-            .finally(function () {
-                createPhaserGame();
+            .catch(function (err) {
+                log("Failed to launch Phaser: " + (err && err.message || err));
             });
     }
 
