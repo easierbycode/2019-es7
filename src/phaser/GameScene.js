@@ -231,20 +231,31 @@ export class PhaserGameScene extends Phaser.Scene {
         );
         this.comboText.setDepth(101);
 
-        this.spGaugeBar = this.add.graphics();
-        this.spGaugeBar.setDepth(102);
-        this.updateSpGauge();
+        this.spBtnWrap = this.add.container(GW - 70, GCY + 15);
+        this.spBtnWrap.setDepth(103);
 
-        this.spBtn = this.add.text(
-            GW - 35, GCY + 20,
-            "SP",
-            { fontFamily: "Arial", fontSize: "14px", fontStyle: "bold", color: "#ff0000", backgroundColor: "#330000", padding: { x: 6, y: 4 } }
-        );
-        this.spBtn.setOrigin(0.5);
-        this.spBtn.setDepth(103);
-        this.spBtn.setInteractive({ useHandCursor: true });
-        this.spBtn.setAlpha(0.3);
-        this.spBtn.on("pointerup", this.onSpFire, this);
+        this.spBtnPulse = this.add.sprite(32, 32, "game_ui", "hudCabtnBg1.gif");
+        this.spBtnPulse.setOrigin(0.5);
+        this.spBtnPulse.setAlpha(0);
+
+        this.spBtnReadyBg = this.add.sprite(-18, -18, "game_ui", "hudCabtnBg0.gif");
+        this.spBtnReadyBg.setOrigin(0, 0);
+        this.spBtnReadyBg.setAlpha(0);
+
+        this.spBtnBarBg = this.add.sprite(0, 0, "game_ui", "hudCabtn100per.gif");
+        this.spBtnBarBg.setOrigin(0, 0);
+
+        this.spBtnBar = this.add.sprite(0, 58, "game_ui", "hudCabtn0per.gif");
+        this.spBtnBar.setOrigin(0, 1);
+        this.spBtnBar.setScale(1, 0);
+
+        this.spBtnWrap.add([this.spBtnPulse, this.spBtnReadyBg, this.spBtnBarBg, this.spBtnBar]);
+        this.spBtnWrap.setSize(this.spBtnBarBg.width, this.spBtnBarBg.height);
+        this.spBtnWrap.setInteractive({ useHandCursor: true });
+        this.spBtnWrap.on("pointerup", this.onSpFire, this);
+
+        this.spReadyTween = null;
+        this.updateSpGauge();
 
         this.bossTimerText = this.add.text(
             GCX, 60,
@@ -378,11 +389,32 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     updateSpGauge() {
-        this.spGaugeBar.clear();
-        this.spGaugeBar.fillStyle(0x333333, 0.7);
-        this.spGaugeBar.fillRect(GW - 70, GCY + 35, 60, 8);
-        this.spGaugeBar.fillStyle(this.spGauge >= 100 ? 0xff0000 : 0x00aaff, 1);
-        this.spGaugeBar.fillRect(GW - 70, GCY + 35, 60 * Math.min(this.spGauge / 100, 1), 8);
+        if (!this.spBtnBar) {
+            return;
+        }
+
+        var ratio = Math.min(this.spGauge / 100, 1);
+        this.spBtnBar.setScale(1, ratio);
+
+        if (ratio >= 1) {
+            this.spBtnReadyBg.setAlpha(1);
+            if (!this.spReadyTween) {
+                this.spReadyTween = this.tweens.add({
+                    targets: this.spBtnPulse,
+                    alpha: 1,
+                    duration: 400,
+                    yoyo: true,
+                    repeat: -1,
+                });
+            }
+        } else {
+            this.spBtnReadyBg.setAlpha(0);
+            this.spBtnPulse.setAlpha(0);
+            if (this.spReadyTween) {
+                this.spReadyTween.stop();
+                this.spReadyTween = null;
+            }
+        }
     }
 
     updateBossHpBar() {
