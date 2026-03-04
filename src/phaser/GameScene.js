@@ -265,7 +265,12 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     createCover() {
-        this.coverOverlay = this.add.tileSprite(0, 0, GW, GH, "game_ui", "stagebgOver.gif");
+        if (!this.textures.getFrame("game_asset", "stagebgOver.gif")) {
+            this.coverOverlay = null;
+            return;
+        }
+
+        this.coverOverlay = this.add.tileSprite(0, 0, GW, GH, "game_asset", "stagebgOver.gif");
         this.coverOverlay.setOrigin(0, 0);
         this.coverOverlay.setDepth(99);
     }
