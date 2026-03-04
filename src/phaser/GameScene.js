@@ -224,12 +224,11 @@ export class PhaserGameScene extends Phaser.Scene {
         this.comboLabel.setDepth(101);
         this.comboLabel.setScale(0, 1);
 
-        this.comboText = this.add.text(
-            194, 19,
-            "0",
-            { fontFamily: "Arial", fontSize: "14px", fontStyle: "bold", color: "#ffff00", stroke: "#000000", strokeThickness: 2 }
-        );
-        this.comboText.setDepth(101);
+        this.comboNumContainer = this.add.container(194, 19);
+        this.comboNumContainer.setDepth(101);
+        this._comboNumSprites = [];
+        this._lastComboNum = -1;
+        this._setComboNum(0);
 
         this.spBtnWrap = this.add.container(GW - 70, GCY + 15);
         this.spBtnWrap.setDepth(103);
@@ -253,6 +252,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this.spBtnWrap.setSize(this.spBtnBarBg.width, this.spBtnBarBg.height);
         this.spBtnWrap.setInteractive({ useHandCursor: true });
         this.spBtnWrap.on("pointerup", this.onSpFire, this);
+        this.spBtn = this.spBtnWrap;
 
         this.spReadyTween = null;
         this.updateSpGauge();
@@ -290,44 +290,74 @@ export class PhaserGameScene extends Phaser.Scene {
         var stageId = gameState.stageId || 0;
         var self = this;
 
-        this.titleText = this.add.text(
-            GCX, GCY - 40,
-            "ROUND " + String(stageId + 1),
-            { fontFamily: "sans-serif", fontSize: "24px", fontStyle: "bold", color: "#ffffff", stroke: "#000000", strokeThickness: 3 }
-        );
-        this.titleText.setOrigin(0.5);
-        this.titleText.setDepth(200);
+        var bg = this.add.graphics();
+        bg.fillStyle(0xffffff, 0.2);
+        bg.fillRect(0, 0, GW, GH);
+        bg.setDepth(200);
+        bg.setAlpha(0);
 
-        this.fightText = this.add.text(
-            GCX, GCY + 10,
-            "FIGHT!",
-            { fontFamily: "sans-serif", fontSize: "18px", fontStyle: "bold", color: "#ff4444", stroke: "#000000", strokeThickness: 3 }
-        );
-        this.fightText.setOrigin(0.5);
-        this.fightText.setDepth(200);
-        this.fightText.setAlpha(0);
+        var stageNumIdx = Math.min(stageId + 1, 4);
+        var stageNumSprite;
+        try {
+            stageNumSprite = this.add.image(GCX, GCY - 20, "game_ui", "stageNum" + String(stageNumIdx) + ".gif");
+            stageNumSprite.setOrigin(0.5);
+        } catch (e) {
+            stageNumSprite = this.add.text(GCX, GCY - 40, "ROUND " + String(stageId + 1),
+                { fontFamily: "sans-serif", fontSize: "24px", fontStyle: "bold", color: "#ffffff", stroke: "#000000", strokeThickness: 3 });
+            stageNumSprite.setOrigin(0.5);
+        }
+        stageNumSprite.setDepth(200);
+        stageNumSprite.setAlpha(0);
+
+        var fightSprite;
+        try {
+            fightSprite = this.add.image(GCX, GCY + 20, "game_ui", "stageFight.gif");
+            fightSprite.setOrigin(0.5);
+        } catch (e) {
+            fightSprite = this.add.text(GCX, GCY + 10, "FIGHT!",
+                { fontFamily: "sans-serif", fontSize: "18px", fontStyle: "bold", color: "#ff4444", stroke: "#000000", strokeThickness: 3 });
+            fightSprite.setOrigin(0.5);
+        }
+        fightSprite.setDepth(200);
+        fightSprite.setAlpha(0);
 
         this.playSound("voice_round" + String(Math.min(stageId, 3)), 0.7);
 
         this.tweens.add({
-            targets: this.titleText,
-            scaleX: 1.2,
-            scaleY: 1.2,
-            duration: 500,
-            yoyo: true,
+            targets: bg,
+            alpha: 1,
+            duration: 300,
             onComplete: function () {
-                self.playSound("voice_fight", 0.7);
                 self.tweens.add({
-                    targets: self.fightText,
+                    targets: stageNumSprite,
                     alpha: 1,
                     duration: 300,
                     onComplete: function () {
-                        self.time.delayedCall(800, function () {
-                            if (self.titleText) self.titleText.destroy();
-                            if (self.fightText) self.fightText.destroy();
-                            self.titleText = null;
-                            self.fightText = null;
-                            self.startGame();
+                        self.time.delayedCall(900, function () {
+                            self.tweens.add({ targets: stageNumSprite, alpha: 0, duration: 200 });
+                            self.playSound("voice_fight", 0.7);
+                            self.tweens.add({
+                                targets: fightSprite,
+                                alpha: 1,
+                                scaleX: 1.2,
+                                scaleY: 1.2,
+                                duration: 200,
+                                onComplete: function () {
+                                    self.time.delayedCall(600, function () {
+                                        self.tweens.add({
+                                            targets: [fightSprite, bg],
+                                            alpha: 0,
+                                            duration: 200,
+                                            onComplete: function () {
+                                                bg.destroy();
+                                                stageNumSprite.destroy();
+                                                fightSprite.destroy();
+                                                self.startGame();
+                                            },
+                                        });
+                                    });
+                                },
+                            });
                         });
                     },
                 });
@@ -800,6 +830,9 @@ export class PhaserGameScene extends Phaser.Scene {
         bullet.setDepth(41);
         bullet.setData("speed", speed);
         bullet.setData("damage", projData.damage || 1);
+        bullet.setData("hp", projData.hp || 1);
+        bullet.setData("score", projData.score || 0);
+        bullet.setData("spgage", projData.spgage || 0);
 
         var dx = this.playerSprite.x - this.bossSprite.x;
         var dy = this.playerSprite.y - this.bossSprite.y;
@@ -833,6 +866,9 @@ export class PhaserGameScene extends Phaser.Scene {
             bullet.setDepth(41);
             bullet.setData("speed", speed);
             bullet.setData("damage", projData.damage || 1);
+            bullet.setData("hp", projData.hp || 1);
+            bullet.setData("score", projData.score || 0);
+            bullet.setData("spgage", projData.spgage || 0);
             bullet.setData("rotX", Math.cos(angle));
             bullet.setData("rotY", Math.sin(angle));
 
@@ -854,6 +890,9 @@ export class PhaserGameScene extends Phaser.Scene {
             bullet.setDepth(41);
             bullet.setData("speed", speed);
             bullet.setData("damage", projData.damage || 1);
+            bullet.setData("hp", projData.hp || 1);
+            bullet.setData("score", projData.score || 0);
+            bullet.setData("spgage", projData.spgage || 0);
             bullet.setData("rotX", Math.cos(angle));
             bullet.setData("rotY", Math.sin(angle));
 
@@ -1114,7 +1153,7 @@ export class PhaserGameScene extends Phaser.Scene {
 
         this.shootTimer += delta;
         var interval = this.shootSpeed === "speed_high" ? this.shootInterval * 0.6 : this.shootInterval;
-        var intervalMs = interval * (1000 / 120);
+        var intervalMs = interval * (1000 / 60);
         if (this.shootTimer >= intervalMs) {
             this.shootTimer = 0;
             this.shoot();
@@ -1277,6 +1316,44 @@ export class PhaserGameScene extends Phaser.Scene {
                 }
             }
 
+            // Player bullets can destroy enemy bullets (matching PIXI behaviour)
+            var ebDestroyed = false;
+            var ebRect1 = { x: eBullet.x - eBullet.width / 2, y: eBullet.y - eBullet.height / 2, w: eBullet.width, h: eBullet.height };
+            var ebHp = eBullet.getData("hp") || 1;
+            for (var pbb = this.playerBullets.length - 1; pbb >= 0; pbb--) {
+                var pb2 = this.playerBullets[pbb];
+                if (!pb2 || !pb2.active) continue;
+                var pb2Rect = { x: pb2.x - pb2.width / 2, y: pb2.y - pb2.height / 2, w: pb2.width, h: pb2.height };
+                if (rectOverlap(pb2Rect, ebRect1)) {
+                    var pb2dmg = pb2.getData("damage") || 1;
+                    ebHp -= pb2dmg;
+                    eBullet.setData("hp", ebHp);
+                    if (this.shootMode !== "big") {
+                        pb2.destroy();
+                        this.playerBullets.splice(pbb, 1);
+                    }
+                    if (ebHp <= 0) {
+                        var ebScore = eBullet.getData("score") || 0;
+                        var ebSpgage = eBullet.getData("spgage") || 0;
+                        if (ebScore > 0) {
+                            this.comboCount++;
+                            if (this.comboCount > this.maxCombo) this.maxCombo = this.comboCount;
+                            var ebRatio = Math.max(1, Math.ceil(this.comboCount / 10));
+                            this.scoreCount += ebScore * ebRatio;
+                            this.comboTimeCnt = 100;
+                            this.spGauge = Math.min(100, this.spGauge + ebSpgage);
+                            this.updateSpGauge();
+                            this.showScorePopup(eBullet.x, eBullet.y, ebScore * ebRatio);
+                        }
+                        eBullet.destroy();
+                        this.enemyBullets.splice(eb, 1);
+                        ebDestroyed = true;
+                    }
+                    break;
+                }
+            }
+            if (ebDestroyed) continue;
+
             var ebRect = { x: eBullet.x - eBullet.width / 2, y: eBullet.y - eBullet.height / 2, w: eBullet.width, h: eBullet.height };
             var pRect2 = { x: this.playerSprite.x - 8, y: this.playerSprite.y - 16, w: 16, h: 32 };
 
@@ -1381,6 +1458,9 @@ export class PhaserGameScene extends Phaser.Scene {
         bullet.setDepth(41);
         bullet.setData("speed", speed);
         bullet.setData("damage", projData.damage || 1);
+        bullet.setData("hp", projData.hp || 1);
+        bullet.setData("score", projData.score || 0);
+        bullet.setData("spgage", projData.spgage || 0);
 
         var dx = this.playerSprite.x - enemy.x;
         var dy = this.playerSprite.y - enemy.y;
@@ -1472,15 +1552,35 @@ export class PhaserGameScene extends Phaser.Scene {
         if (this.scoreText) {
             this.scoreText.setText(String(this.scoreCount));
         }
-        if (this.comboText) {
-            this.comboText.setText(String(this.comboCount));
-        }
+        this._setComboNum(this.comboCount);
         if (this.comboLabel) {
             this.comboLabel.setScale(this.comboTimeCnt / 100, 1);
         }
         if (this.worldBestText) {
             var best = Math.max(getDisplayedHighScore(), this.scoreCount);
             this.worldBestText.setText(getWorldBestLabel() + " " + String(best));
+        }
+    }
+
+    _setComboNum(num) {
+        if (!this.comboNumContainer || !this._comboNumSprites) return;
+        if (this._lastComboNum === num) return;
+        this._lastComboNum = num;
+        for (var i = 0; i < this._comboNumSprites.length; i++) {
+            this.comboNumContainer.remove(this._comboNumSprites[i], true);
+        }
+        this._comboNumSprites = [];
+        var text = String(num);
+        var x = 0;
+        for (var i = 0; i < text.length; i++) {
+            var frame = "comboNum" + text[i] + ".gif";
+            try {
+                var sprite = this.add.image(x, 0, "game_ui", frame);
+                sprite.setOrigin(0, 0);
+                this.comboNumContainer.add(sprite);
+                this._comboNumSprites.push(sprite);
+                x += sprite.width;
+            } catch (e) {}
         }
     }
 }
