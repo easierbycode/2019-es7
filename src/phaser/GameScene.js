@@ -520,11 +520,16 @@ export class PhaserGameScene extends Phaser.Scene {
             callback: function () {
                 var ex = count % 8;
                 var ey = Math.floor(count / 8);
-                var x = (ex * 35) + (ey % 2 === 0 ? 0 : 15);
-                var y = GH - 60 - ey * 45;
+                var colW = GW / 8;
+                var rowH = (GH - 120) / 4;
+                var x = colW * ex + colW / 2 + (ey % 2 === 0 ? 0 : colW / 2);
+                if (x > GW - 24) {
+                    x -= colW / 2;
+                }
+                var y = GH - 80 - ey * rowH;
 
                 var explosion = self.add.sprite(x, y, "game_asset", "spExplosion00.gif");
-                explosion.setOrigin(0, 0);
+                explosion.setOrigin(0.5);
                 explosion.setDepth(140);
                 self.playSound("se_sp_explosion", 0.3);
 
@@ -574,6 +579,7 @@ export class PhaserGameScene extends Phaser.Scene {
                 b.setData("damage", shootData.damage);
                 b.setData("hp", shootData.hp);
                 b.setData("angle", a * 0.15);
+                b.setRotation(-Math.PI / 2 + a * 0.2);
                 this.playerBullets.push(b);
             }
         } else {
@@ -583,6 +589,7 @@ export class PhaserGameScene extends Phaser.Scene {
             bullet.setData("damage", shootData.damage);
             bullet.setData("hp", shootData.hp);
             bullet.setData("angle", 0);
+            bullet.setRotation(-Math.PI / 2);
             if (this.shootMode === "big") {
                 bullet.setScale(1.5);
             }
