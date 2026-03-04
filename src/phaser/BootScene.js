@@ -11,29 +11,52 @@ export class BootScene extends Phaser.Scene {
         var cx = GAME_DIMENSIONS.CENTER_X;
         var cy = GAME_DIMENSIONS.CENTER_Y;
 
-        var progressBg = this.add.graphics();
-        progressBg.fillStyle(0x222222, 1);
-        progressBg.fillRect(cx - 80, cy - 6, 160, 12);
+        this.loadingBg = null;
+        this.loadingG = null;
+        this.loadingFrameIndex = 0;
 
-        var progressBar = this.add.graphics();
+        var self = this;
 
-        var loadingText = this.add.text(cx, cy - 24, "LOADING...", {
-            fontFamily: "sans-serif",
-            fontSize: "12px",
-            color: "#ffffff",
-        });
-        loadingText.setOrigin(0.5);
+        function ensureLoadingPreview() {
+            if (self.loadingBg || !self.textures.exists("loading_bg") || !self.textures.exists("loading0")) {
+                return;
+            }
 
-        this.load.on("progress", function (value) {
-            progressBar.clear();
-            progressBar.fillStyle(0xffffff, 1);
-            progressBar.fillRect(cx - 78, cy - 4, 156 * value, 8);
-        });
+            self.loadingBg = self.add.image(cx, cy, "loading_bg");
+            self.loadingBg.setAlpha(0.09);
+
+            self.loadingG = self.add.image(cx, cy, "loading0");
+
+            self.time.addEvent({
+                delay: 120,
+                loop: true,
+                callback: function () {
+                    if (!self.loadingG) {
+                        return;
+                    }
+
+                    self.loadingFrameIndex = (self.loadingFrameIndex + 1) % 3;
+                    self.loadingG.setTexture("loading" + String(self.loadingFrameIndex));
+
+                    if (self.loadingBg) {
+                        self.loadingBg.flipX = !self.loadingBg.flipX;
+                    }
+                },
+            });
+        }
+
+        this.load.on("filecomplete-image-loading_bg", ensureLoadingPreview);
+        this.load.on("filecomplete-image-loading0", ensureLoadingPreview);
 
         this.load.on("complete", function () {
-            progressBar.destroy();
-            progressBg.destroy();
-            loadingText.destroy();
+            if (self.loadingG) {
+                self.loadingG.destroy();
+                self.loadingG = null;
+            }
+            if (self.loadingBg) {
+                self.loadingBg.destroy();
+                self.loadingBg = null;
+            }
         });
 
         this.load.atlas("title_ui", "assets/img/title_ui.png", "assets/title_ui.json");
@@ -49,6 +72,9 @@ export class BootScene extends Phaser.Scene {
         }
 
         this.load.image("loading_bg", "assets/img/loading/loading_bg.png");
+        this.load.image("loading0", "assets/img/loading/loading0.gif");
+        this.load.image("loading1", "assets/img/loading/loading1.gif");
+        this.load.image("loading2", "assets/img/loading/loading2.gif");
 
         if (!gameState.lowModeFlg) {
             var soundKeys = Object.keys(RESOURCE_PATHS);

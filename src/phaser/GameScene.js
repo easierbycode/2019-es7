@@ -138,14 +138,18 @@ export class PhaserGameScene extends Phaser.Scene {
         this.shootSpeed = gameState.shootSpeed || "speed_normal";
 
         // Keyboard controls for PC mode
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.wasd = this.input.keyboard.addKeys({
-            up: Phaser.Input.Keyboard.KeyCodes.W,
-            down: Phaser.Input.Keyboard.KeyCodes.S,
-            left: Phaser.Input.Keyboard.KeyCodes.A,
-            right: Phaser.Input.Keyboard.KeyCodes.D,
-            sp: Phaser.Input.Keyboard.KeyCodes.SPACE,
-        });
+        this.cursors = null;
+        this.wasd = null;
+        try {
+            this.cursors = this.input.keyboard.createCursorKeys();
+            this.wasd = this.input.keyboard.addKeys({
+                up: Phaser.Input.Keyboard.KeyCodes.W,
+                down: Phaser.Input.Keyboard.KeyCodes.S,
+                left: Phaser.Input.Keyboard.KeyCodes.A,
+                right: Phaser.Input.Keyboard.KeyCodes.D,
+                sp: Phaser.Input.Keyboard.KeyCodes.SPACE,
+            });
+        } catch (e) {}
         this.keyMoveSpeed = 3;
 
         this.stageBgmName = "";
@@ -227,20 +231,31 @@ export class PhaserGameScene extends Phaser.Scene {
         );
         this.comboText.setDepth(101);
 
-        this.spGaugeBar = this.add.graphics();
-        this.spGaugeBar.setDepth(102);
-        this.updateSpGauge();
+        this.spBtnWrap = this.add.container(GW - 70, GCY + 15);
+        this.spBtnWrap.setDepth(103);
 
-        this.spBtn = this.add.text(
-            GW - 35, GCY + 20,
-            "SP",
-            { fontFamily: "Arial", fontSize: "14px", fontStyle: "bold", color: "#ff0000", backgroundColor: "#330000", padding: { x: 6, y: 4 } }
-        );
-        this.spBtn.setOrigin(0.5);
-        this.spBtn.setDepth(103);
-        this.spBtn.setInteractive({ useHandCursor: true });
-        this.spBtn.setAlpha(0.3);
-        this.spBtn.on("pointerup", this.onSpFire, this);
+        this.spBtnPulse = this.add.sprite(32, 32, "game_ui", "hudCabtnBg1.gif");
+        this.spBtnPulse.setOrigin(0.5);
+        this.spBtnPulse.setAlpha(0);
+
+        this.spBtnReadyBg = this.add.sprite(-18, -18, "game_ui", "hudCabtnBg0.gif");
+        this.spBtnReadyBg.setOrigin(0, 0);
+        this.spBtnReadyBg.setAlpha(0);
+
+        this.spBtnBarBg = this.add.sprite(0, 0, "game_ui", "hudCabtn100per.gif");
+        this.spBtnBarBg.setOrigin(0, 0);
+
+        this.spBtnBar = this.add.sprite(0, 58, "game_ui", "hudCabtn0per.gif");
+        this.spBtnBar.setOrigin(0, 1);
+        this.spBtnBar.setScale(1, 0);
+
+        this.spBtnWrap.add([this.spBtnPulse, this.spBtnReadyBg, this.spBtnBarBg, this.spBtnBar]);
+        this.spBtnWrap.setSize(this.spBtnBarBg.width, this.spBtnBarBg.height);
+        this.spBtnWrap.setInteractive({ useHandCursor: true });
+        this.spBtnWrap.on("pointerup", this.onSpFire, this);
+
+        this.spReadyTween = null;
+        this.updateSpGauge();
 
         this.bossTimerText = this.add.text(
             GCX, 60,
@@ -261,7 +276,12 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     createCover() {
-        this.coverOverlay = this.add.tileSprite(0, 0, GW, GH, "game_ui", "stagebgOver.gif");
+        if (!this.textures.getFrame("game_asset", "stagebgOver.gif")) {
+            this.coverOverlay = null;
+            return;
+        }
+
+        this.coverOverlay = this.add.tileSprite(0, 0, GW, GH, "game_asset", "stagebgOver.gif");
         this.coverOverlay.setOrigin(0, 0);
         this.coverOverlay.setDepth(99);
     }
@@ -338,7 +358,7 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     handleKeyboardInput() {
-        if (!this.gameStarted || this.playerDead || this.theWorldFlg) {
+        if (!this.gameStarted || this.playerDead || this.theWorldFlg || !this.cursors || !this.wasd) {
             return;
         }
 
@@ -363,17 +383,38 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         // Space bar triggers SP
-        if (Phaser.Input.Keyboard.JustDown(this.wasd.sp)) {
+        if (this.wasd.sp && Phaser.Input.Keyboard.JustDown(this.wasd.sp)) {
             this.onSpFire();
         }
     }
 
     updateSpGauge() {
-        this.spGaugeBar.clear();
-        this.spGaugeBar.fillStyle(0x333333, 0.7);
-        this.spGaugeBar.fillRect(GW - 70, GCY + 35, 60, 8);
-        this.spGaugeBar.fillStyle(this.spGauge >= 100 ? 0xff0000 : 0x00aaff, 1);
-        this.spGaugeBar.fillRect(GW - 70, GCY + 35, 60 * Math.min(this.spGauge / 100, 1), 8);
+        if (!this.spBtnBar) {
+            return;
+        }
+
+        var ratio = Math.min(this.spGauge / 100, 1);
+        this.spBtnBar.setScale(1, ratio);
+
+        if (ratio >= 1) {
+            this.spBtnReadyBg.setAlpha(1);
+            if (!this.spReadyTween) {
+                this.spReadyTween = this.tweens.add({
+                    targets: this.spBtnPulse,
+                    alpha: 1,
+                    duration: 400,
+                    yoyo: true,
+                    repeat: -1,
+                });
+            }
+        } else {
+            this.spBtnReadyBg.setAlpha(0);
+            this.spBtnPulse.setAlpha(0);
+            if (this.spReadyTween) {
+                this.spReadyTween.stop();
+                this.spReadyTween = null;
+            }
+        }
     }
 
     updateBossHpBar() {
@@ -479,11 +520,16 @@ export class PhaserGameScene extends Phaser.Scene {
             callback: function () {
                 var ex = count % 8;
                 var ey = Math.floor(count / 8);
-                var x = (ex * 35) + (ey % 2 === 0 ? 0 : 15);
-                var y = GH - 60 - ey * 45;
+                var colW = GW / 8;
+                var rowH = (GH - 120) / 4;
+                var x = colW * ex + colW / 2 + (ey % 2 === 0 ? 0 : colW / 2);
+                if (x > GW - 24) {
+                    x -= colW / 2;
+                }
+                var y = GH - 80 - ey * rowH;
 
                 var explosion = self.add.sprite(x, y, "game_asset", "spExplosion00.gif");
-                explosion.setOrigin(0, 0);
+                explosion.setOrigin(0.5);
                 explosion.setDepth(140);
                 self.playSound("se_sp_explosion", 0.3);
 
@@ -533,6 +579,7 @@ export class PhaserGameScene extends Phaser.Scene {
                 b.setData("damage", shootData.damage);
                 b.setData("hp", shootData.hp);
                 b.setData("angle", a * 0.15);
+                b.setRotation(-Math.PI / 2 + a * 0.2);
                 this.playerBullets.push(b);
             }
         } else {
@@ -542,6 +589,7 @@ export class PhaserGameScene extends Phaser.Scene {
             bullet.setData("damage", shootData.damage);
             bullet.setData("hp", shootData.hp);
             bullet.setData("angle", 0);
+            bullet.setRotation(-Math.PI / 2);
             if (this.shootMode === "big") {
                 bullet.setScale(1.5);
             }

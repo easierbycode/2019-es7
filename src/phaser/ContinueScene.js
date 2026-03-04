@@ -54,35 +54,24 @@ export class PhaserContinueScene extends Phaser.Scene {
         this.cntText.setOrigin(0, 0);
         this.cntText.setAlpha(0);
 
-        this.yesBtn = this.add.text(
-            GCX - 50, GCY + 70,
-            "YES",
-            {
-                fontFamily: "sans-serif",
-                fontSize: "20px",
-                fontStyle: "bold",
-                color: "#ffffff",
-                backgroundColor: "#003300",
-                padding: { x: 12, y: 8 },
-            }
-        );
-        this.yesBtn.setOrigin(0.5);
-        this.yesBtn.setInteractive({ useHandCursor: true });
+        var self = this;
 
-        this.noBtn = this.add.text(
-            GCX + 50, GCY + 70,
-            "NO",
-            {
-                fontFamily: "sans-serif",
-                fontSize: "20px",
-                fontStyle: "bold",
-                color: "#ffffff",
-                backgroundColor: "#330000",
-                padding: { x: 12, y: 8 },
-            }
-        );
-        this.noBtn.setOrigin(0.5);
-        this.noBtn.setInteractive({ useHandCursor: true });
+        this.yesBtn = this.add.sprite(0, 0, "game_ui", "continueYes.gif");
+        this.yesBtn.setOrigin(0, 0);
+        this.yesBtn.x = GCX - this.yesBtn.width / 2 - 50;
+        this.yesBtn.y = GCY - this.yesBtn.height / 2 + 70;
+
+        this.noBtn = this.add.sprite(0, 0, "game_ui", "continueNo.gif");
+        this.noBtn.setOrigin(0, 0);
+        this.noBtn.x = GCX - this.noBtn.width / 2 + 50;
+        this.noBtn.y = GCY - this.noBtn.height / 2 + 70;
+
+        this.setupContinueButton(this.yesBtn, "continueYes", function () {
+            self.selectYes();
+        });
+        this.setupContinueButton(this.noBtn, "continueNo", function () {
+            self.selectNo();
+        });
 
         this.commentText = this.add.text(
             GCX, GH - 100,
@@ -124,20 +113,15 @@ export class PhaserContinueScene extends Phaser.Scene {
             }
         );
 
-        var self = this;
-
-        this.yesBtn.on("pointerup", function () {
-            self.selectYes();
-        });
-
-        this.noBtn.on("pointerup", function () {
-            self.selectNo();
-        });
-
         // Keyboard: Y for yes, N for no, Enter for yes
-        this.yKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Y);
-        this.nKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.N);
-        this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+        this.yKey = null;
+        this.nKey = null;
+        this.enterKey = null;
+        try {
+            this.yKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Y);
+            this.nKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.N);
+            this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+        } catch (e) {}
 
         this.playBgm("bgm_continue", 0.25);
 
@@ -146,6 +130,25 @@ export class PhaserContinueScene extends Phaser.Scene {
             repeat: 9,
             callback: this.onCountDown,
             callbackScope: this,
+        });
+    }
+
+
+    setupContinueButton(button, framePrefix, onPress) {
+        button.setInteractive({ useHandCursor: true });
+
+        button.on("pointerover", function () {
+            button.setFrame(framePrefix + "Over.gif");
+        });
+        button.on("pointerout", function () {
+            button.setFrame(framePrefix + ".gif");
+        });
+        button.on("pointerdown", function () {
+            button.setFrame(framePrefix + "Down.gif");
+        });
+        button.on("pointerup", function () {
+            button.setFrame(framePrefix + "Over.gif");
+            onPress();
         });
     }
 
@@ -365,9 +368,10 @@ export class PhaserContinueScene extends Phaser.Scene {
 
         // Keyboard continue controls
         if (this.countActive) {
-            if (Phaser.Input.Keyboard.JustDown(this.yKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+            if ((this.yKey && Phaser.Input.Keyboard.JustDown(this.yKey))
+                || (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey))) {
                 this.selectYes();
-            } else if (Phaser.Input.Keyboard.JustDown(this.nKey)) {
+            } else if (this.nKey && Phaser.Input.Keyboard.JustDown(this.nKey)) {
                 this.selectNo();
             }
         }
