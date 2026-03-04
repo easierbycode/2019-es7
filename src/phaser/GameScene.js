@@ -138,14 +138,18 @@ export class PhaserGameScene extends Phaser.Scene {
         this.shootSpeed = gameState.shootSpeed || "speed_normal";
 
         // Keyboard controls for PC mode
-        this.cursors = this.input.keyboard.createCursorKeys();
-        this.wasd = this.input.keyboard.addKeys({
-            up: Phaser.Input.Keyboard.KeyCodes.W,
-            down: Phaser.Input.Keyboard.KeyCodes.S,
-            left: Phaser.Input.Keyboard.KeyCodes.A,
-            right: Phaser.Input.Keyboard.KeyCodes.D,
-            sp: Phaser.Input.Keyboard.KeyCodes.SPACE,
-        });
+        this.cursors = null;
+        this.wasd = null;
+        try {
+            this.cursors = this.input.keyboard.createCursorKeys();
+            this.wasd = this.input.keyboard.addKeys({
+                up: Phaser.Input.Keyboard.KeyCodes.W,
+                down: Phaser.Input.Keyboard.KeyCodes.S,
+                left: Phaser.Input.Keyboard.KeyCodes.A,
+                right: Phaser.Input.Keyboard.KeyCodes.D,
+                sp: Phaser.Input.Keyboard.KeyCodes.SPACE,
+            });
+        } catch (e) {}
         this.keyMoveSpeed = 3;
 
         this.stageBgmName = "";
@@ -261,7 +265,12 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     createCover() {
-        this.coverOverlay = this.add.tileSprite(0, 0, GW, GH, "game_ui", "stagebgOver.gif");
+        if (!this.textures.getFrame("game_asset", "stagebgOver.gif")) {
+            this.coverOverlay = null;
+            return;
+        }
+
+        this.coverOverlay = this.add.tileSprite(0, 0, GW, GH, "game_asset", "stagebgOver.gif");
         this.coverOverlay.setOrigin(0, 0);
         this.coverOverlay.setDepth(99);
     }
@@ -338,7 +347,7 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     handleKeyboardInput() {
-        if (!this.gameStarted || this.playerDead || this.theWorldFlg) {
+        if (!this.gameStarted || this.playerDead || this.theWorldFlg || !this.cursors || !this.wasd) {
             return;
         }
 
@@ -363,7 +372,7 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         // Space bar triggers SP
-        if (Phaser.Input.Keyboard.JustDown(this.wasd.sp)) {
+        if (this.wasd.sp && Phaser.Input.Keyboard.JustDown(this.wasd.sp)) {
             this.onSpFire();
         }
     }

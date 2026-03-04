@@ -135,9 +135,14 @@ export class PhaserContinueScene extends Phaser.Scene {
         });
 
         // Keyboard: Y for yes, N for no, Enter for yes
-        this.yKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Y);
-        this.nKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.N);
-        this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+        this.yKey = null;
+        this.nKey = null;
+        this.enterKey = null;
+        try {
+            this.yKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Y);
+            this.nKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.N);
+            this.enterKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+        } catch (e) {}
 
         this.playBgm("bgm_continue", 0.25);
 
@@ -365,9 +370,10 @@ export class PhaserContinueScene extends Phaser.Scene {
 
         // Keyboard continue controls
         if (this.countActive) {
-            if (Phaser.Input.Keyboard.JustDown(this.yKey) || Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+            if ((this.yKey && Phaser.Input.Keyboard.JustDown(this.yKey))
+                || (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey))) {
                 this.selectYes();
-            } else if (Phaser.Input.Keyboard.JustDown(this.nKey)) {
+            } else if (this.nKey && Phaser.Input.Keyboard.JustDown(this.nKey)) {
                 this.selectNo();
             }
         }
