@@ -23,9 +23,8 @@ export function createPhaserGame() {
         height: GAME_DIMENSIONS.HEIGHT,
         parent: "phaser-canvas",           // ← FIXED (matches your HTML)
         backgroundColor: "#000000",
-        fps: { 
-            target: 30, 
-            forceSetTimeOut: true 
+        fps: {
+            target: 60
         },
         scale: {
             mode: Phaser.Scale.FIT,

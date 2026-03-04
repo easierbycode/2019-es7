@@ -357,7 +357,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this.playerSprite.x = clamp(pointer.x, 16, GW - 16);
     }
 
-    handleKeyboardInput() {
+    handleKeyboardInput(frameScale) {
         if (!this.gameStarted || this.playerDead || this.theWorldFlg || !this.cursors || !this.wasd) {
             return;
         }
@@ -366,15 +366,15 @@ export class PhaserGameScene extends Phaser.Scene {
         var moveY = 0;
 
         if (this.cursors.left.isDown || this.wasd.left.isDown) {
-            moveX = -this.keyMoveSpeed;
+            moveX = -this.keyMoveSpeed * frameScale;
         } else if (this.cursors.right.isDown || this.wasd.right.isDown) {
-            moveX = this.keyMoveSpeed;
+            moveX = this.keyMoveSpeed * frameScale;
         }
 
         if (this.cursors.up.isDown || this.wasd.up.isDown) {
-            moveY = -this.keyMoveSpeed;
+            moveY = -this.keyMoveSpeed * frameScale;
         } else if (this.cursors.down.isDown || this.wasd.down.isDown) {
-            moveY = this.keyMoveSpeed;
+            moveY = this.keyMoveSpeed * frameScale;
         }
 
         if (moveX !== 0 || moveY !== 0) {
@@ -1101,7 +1101,8 @@ export class PhaserGameScene extends Phaser.Scene {
         if (this.playerDead || this.stageCleared) return;
 
         // Handle keyboard input every frame
-        this.handleKeyboardInput();
+        var frameScale = delta / (1000 / 60);
+        this.handleKeyboardInput(frameScale);
 
         if (this.theWorldFlg) {
             this.updateHUD();
@@ -1109,7 +1110,7 @@ export class PhaserGameScene extends Phaser.Scene {
             return;
         }
 
-        this.stageBg.tilePositionY -= 0.7;
+        this.stageBg.tilePositionY -= 0.7 * frameScale;
 
         this.shootTimer += delta;
         var interval = this.shootSpeed === "speed_high" ? this.shootInterval * 0.6 : this.shootInterval;
@@ -1127,8 +1128,8 @@ export class PhaserGameScene extends Phaser.Scene {
             }
 
             var angle = bullet.getData("angle") || 0;
-            bullet.y -= 4;
-            bullet.x += angle * 4;
+            bullet.y -= 4 * frameScale;
+            bullet.x += angle * 4 * frameScale;
 
             if (bullet.y < -20) {
                 bullet.destroy();
@@ -1147,7 +1148,7 @@ export class PhaserGameScene extends Phaser.Scene {
 
             if (!isBoss) {
                 var speed = enemy.getData("speed") || 0.8;
-                enemy.y += speed;
+                enemy.y += speed * frameScale;
 
                 var shootCnt = enemy.getData("shootCnt") + 1;
                 enemy.setData("shootCnt", shootCnt);
@@ -1256,8 +1257,8 @@ export class PhaserGameScene extends Phaser.Scene {
             var rotX = eBullet.getData("rotX") || 0;
             var rotY = eBullet.getData("rotY") || 1;
             var spd = eBullet.getData("speed") || 1;
-            eBullet.x += rotX * spd;
-            eBullet.y += rotY * spd;
+            eBullet.x += rotX * spd * frameScale;
+            eBullet.y += rotY * spd * frameScale;
 
             if (eBullet.y > GH + 20 || eBullet.y < -20 || eBullet.x < -20 || eBullet.x > GW + 20) {
                 eBullet.destroy();
@@ -1294,7 +1295,7 @@ export class PhaserGameScene extends Phaser.Scene {
                 continue;
             }
 
-            item.y += 1;
+            item.y += 1 * frameScale;
 
             var iRect = { x: item.x - item.width / 2, y: item.y - item.height / 2, w: item.width, h: item.height };
             var pRect3 = { x: this.playerSprite.x - 12, y: this.playerSprite.y - 20, w: 24, h: 40 };
