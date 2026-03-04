@@ -112,7 +112,6 @@ export class PhaserTitleScene extends Phaser.Scene {
             GAME_DIMENSIONS.HEIGHT
         );
         this.tapZone.setInteractive({ useHandCursor: true });
-        this.tapZone.setDepth(-10);
         this.tapZone.on("pointerup", function () {
             self.titleStart();
         });
