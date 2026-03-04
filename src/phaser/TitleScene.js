@@ -5,6 +5,7 @@ import {
     getWorldBestLabel,
     getHighScoreSyncText,
 } from "../highScoreUi.js";
+import { StaffRollPanel } from "./StaffRollPanel.js";
 
 export class PhaserTitleScene extends Phaser.Scene {
     constructor() {
@@ -14,6 +15,7 @@ export class PhaserTitleScene extends Phaser.Scene {
 
     create() {
         this.transitioning = false;
+        this.staffRollPanel = null;
 
         this.bg = this.add.tileSprite(
             0, 0,
@@ -114,6 +116,32 @@ export class PhaserTitleScene extends Phaser.Scene {
             self.titleStart();
         });
 
+        this.twitterBtn = this.createFrameButton(
+            GAME_DIMENSIONS.CENTER_X,
+            this.copyright.y - 12,
+            "twitterBtn"
+        );
+        this.twitterBtn.setOrigin(0.5);
+        this.twitterBtn.on("pointerup", this.tweet, this);
+
+        this.howtoBtn = this.createFrameButton(15, 10, "howtoBtn");
+        this.howtoBtn.setOrigin(0, 0);
+        this.howtoBtn.setScale(1, 0);
+        this.howtoBtn.on("pointerup", function () {
+            if (typeof window !== "undefined" && typeof window.howtoModalOpen === "function") {
+                window.howtoModalOpen();
+            }
+        });
+
+        this.staffrollBtn = this.createFrameButton(
+            GAME_DIMENSIONS.WIDTH - 15,
+            10,
+            "staffrollBtn"
+        );
+        this.staffrollBtn.setOrigin(1, 0);
+        this.staffrollBtn.setScale(1, 0);
+        this.staffrollBtn.on("pointerup", this.showStaffroll, this);
+
         this.fadeRect = this.add.graphics();
         this.fadeRect.fillStyle(0x000000, 1);
         this.fadeRect.fillRect(0, 0, GAME_DIMENSIONS.WIDTH, GAME_DIMENSIONS.HEIGHT);
@@ -190,6 +218,73 @@ export class PhaserTitleScene extends Phaser.Scene {
                 self.startFlashing();
             },
         });
+
+        this.tweens.add({
+            targets: this.howtoBtn,
+            scaleY: 1,
+            duration: 300,
+            delay: 2600,
+            ease: "Elastic.easeOut",
+        });
+
+        this.tweens.add({
+            targets: this.staffrollBtn,
+            scaleY: 1,
+            duration: 300,
+            delay: 2750,
+            ease: "Elastic.easeOut",
+        });
+    }
+
+    createFrameButton(x, y, framePrefix) {
+        var button = this.add.sprite(x, y, "game_ui", framePrefix + "0.gif");
+        button.setInteractive({ useHandCursor: true });
+
+        button.on("pointerover", function () {
+            button.setFrame(framePrefix + "1.gif");
+        });
+        button.on("pointerout", function () {
+            button.setFrame(framePrefix + "0.gif");
+        });
+        button.on("pointerdown", function () {
+            button.setFrame(framePrefix + "2.gif");
+        });
+        button.on("pointerup", function () {
+            button.setFrame(framePrefix + "1.gif");
+        });
+
+        return button;
+    }
+
+    showStaffroll() {
+        if (this.staffRollPanel && this.staffRollPanel.active) {
+            return;
+        }
+        this.staffRollPanel = new StaffRollPanel(this);
+    }
+
+    tweet() {
+        var score = Number(gameState.score || 0);
+        var highScore = Number(gameState.highScore || 0);
+
+        var url = "";
+        var hashtags = "";
+        var text = "";
+
+        if (LANG === "ja") {
+            url = encodeURIComponent("https://game.capcom.com/cfn/sfv/aprilfool/2019/?lang=ja");
+            hashtags = encodeURIComponent("シャド研,SFVAE,aprilfool,エイプリルフール");
+            text = encodeURIComponent("エイプリルフール 2019 世界大統領がSTGやってみた\nHISCORE:" + highScore + "\n");
+        } else {
+            url = encodeURIComponent("https://game.capcom.com/cfn/sfv/aprilfool/2019/?lang=en");
+            hashtags = encodeURIComponent("ShadalooCRI, SFVAE, aprilfool");
+            text = encodeURIComponent("APRIL FOOL 2019 WORLD PRESIDENT CHALLENGES A STG\nBEST:" + highScore + "\n");
+        }
+
+        var tweetUrl = "https://twitter.com/intent/tweet?url=" + url + "&hashtags=" + hashtags + "&text=" + text + "&score=" + score;
+        try {
+            window.open(tweetUrl, "_blank");
+        } catch (e) {}
     }
 
     startFlashing() {
@@ -237,11 +332,19 @@ export class PhaserTitleScene extends Phaser.Scene {
         if (this.transitioning) {
             return;
         }
+
+        if (this.staffRollPanel && this.staffRollPanel.active) {
+            return;
+        }
+
         this.transitioning = true;
         this.playSound("se_decision", 0.75);
 
         this.tweens.killTweensOf(this.startText);
         this.startText.disableInteractive();
+        this.twitterBtn.disableInteractive();
+        this.howtoBtn.disableInteractive();
+        this.staffrollBtn.disableInteractive();
 
         var self = this;
         this.tweens.add({
