@@ -1161,6 +1161,8 @@ import { PLAYER_STATES, BOSS_STATES } from "./enums/player-boss-states.js";
             }(this, e),
             // t is used to set the id property of the N instance
             (o = j(this, X(e).call(this))).id = t,
+            o._accumulator = 0,
+            o._tick = o.atTick.bind(o),
             o.on("added", o.atSceneAdded),
             o.on("removed", o.atSceneRemoved),
             o
@@ -1193,9 +1195,17 @@ import { PLAYER_STATES, BOSS_STATES } from "./enums/player-boss-states.js";
         e.prototype.sceneAdded = function() {
             F.dlog(this.constructor.name + ".sceneAdded() Start.");
             this.run();
-            B.Manager.game.ticker.add(this.loop, this);
+            B.Manager.game.ticker.add(this._tick, this);
             B.Manager.game.ticker.start();
             F.dlog(this.constructor.name + ".sceneAdded() End.");
+        };
+
+        e.prototype.atTick = function(t) {
+            this._accumulator += Math.min((t || 0) * 2, 8);
+            while (this._accumulator >= 1) {
+                this._accumulator -= 1;
+                this.loop(1);
+            }
         };
     
         e.prototype.atSceneRemoved = function(t) {
@@ -1203,7 +1213,7 @@ import { PLAYER_STATES, BOSS_STATES } from "./enums/player-boss-states.js";
         };
     
         e.prototype.sceneRemoved = function() {
-            for (B.Manager.game.ticker.remove(this.loop, this),
+            for (B.Manager.game.ticker.remove(this._tick, this),
                 B.Manager.game.ticker.stop(); this.children[0]; ) {
                 if ("loop"in this.children[0] && "function" == typeof this.children[0].loop) {
                     B.Manager.game.ticker.remove(this.children[0].loop, this.children[0]);
@@ -7339,6 +7349,8 @@ import { PLAYER_STATES, BOSS_STATES } from "./enums/player-boss-states.js";
                     break;
                 default:
                     var y = new S(t.projectileData);
+                    y.rotX = 0,
+                    y.rotY = 1,
                     y.unit.x = t.unit.x + t.unit.width / 2 - y.unit.width / 2,
                     y.unit.y = t.unit.y + t.unit.hitArea.height / 2,
                     y.on(S.CUSTOM_EVENT_DEAD, this.enemyRemove.bind(this, y)),

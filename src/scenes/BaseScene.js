@@ -23,7 +23,6 @@ export class BaseScene extends PIXI.Container {
         this.id = id;
         this.ticker = resolveTicker();
         this._accumulator = 0;
-        this._lastTickTime = 0;
         this._loop = this._onTick.bind(this);
 
         this._onSceneAdded = this._handleSceneAdded.bind(this);
@@ -33,21 +32,10 @@ export class BaseScene extends PIXI.Container {
         this.on("removed", this._onSceneRemoved);
     }
 
-    _onTick() {
-        // Fixed timestep using wall-clock time (performance.now) instead of
-        // PIXI's delta, which can be unreliable on mobile browsers / battery
-        // saver / high-refresh-rate displays.  Targets 120 logic updates/sec.
-        var now = performance.now();
-        if (this._lastTickTime === 0) {
-            this._lastTickTime = now;
-        }
-        var elapsed = now - this._lastTickTime;
-        this._lastTickTime = now;
-
-        // Convert ms to frame units (8.333ms = 1 frame at 120fps).
-        // Cap at 8 frames to handle drops down to ~15fps.
-        var FRAME_MS = 1000 / 120;
-        this._accumulator += Math.min(elapsed / FRAME_MS, 8);
+    _onTick(delta) {
+        // Keep PIXI's native delta implementation and scale to 120Hz logic.
+        // PIXI delta is normalized to 60fps, so multiply by 2.
+        this._accumulator += Math.min((delta || 0) * 2, 8);
         while (this._accumulator >= 1) {
             this._accumulator -= 1;
             this.loop(1);
