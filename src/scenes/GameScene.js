@@ -684,6 +684,8 @@ export class GameScene extends BaseScene {
 
         default: {
             const projectile = new Bullet(owner.projectileData);
+            projectile.rotX = 0;
+            projectile.rotY = 1;
             projectile.unit.x = owner.unit.x + owner.unit.width / 2 - projectile.unit.width / 2;
             projectile.unit.y = owner.unit.y + owner.unit.hitArea.height / 2;
 
