@@ -78,7 +78,7 @@ export class StaffRollPanel extends Phaser.GameObjects.Container {
         button.on("pointerup", function () {
             openExternalUrl(url);
         });
-        this.namePanel.add(button);
+        this.add(button);
     }
 
     showWithAnimation() {
