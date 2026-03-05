@@ -1167,8 +1167,8 @@ export class PhaserGameScene extends Phaser.Scene {
             }
 
             var angle = bullet.getData("angle") || 0;
-            bullet.y -= 4 * frameScale;
-            bullet.x += angle * 4 * frameScale;
+            bullet.y -= 3.5 * frameScale;
+            bullet.x += angle * 3.5 * frameScale;
 
             if (bullet.y < -20) {
                 bullet.destroy();
