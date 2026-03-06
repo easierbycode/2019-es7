@@ -126,7 +126,6 @@ export class PhaserAdvScene extends Phaser.Scene {
             fontSize: "16px",
             fontStyle: "bold",
             color: "#ffffff",
-            padding: { x: 10, y: 10 },
         });
 
         this.txt = this.add.text(15, GAME_DIMENSIONS.CENTER_Y + 30, "", {
@@ -142,7 +141,7 @@ export class PhaserAdvScene extends Phaser.Scene {
         this.nextBtn = this.add.text(
             GAME_DIMENSIONS.WIDTH - 20,
             GAME_DIMENSIONS.HEIGHT - 30,
-            "▶",
+            "Next▼",
             {
                 fontFamily: "sans-serif",
                 fontSize: "20px",
@@ -283,9 +282,9 @@ export class PhaserAdvScene extends Phaser.Scene {
         this.nextBtn.setVisible(true);
 
         if (this.partNum >= this.scenario[this.stageKey].part.length - 1) {
-            this.nextBtn.setText("▶▶");
+            this.nextBtn.setText("LET'S GO! ▶︎");
         } else {
-            this.nextBtn.setText("▶");
+            this.nextBtn.setText("Next▼");
         }
     }
 }

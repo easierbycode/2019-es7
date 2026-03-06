@@ -121,6 +121,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this.bossScore = 0;
         this.bossInterval = 0;
         this.bossIntervalCnt = 0;
+        this.bossIntervalCounter = 0;
         this.bossName = "";
         this.bossStageId = stageId;
         this.bossProjCnt = 0;
@@ -136,6 +137,8 @@ export class PhaserGameScene extends Phaser.Scene {
         this.shootInterval = this.recipe.playerData.shootNormal.interval || 23;
         this.shootMode = gameState.shootMode || "normal";
         this.shootSpeed = gameState.shootSpeed || "speed_normal";
+
+        this.enemyWaveFrameCounter = 0;
 
         // Keyboard controls for PC mode
         this.cursors = null;
@@ -210,6 +213,7 @@ export class PhaserGameScene extends Phaser.Scene {
             String(this.scoreCount),
             { fontFamily: "Arial", fontSize: "12px", fontStyle: "bold", color: "#ffffff", stroke: "#000000", strokeThickness: 2 }
         );
+        this.scoreText.setOrigin(0, 0.5);
         this.scoreText.setDepth(101);
 
         this.worldBestText = this.add.text(
@@ -367,6 +371,7 @@ export class PhaserGameScene extends Phaser.Scene {
 
     startGame() {
         this.gameStarted = true;
+        this.stageBgAmountMove = 1.4;
         this.enemyWaveFlg = true;
         this.frameCnt = 0;
         this.waveCount = 0;
@@ -637,6 +642,7 @@ export class PhaserGameScene extends Phaser.Scene {
         enemy.setOrigin(0.5);
         enemy.setDepth(40);
         enemy.setData("type", "enemy");
+        enemy.setData("name", data.name || "");
         enemy.setData("hp", data.hp || 1);
         enemy.setData("maxHp", data.hp || 1);
         enemy.setData("speed", data.speed || 0.8);
@@ -705,6 +711,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this.bossScore = bossData.score || 5000;
         this.bossInterval = bossData.interval || 60;
         this.bossIntervalCnt = 0;
+        this.bossIntervalCounter = 0;
         this.bossName = bossData.name || "boss";
         this.bossProjCnt = 0;
 
@@ -1136,11 +1143,17 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     update(time, delta) {
+        var frameScale = delta / (1000 / 30);
+
+        if (this.stageBg && !this.playerDead && !this.stageCleared) {
+            var bgMove = this.gameStarted ? (this.stageBgAmountMove || 1.4) : 1.4;
+            this.stageBg.tilePositionY -= bgMove * frameScale;
+        }
+
         if (!this.gameStarted) return;
         if (this.playerDead || this.stageCleared) return;
 
         // Handle keyboard input every frame
-        var frameScale = delta / (1000 / 60);
         this.handleKeyboardInput(frameScale);
 
         if (this.theWorldFlg) {
@@ -1149,7 +1162,6 @@ export class PhaserGameScene extends Phaser.Scene {
             return;
         }
 
-        this.stageBg.tilePositionY -= 0.7 * frameScale;
 
         this.shootTimer += delta;
         var interval = this.shootSpeed === "speed_high" ? this.shootInterval * 0.6 : this.shootInterval;
@@ -1189,10 +1201,11 @@ export class PhaserGameScene extends Phaser.Scene {
                 var speed = enemy.getData("speed") || 0.8;
                 enemy.y += speed * frameScale;
 
-                var shootCnt = enemy.getData("shootCnt") + 1;
+                var shootCnt = enemy.getData("shootCnt") + frameScale;
                 enemy.setData("shootCnt", shootCnt);
                 var shootInterval = enemy.getData("interval") || 300;
-                if (shootInterval > 0 && shootCnt % shootInterval === 0) {
+                if (shootInterval > 0 && shootCnt >= shootInterval) {
+                    enemy.setData("shootCnt", shootCnt - shootInterval);
                     this.enemyShoot(enemy);
                 }
             } else {
@@ -1204,8 +1217,9 @@ export class PhaserGameScene extends Phaser.Scene {
                     }
                 }
 
-                this.bossIntervalCnt++;
-                if (this.bossInterval > 0 && this.bossIntervalCnt % this.bossInterval === 0) {
+                this.bossIntervalCounter += frameScale;
+                if (this.bossInterval > 0 && this.bossIntervalCounter >= this.bossInterval) {
+                    this.bossIntervalCounter -= this.bossInterval;
                     this.bossShoot();
                 }
 
@@ -1392,10 +1406,11 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         if (this.enemyWaveFlg) {
-            if (this.frameCnt % this.waveInterval === 0) {
+            this.enemyWaveFrameCounter += frameScale;
+            if (this.enemyWaveFrameCounter >= this.waveInterval) {
+                this.enemyWaveFrameCounter -= this.waveInterval;
                 this.enemyWave();
             }
-            this.frameCnt++;
         }
 
         if (this.bossTimerStartFlg) {
@@ -1462,12 +1477,18 @@ export class PhaserGameScene extends Phaser.Scene {
         bullet.setData("score", projData.score || 0);
         bullet.setData("spgage", projData.spgage || 0);
 
-        var dx = this.playerSprite.x - enemy.x;
-        var dy = this.playerSprite.y - enemy.y;
-        var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        var enemyName = String(enemy.getData("name") || "").toLowerCase();
+        if (enemyName === "solidera" || enemyName === "soldiera") {
+            bullet.setData("rotX", 0);
+            bullet.setData("rotY", 1);
+        } else {
+            var dx = this.playerSprite.x - enemy.x;
+            var dy = this.playerSprite.y - enemy.y;
+            var dist = Math.sqrt(dx * dx + dy * dy) || 1;
 
-        bullet.setData("rotX", dx / dist);
-        bullet.setData("rotY", dy / dist);
+            bullet.setData("rotX", dx / dist);
+            bullet.setData("rotY", dy / dist);
+        }
 
         this.enemyBullets.push(bullet);
     }

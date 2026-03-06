@@ -4,6 +4,7 @@ import {
     getDisplayedHighScore,
     getWorldBestLabel,
     getHighScoreSyncText,
+    getHighScoreSyncTint,
 } from "../highScoreUi.js";
 import { StaffRollPanel } from "./StaffRollPanel.js";
 
@@ -93,9 +94,9 @@ export class PhaserTitleScene extends Phaser.Scene {
                 fontFamily: "Arial",
                 fontSize: "8px",
                 fontStyle: "bold",
-                color: "#cccccc",
+                color: "#9be37f",
                 stroke: "#000000",
-                strokeThickness: 1,
+                strokeThickness: 2,
             }
         );
 
@@ -386,8 +387,11 @@ export class PhaserTitleScene extends Phaser.Scene {
         if (this.highScoreText) {
             this.highScoreText.setText(String(getDisplayedHighScore()));
         }
+
         if (this.scoreSyncLabel) {
             this.scoreSyncLabel.setText(getHighScoreSyncText());
+            var syncTint = getHighScoreSyncTint();
+            this.scoreSyncLabel.setColor("#" + syncTint.toString(16).padStart(6, "0"));
         }
 
         // Keyboard start
