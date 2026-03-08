@@ -9,19 +9,6 @@ import { PhaserGameScene } from "./GameScene.js";
 import { PhaserContinueScene } from "./ContinueScene.js";
 import { PhaserEndingScene } from "./EndingScene.js";
 
-
-function detectTargetFps() {
-    var maxFps = 120;
-
-    try {
-        if (typeof window !== "undefined" && window.screen && typeof window.screen.frameRate === "number") {
-            maxFps = window.screen.frameRate >= 143 ? 144 : window.screen.frameRate >= 119 ? 120 : 60;
-        }
-    } catch (e) {}
-
-    return maxFps;
-}
-
 export function createPhaserGame() {
     // Hide old PIXI canvas, show new Phaser one
     const pixiCanvas = document.getElementById("canvas");
@@ -30,8 +17,6 @@ export function createPhaserGame() {
     if (pixiCanvas) pixiCanvas.style.display = "none";
     if (phaserContainer) phaserContainer.style.display = "flex";
 
-    const targetFps = detectTargetFps();
-
     const phaserConfig = {
         type: Phaser.AUTO,
         width: GAME_DIMENSIONS.WIDTH,
@@ -39,7 +24,7 @@ export function createPhaserGame() {
         parent: "phaser-canvas",           // ← FIXED (matches your HTML)
         backgroundColor: "#000000",
         fps: {
-            target: targetFps
+            target: 60
         },
         scale: {
             mode: Phaser.Scale.FIT,
@@ -58,7 +43,7 @@ export function createPhaserGame() {
     const game = new Phaser.Game(phaserConfig);
     globalThis.__PHASER_4_GAME__ = game;   // useful for console debugging
 
-    console.log("✅ Phaser 4 game started successfully (all scenes ready)", "fps:", targetFps);
+    console.log("✅ Phaser 4 game started successfully (all scenes ready)");
     return game;
 }
 
