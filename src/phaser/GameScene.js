@@ -292,78 +292,69 @@ export class PhaserGameScene extends Phaser.Scene {
         var stageId = gameState.stageId || 0;
         var self = this;
 
+        // PIXI: gameStartBg = white 0.2 alpha fullscreen overlay
         var bg = this.add.graphics();
         bg.fillStyle(0xffffff, 0.2);
         bg.fillRect(0, 0, GW, GH);
         bg.setDepth(200);
         bg.setAlpha(0);
 
+        // PIXI: stageNum at (0, GAME_HEIGHT/2 - 20) top-left origin, 256×64 bitmap
         var stageNumIdx = Math.min(stageId + 1, 4);
-        var stageNumSprite;
-        try {
-            stageNumSprite = this.add.image(GCX, GCY - 20, "game_ui", "stageNum" + String(stageNumIdx) + ".gif");
-            stageNumSprite.setOrigin(0.5);
-        } catch (e) {
-            stageNumSprite = this.add.text(GCX, GCY - 40, "ROUND " + String(stageId + 1),
-                { fontFamily: "sans-serif", fontSize: "24px", fontStyle: "bold", color: "#ffffff", stroke: "#000000", strokeThickness: 3 });
-            stageNumSprite.setOrigin(0.5);
-        }
-        stageNumSprite.setDepth(200);
+        var stageNumSprite = this.add.image(0, GCY - 20, "game_ui", "stageNum" + String(stageNumIdx) + ".gif");
+        stageNumSprite.setOrigin(0, 0);
+        stageNumSprite.setDepth(201);
         stageNumSprite.setAlpha(0);
 
-        var fightSprite;
-        try {
-            fightSprite = this.add.image(GCX, GCY + 20, "game_ui", "stageFight.gif");
-            fightSprite.setOrigin(0.5);
-        } catch (e) {
-            fightSprite = this.add.text(GCX, GCY + 10, "FIGHT!",
-                { fontFamily: "sans-serif", fontSize: "18px", fontStyle: "bold", color: "#ff4444", stroke: "#000000", strokeThickness: 3 });
-            fightSprite.setOrigin(0.5);
-        }
-        fightSprite.setDepth(200);
+        // PIXI: stageFight at center (width/2, GAME_HEIGHT/2 + height/2 - 20) anchor(0.5)
+        // = (128, 252). Starts at scale 1.2, animates down to 1.
+        var fightSprite = this.add.image(GCX, GCY + 12, "game_ui", "stageFight.gif");
+        fightSprite.setOrigin(0.5);
+        fightSprite.setDepth(201);
         fightSprite.setAlpha(0);
+        fightSprite.setScale(1.2);
 
-        this.playSound("voice_round" + String(Math.min(stageId, 3)), 0.7);
+        // PIXI timeline (times in ms):
+        // [0-300] BG fade in
+        this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
 
-        this.tweens.add({
-            targets: bg,
-            alpha: 1,
-            duration: 300,
-            onComplete: function () {
-                self.tweens.add({
-                    targets: stageNumSprite,
-                    alpha: 1,
-                    duration: 300,
-                    onComplete: function () {
-                        self.time.delayedCall(900, function () {
-                            self.tweens.add({ targets: stageNumSprite, alpha: 0, duration: 200 });
-                            self.playSound("voice_fight", 0.7);
-                            self.tweens.add({
-                                targets: fightSprite,
-                                alpha: 1,
-                                scaleX: 1.2,
-                                scaleY: 1.2,
-                                duration: 200,
-                                onComplete: function () {
-                                    self.time.delayedCall(600, function () {
-                                        self.tweens.add({
-                                            targets: [fightSprite, bg],
-                                            alpha: 0,
-                                            duration: 200,
-                                            onComplete: function () {
-                                                bg.destroy();
-                                                stageNumSprite.destroy();
-                                                fightSprite.destroy();
-                                                self.startGame();
-                                            },
-                                        });
-                                    });
-                                },
-                            });
-                        });
-                    },
-                });
-            },
+        // [300] voice_round + [300-600] stageNum fade in
+        this.time.delayedCall(300, function () {
+            self.playSound("voice_round" + String(Math.min(stageId, 3)), 0.7);
+            self.tweens.add({ targets: stageNumSprite, alpha: 1, duration: 300 });
+        });
+
+        // [1600-1700] stageNum fade out + [1600-1800] fight fade in & scale 1.2→1
+        this.time.delayedCall(1600, function () {
+            self.tweens.add({ targets: stageNumSprite, alpha: 0, duration: 100 });
+            self.tweens.add({ targets: fightSprite, alpha: 1, duration: 200 });
+            self.tweens.add({ targets: fightSprite, scaleX: 1, scaleY: 1, duration: 200 });
+        });
+
+        // [1800] voice_fight
+        this.time.delayedCall(1800, function () {
+            self.playSound("voice_fight", 0.7);
+        });
+
+        // [2200-2400] fight scale 1→1.5 + fade out
+        this.time.delayedCall(2200, function () {
+            self.tweens.add({ targets: fightSprite, scaleX: 1.5, scaleY: 1.5, duration: 200 });
+            self.tweens.add({ targets: fightSprite, alpha: 0, duration: 200 });
+        });
+
+        // [2300-2500] BG fade out → startGame
+        this.time.delayedCall(2300, function () {
+            self.tweens.add({
+                targets: bg,
+                alpha: 0,
+                duration: 200,
+                onComplete: function () {
+                    bg.destroy();
+                    stageNumSprite.destroy();
+                    fightSprite.destroy();
+                    self.startGame();
+                },
+            });
         });
     }
 
@@ -1248,18 +1239,28 @@ export class PhaserGameScene extends Phaser.Scene {
 
         var self = this;
 
-        var clearText = this.add.text(GCX, GCY, "STAGE CLEAR!", {
-            fontFamily: "sans-serif",
-            fontSize: "20px",
-            fontStyle: "bold",
-            color: "#ffffff",
-            stroke: "#000000",
-            strokeThickness: 3,
-        });
-        clearText.setOrigin(0.5);
-        clearText.setDepth(200);
+        // PIXI: stageClearBg (white 0.4 alpha fullscreen) + stageclear.gif sprite
+        var clearBg = this.add.graphics();
+        clearBg.fillStyle(0xffffff, 0.4);
+        clearBg.fillRect(0, 0, GW, GH);
+        clearBg.setDepth(200);
+        clearBg.setAlpha(0);
 
-        this.playSound("voice_ko", 0.7);
+        // stageclear.gif (212×88) positioned: x centered, y = GAME_HEIGHT/2 - height
+        // PIXI: x = GAME_WIDTH/2 - width/2, y = GAME_HEIGHT/2 - height (top-left origin)
+        // Center of sprite: (GCX, GCY - 88 + 44) = (GCX, GCY - 44)
+        var clearSprite = this.add.sprite(GCX, GCY - 44, "game_ui", "stageclear.gif");
+        clearSprite.setOrigin(0.5);
+        clearSprite.setDepth(201);
+        clearSprite.setAlpha(0);
+
+        // PIXI animation: 0.3s delay, then fade in 0.5s
+        this.tweens.add({
+            targets: [clearBg, clearSprite],
+            alpha: 1,
+            duration: 500,
+            delay: 300,
+        });
 
         this.time.delayedCall(2500, function () {
             self.stopAllSounds();
@@ -2370,7 +2371,36 @@ export class PhaserGameScene extends Phaser.Scene {
         akebonoBg.play("akebono_bg_anim");
         this.akebonoBgSprite = akebonoBg;
 
-        // PIXI title.akebonofinish(): show K.O. text with scale-in + sound
+        // PIXI title.akebonofinish(): knockoutK.gif + knockoutO.gif scale-in
+        // K at GAME_CENTER - width/2, O at GAME_CENTER + width/2, both anchor(0.5)
+        var koK = this.add.sprite(GCX - 41, GCY, "game_ui", "knockoutK.gif");
+        koK.setOrigin(0.5);
+        koK.setDepth(200);
+        koK.setScale(0);
+
+        var koO = this.add.sprite(GCX + 41, GCY, "game_ui", "knockoutO.gif");
+        koO.setOrigin(0.5);
+        koO.setDepth(200);
+        koO.setScale(0);
+
+        // K: scale 0→1, 0.4s, Back.easeOut
+        this.tweens.add({
+            targets: koK,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 400,
+            ease: "Back.easeOut",
+        });
+        // O: same but delayed 0.15s (PIXI overlap "-=0.25" from 0.4s = 0.15s offset)
+        this.tweens.add({
+            targets: koO,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 400,
+            delay: 150,
+            ease: "Back.easeOut",
+        });
+
         this.playSound("voice_ko", 0.7);
     }
 
