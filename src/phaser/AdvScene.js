@@ -79,6 +79,27 @@ var ADV_SCENARIO_EN = {
     },
 };
 
+function addPixiPositionedText(scene, x, y, value, style) {
+    var textStyle = Object.assign({}, style);
+    var padding = textStyle.padding;
+    var paddingX = 0;
+    var paddingY = 0;
+
+    if (typeof padding === "number") {
+        paddingX = padding;
+        paddingY = padding;
+        textStyle.padding = { x: padding, y: padding };
+    } else if (padding) {
+        paddingX = padding.x || 0;
+        paddingY = padding.y || 0;
+    }
+
+    // PIXI trims text padding back out of its bounds, while Phaser keeps it in the box.
+    var text = scene.add.text(x - paddingX, y - paddingY, value, textStyle);
+    text.setOrigin(0, 0);
+    return text;
+}
+
 export class PhaserAdvScene extends Phaser.Scene {
     constructor() {
         super({ key: "PhaserAdvScene" });
@@ -121,7 +142,7 @@ export class PhaserAdvScene extends Phaser.Scene {
         nameBg.fillRoundedRect(16, GAME_DIMENSIONS.CENTER_Y - 5, 80, 24, 6);
         nameBg.strokeRoundedRect(16, GAME_DIMENSIONS.CENTER_Y - 5, 80, 24, 6);
 
-        this.add.text(50, GAME_DIMENSIONS.CENTER_Y - 4, "G", {
+        this.nameTxt = addPixiPositionedText(this, 50, GAME_DIMENSIONS.CENTER_Y - 4, "G", {
             fontFamily: "sans-serif",
             fontSize: "16px",
             fontStyle: "bold",
@@ -129,7 +150,7 @@ export class PhaserAdvScene extends Phaser.Scene {
             padding: { x: 10, y: 10 },
         });
 
-        this.txt = this.add.text(15, GAME_DIMENSIONS.CENTER_Y + 30, "", {
+        this.txt = addPixiPositionedText(this, 15, GAME_DIMENSIONS.CENTER_Y + 30, "", {
             fontFamily: "sans-serif",
             fontSize: "16px",
             fontStyle: "bold",
