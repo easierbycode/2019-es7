@@ -113,11 +113,47 @@ jobs:
           CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL: https://services.gradle.org/distributions/gradle-8.12-bin.zip
         run: cordova compile android --debug --packageType=apk
 
+      - name: Save original APK
+        run: cp cordova/platforms/android/app/build/outputs/apk/debug/*.apk ./game-original.apk
+
+      - name: Prepare Cordova www for phaser-game
+        run: |
+          rm -rf cordova/www/*
+          cp -r assets cordova/www/
+          cp -r src cordova/www/
+          cp -r icons cordova/www/ || true
+          cp manifest.json cordova/www/ || true
+          cp favicon.ico cordova/www/ || true
+          cp phaser-game.html cordova/www/
+          sed -i 's/<\/head>/<script src="cordova.js"><\/script><\/head>/' cordova/www/phaser-game.html
+
+      - name: Update config.xml for phaser-game entry point
+        run: sed -i 's|<content src="index.html" />|<content src="phaser-game.html" />|' cordova/config.xml
+
+      - name: Prepare Cordova Android (phaser-game)
+        working-directory: cordova
+        run: cordova prepare android
+
+      - name: Build Cordova Android (phaser-game APK)
+        working-directory: cordova
+        env:
+          CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL: https://services.gradle.org/distributions/gradle-8.12-bin.zip
+        run: cordova compile android --debug --packageType=apk
+
+      - name: Save phaser-game APK
+        run: cp cordova/platforms/android/app/build/outputs/apk/debug/*.apk ./phaser-game.apk
+
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: game-apk
-          path: cordova/platforms/android/app/build/outputs/apk/debug/*.apk
+          path: ./game-original.apk
+
+      - name: Upload phaser-game APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: phaser-game-apk
+          path: ./phaser-game.apk
 
   web:
     needs: cordova
@@ -136,6 +172,7 @@ jobs:
           cp -r src dist/
           cp -r icons dist/ || true
           cp index.html dist/
+          cp phaser-game.html dist/
           cp manifest.json dist/ || true
           cp favicon.ico dist/ || true
           cp app-original.js dist/ || true
@@ -146,11 +183,18 @@ jobs:
           name: game-apk
           path: ./apk-tmp
 
-      - name: Copy APK to dist
+      - name: Download phaser-game APK artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: phaser-game-apk
+          path: ./phaser-apk-tmp
+
+      - name: Copy APKs to dist
         run: |
           cp apk-tmp/*.apk dist/game.apk
-          ls -l dist/game.apk
-          rm -rf apk-tmp
+          cp phaser-apk-tmp/*.apk dist/phaser-game.apk
+          ls -l dist/game.apk dist/phaser-game.apk
+          rm -rf apk-tmp phaser-apk-tmp
 
       - name: Create downloadable zip of built site
         run: |
