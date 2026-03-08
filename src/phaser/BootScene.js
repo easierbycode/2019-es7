@@ -94,7 +94,14 @@ export class BootScene extends Phaser.Scene {
             gameState._phaserRecipe = recipe;
         }
 
-        this.scene.start("PhaserTitleScene");
+        // Phaser 4 RC6: the scene-level plugin (this.scene.start) and
+        // this.time.delayedCall do not work reliably from create().
+        // Use the game-level scene manager via setTimeout instead.
+        var game = this.game;
+        setTimeout(function () {
+            game.scene.stop("BootScene");
+            game.scene.start("PhaserTitleScene");
+        }, 50);
     }
 }
 
