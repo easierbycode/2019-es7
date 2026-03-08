@@ -240,9 +240,11 @@ export class PhaserGameScene extends Phaser.Scene {
         this.spBtnBarBg = this.add.sprite(0, 0, "game_ui", "hudCabtn100per.gif");
         this.spBtnBarBg.setOrigin(0, 0);
 
-        this.spBtnBar = this.add.sprite(0, 58, "game_ui", "hudCabtn0per.gif");
-        this.spBtnBar.setOrigin(0, 1);
-        this.spBtnBar.setScale(1, 0);
+        // Fill bar — revealed by crop mask (PIXI CaButton mask approach)
+        // PIXI: Graphics mask rect (8, 8, 51, 50) with scale.y = percent
+        // Phaser 4 RC6 WebGL: setMask unsupported; use setCrop for equivalent clipping
+        this.spBtnBar = this.add.sprite(0, 0, "game_ui", "hudCabtn0per.gif");
+        this.spBtnBar.setOrigin(0, 0);
 
         this.spBtnWrap.add([this.spBtnPulse, this.spBtnReadyBg, this.spBtnBarBg, this.spBtnBar]);
         this.spBtnWrap.setSize(this.spBtnBarBg.width, this.spBtnBarBg.height);
@@ -425,7 +427,16 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         var ratio = Math.min(this.spGauge / 100, 1);
-        this.spBtnBar.setScale(1, ratio);
+        // PIXI CaButton mask: rect (8, 8, 51, 50) scaled on Y by percent
+        // When PIXI Graphics.scale.y = s, rect(8, 8, 51, 50) → (8, 8*s, 51, 50*s)
+        // setCrop equivalent: clip the fill sprite to the same region
+        if (ratio <= 0) {
+            this.spBtnBar.setCrop(0, 0, 0, 0);
+        } else {
+            var cropY = Math.round(8 * ratio);
+            var cropH = Math.round(50 * ratio);
+            this.spBtnBar.setCrop(8, cropY, 51, cropH);
+        }
 
         if (ratio >= 1) {
             this.spBtnReadyBg.setAlpha(1);
@@ -1096,6 +1107,43 @@ export class PhaserGameScene extends Phaser.Scene {
         });
     }
 
+    // 5-frame hit/guard impact at bullet position (PIXI enemy onDamage explosion)
+    // hit0-4.gif for regular hits, guard0-4.gif for invulnerable ("infinity" HP) enemies
+    showHitImpact(x, y, isGuard) {
+        var animKey = isGuard ? "guard_impact_anim" : "hit_impact_anim";
+        if (!this.anims.exists(animKey)) {
+            var prefix = isGuard ? "guard" : "hit";
+            var frames = [];
+            for (var i = 0; i < 5; i++) {
+                frames.push({ key: "game_asset", frame: prefix + i + ".gif" });
+            }
+            this.anims.create({ key: animKey, frames: frames, frameRate: 48, repeat: 0 });
+        }
+        var frameKey = isGuard ? "guard0.gif" : "hit0.gif";
+        var impact = this.add.sprite(x, y - 10, "game_asset", frameKey);
+        impact.setOrigin(0.5);
+        impact.setDepth(60);
+        // PIXI scale: min(1, (unitHeight + 50) / 32) + 0.2 ≈ 1.2 for typical bullets
+        impact.setScale(1.2);
+        impact.play(animKey);
+        impact.once("animationcomplete", function () { impact.destroy(); });
+    }
+
+    // Red tint flash on surviving enemy (PIXI: TweenMax 0.1s red, 0.1s back to white)
+    flashEnemyTint(enemy) {
+        if (!enemy || !enemy.active) return;
+        var existing = enemy.getData("_tintTimer");
+        if (existing) existing.remove(false);
+        enemy.setTint(0xFF0000);
+        var timer = this.time.delayedCall(100, function () {
+            if (enemy && enemy.active) {
+                enemy.clearTint();
+                enemy.setData("_tintTimer", null);
+            }
+        });
+        enemy.setData("_tintTimer", timer);
+    }
+
     showScorePopup(x, y, score) {
         var txt = this.add.text(x, y, String(score), {
             fontFamily: "Arial",
@@ -1461,21 +1509,39 @@ export class PhaserGameScene extends Phaser.Scene {
 
                     if (applyDamage) {
                         var dmg = pb.getData("damage") || 1;
-                        var ehp = enemy.getData("hp") - dmg;
-                        enemy.setData("hp", ehp);
+                        var hpBefore = enemy.getData("hp");
+                        var isGuard = (hpBefore === "infinity");
 
-                        if (isBoss) {
-                            this.bossHp = ehp;
-                            this.checkBossDanger();
-                        }
+                        if (!isGuard) {
+                            // Normal damage path
+                            var ehp = hpBefore - dmg;
+                            enemy.setData("hp", ehp);
 
-                        if (ehp <= 0) {
                             if (isBoss) {
-                                this.bossDie(enemy);
-                            } else {
-                                this.enemyDie(enemy, false);
+                                this.bossHp = ehp;
+                                this.checkBossDanger();
                             }
-                            break;
+
+                            // Hit impact at bullet position (PIXI: r.onDamage explosion)
+                            this.showHitImpact(pb.x, pb.y, false);
+                            this.playSound("se_damage", 0.15);
+
+                            if (ehp <= 0) {
+                                if (isBoss) {
+                                    this.bossDie(enemy);
+                                } else {
+                                    this.enemyDie(enemy, false);
+                                }
+                                break;
+                            }
+
+                            // Red tint flash on surviving enemy
+                            this.flashEnemyTint(enemy);
+                        } else {
+                            // Guard: invulnerable enemy ("infinity" HP), no HP change
+                            this.showHitImpact(pb.x, pb.y, true);
+                            this.playSound("se_guard", 0.2);
+                            this.flashEnemyTint(enemy);
                         }
                     }
 
@@ -1682,17 +1748,24 @@ export class PhaserGameScene extends Phaser.Scene {
         bullet.setData("score", projData.score || 0);
         bullet.setData("spgage", projData.spgage || 0);
 
+        // PIXI projectileAdd default: rotX=0, rotY=1 (straight down).
+        // soliderB aims at player; special projectile types (beam, smoke, etc.) also aim.
+        // All other regular enemies (soliderA, launchpad, etc.) shoot straight down.
         var enemyName = String(enemy.getData("name") || "").toLowerCase();
-        if (enemyName === "solidera" || enemyName === "soldiera") {
-            bullet.setData("rotX", 0);
-            bullet.setData("rotY", 1);
-        } else {
+        var projName = String((projData && projData.name) || "").toLowerCase();
+
+        if (enemyName === "soliderb" || enemyName === "soldierb" ||
+            projName === "beam" || projName === "smoke" || projName === "meka" || projName === "psychofield") {
+            // Aimed at player
             var dx = this.playerSprite.x - enemy.x;
             var dy = this.playerSprite.y - enemy.y;
             var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-
             bullet.setData("rotX", dx / dist);
             bullet.setData("rotY", dy / dist);
+        } else {
+            // Default: straight down (matches PIXI)
+            bullet.setData("rotX", 0);
+            bullet.setData("rotY", 1);
         }
 
         this.enemyBullets.push(bullet);
