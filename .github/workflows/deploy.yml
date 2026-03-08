@@ -46,27 +46,27 @@ jobs:
           if [ ! -d cordova ]; then
             cordova create cordova com.easierbycode.game2019es7 "2019-es7"
             cd cordova
-            cordova platform add android@latest
+            cordova platform add android@14.0.1
           fi
 
       - name: Copy project config.xml into Cordova project
         run: cp config.xml cordova/config.xml
 
-      - name: Update config.xml for Android 15/16
+      - name: Normalize config.xml for Cordova Android 14
         run: |
-          # Set target-sdk to 35 (Android 15) for stable latest support
+          # Cordova Android 14 targets Android 15 / SDK 35.
           if grep -q "android-targetSdkVersion" cordova/config.xml; then
             sed -i 's/android-targetSdkVersion" value="[0-9]*"/android-targetSdkVersion" value="35"/' cordova/config.xml
           else
             sed -i '/<\/widget>/i \    <preference name="android-targetSdkVersion" value="35" \/>' cordova/config.xml
           fi
-          # Set compile-sdk to 35 so AAPT2 can handle appcompat-1.7.0 HalfFloat colors
+          # Keep compile SDK at 35 to match the Cordova Android 14 platform sources.
           if grep -q "android-compileSdkVersion" cordova/config.xml; then
             sed -i 's/android-compileSdkVersion" value="[0-9]*"/android-compileSdkVersion" value="35"/' cordova/config.xml
           else
             sed -i '/<\/widget>/i \    <preference name="android-compileSdkVersion" value="35" \/>' cordova/config.xml
           fi
-          # Pin Gradle version to 8.12 to avoid failures with non-existent versions like 8.13
+          # Keep a known-good Gradle wrapper version for CI reproducibility.
           if grep -q "android-gradle-distribution-url" cordova/config.xml; then
             sed -i 's|android-gradle-distribution-url" value=".*"|android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.12-bin.zip"|' cordova/config.xml
           else
@@ -93,7 +93,7 @@ jobs:
         working-directory: cordova
         run: cordova prepare android
 
-      - name: Force compileSdkVersion 35 for AAPT2 compatibility
+      - name: Force compileSdkVersion 35 for Cordova Android 14
         run: |
           CONFIG=cordova/platforms/android/cdv-gradle-config.json
           echo "=== Before patch ==="
