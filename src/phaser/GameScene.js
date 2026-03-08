@@ -248,7 +248,15 @@ export class PhaserGameScene extends Phaser.Scene {
 
         this.spBtnWrap.add([this.spBtnPulse, this.spBtnReadyBg, this.spBtnBarBg, this.spBtnBar]);
         this.spBtnWrap.setSize(this.spBtnBarBg.width, this.spBtnBarBg.height);
-        this.spBtnWrap.setInteractive({ useHandCursor: true });
+        this.spBtnWrap.setInteractive(
+            new Phaser.Geom.Circle(
+                this.spBtnBarBg.width / 2,
+                this.spBtnBarBg.height / 2,
+                Math.min(this.spBtnBarBg.width, this.spBtnBarBg.height) / 2 - 5
+            ),
+            Phaser.Geom.Circle.Contains
+        );
+        this.spBtnWrap.input.cursor = "pointer";
         this.spBtnWrap.on("pointerup", this.onSpFire, this);
         this.spBtn = this.spBtnWrap;
 
