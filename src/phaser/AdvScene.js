@@ -139,13 +139,14 @@ export class PhaserAdvScene extends Phaser.Scene {
             padding: { x: 10, y: 10 },
         });
 
+        // PIXI adv scene: "Next▼" for next part, "LET'S GO! ▶︎" for last part
         this.nextBtn = this.add.text(
             GAME_DIMENSIONS.WIDTH - 20,
             GAME_DIMENSIONS.HEIGHT - 30,
-            "▶",
+            "Next▼",
             {
                 fontFamily: "sans-serif",
-                fontSize: "20px",
+                fontSize: "16px",
                 color: "#ffffff",
             }
         );
@@ -283,9 +284,9 @@ export class PhaserAdvScene extends Phaser.Scene {
         this.nextBtn.setVisible(true);
 
         if (this.partNum >= this.scenario[this.stageKey].part.length - 1) {
-            this.nextBtn.setText("▶▶");
+            this.nextBtn.setText("LET'S GO! ▶︎");
         } else {
-            this.nextBtn.setText("▶");
+            this.nextBtn.setText("Next▼");
         }
     }
 }
