@@ -5,6 +5,7 @@ import {
     getDisplayedHighScore,
     getWorldBestLabel,
     getHighScoreSyncText,
+    getHighScoreSyncTint,
 } from "../highScoreUi.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
@@ -30,11 +31,25 @@ export class PhaserEndingScene extends Phaser.Scene {
 
         this.playSound("voice_congra", 0.7);
 
-        var congraTitle = this.add.sprite(GCX, 60, "game_ui", "congraTitle.gif");
+        // PIXI uses animated congraTxt0-2.gif (animationSpeed 0.2 at 120fps ≈ 5fps)
+        if (!this.anims.exists("congra_txt_anim")) {
+            this.anims.create({
+                key: "congra_txt_anim",
+                frames: [
+                    { key: "game_ui", frame: "congraTxt0.gif" },
+                    { key: "game_ui", frame: "congraTxt1.gif" },
+                    { key: "game_ui", frame: "congraTxt2.gif" },
+                ],
+                frameRate: 5,
+                repeat: -1,
+            });
+        }
+        var congraTitle = this.add.sprite(GCX, 60, "game_ui", "congraTxt0.gif");
         congraTitle.setOrigin(0.5);
+        congraTitle.play("congra_txt_anim");
 
-        var congraFace = this.add.sprite(GCX, 160, "game_ui", "congraFace.gif");
-        congraFace.setOrigin(0.5);
+        var congraInfoBg = this.add.sprite(GCX, 160, "game_ui", "congraInfoBg.gif");
+        congraInfoBg.setOrigin(0.5);
 
         var scoreLabel = LANG === "ja" ? "スコア" : "SCORE";
         this.add.text(GCX, 240, scoreLabel, {
@@ -82,13 +97,14 @@ export class PhaserEndingScene extends Phaser.Scene {
             strokeThickness: 2,
         }).setOrigin(0.5);
 
+        var syncTint = getHighScoreSyncTint();
         this.scoreSyncLabel = this.add.text(GCX, 340, getHighScoreSyncText(), {
             fontFamily: "Arial",
             fontSize: "8px",
             fontStyle: "bold",
-            color: "#cccccc",
+            color: "#" + syncTint.toString(16).padStart(6, "0"),
             stroke: "#000000",
-            strokeThickness: 1,
+            strokeThickness: 2,
         }).setOrigin(0.5);
 
         var maxComboLabel = LANG === "ja" ? "最大コンボ" : "MAX COMBO";
@@ -236,6 +252,8 @@ export class PhaserEndingScene extends Phaser.Scene {
     update() {
         if (this.scoreSyncLabel) {
             this.scoreSyncLabel.setText(getHighScoreSyncText());
+            var syncTint = getHighScoreSyncTint();
+            this.scoreSyncLabel.setColor("#" + syncTint.toString(16).padStart(6, "0"));
         }
     }
 }

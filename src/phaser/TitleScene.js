@@ -4,6 +4,7 @@ import {
     getDisplayedHighScore,
     getWorldBestLabel,
     getHighScoreSyncText,
+    getHighScoreSyncTint,
 } from "../highScoreUi.js";
 import { StaffRollPanel } from "./StaffRollPanel.js";
 
@@ -93,9 +94,9 @@ export class PhaserTitleScene extends Phaser.Scene {
                 fontFamily: "Arial",
                 fontSize: "8px",
                 fontStyle: "bold",
-                color: "#cccccc",
+                color: "#9be37f",
                 stroke: "#000000",
-                strokeThickness: 1,
+                strokeThickness: 2,
             }
         );
 
@@ -141,11 +142,6 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.staffrollBtn.setOrigin(1, 0);
         this.staffrollBtn.setScale(1, 0);
         this.staffrollBtn.on("pointerup", this.showStaffroll, this);
-
-        this.fadeRect = this.add.graphics();
-        this.fadeRect.fillStyle(0x000000, 1);
-        this.fadeRect.fillRect(0, 0, GAME_DIMENSIONS.WIDTH, GAME_DIMENSIONS.HEIGHT);
-        this.fadeRect.setAlpha(0);
 
         this.playTitleVoice = false;
         this.startIntroAnimation();
@@ -345,15 +341,13 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.twitterBtn.disableInteractive();
         this.howtoBtn.disableInteractive();
         this.staffrollBtn.disableInteractive();
+        this.tapZone.disableInteractive();
 
         var self = this;
-        this.tweens.add({
-            targets: this.fadeRect,
-            alpha: 1,
-            duration: 1000,
-            onComplete: function () {
+        this.cameras.main.fade(1000, 0, 0, 0, false, function (cam, progress) {
+            if (progress >= 1) {
                 self.goToAdvScene();
-            },
+            }
         });
     }
 
@@ -379,15 +373,25 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.scene.start("PhaserAdvScene");
     }
 
-    update() {
-        if (this.bg) {
-            this.bg.tilePositionX -= 0.5;
+    update(time, delta) {
+        // Fixed-timestep BG scroll (120 logical fps, matching PIXI)
+        var STEP = 8.333333;
+        this._accumulator = (this._accumulator || 0) + Math.min(delta, 66.67);
+        while (this._accumulator >= STEP) {
+            this._accumulator -= STEP;
+            if (this.bg) {
+                this.bg.tilePositionX -= 0.5;
+            }
         }
+
         if (this.highScoreText) {
             this.highScoreText.setText(String(getDisplayedHighScore()));
         }
+
         if (this.scoreSyncLabel) {
             this.scoreSyncLabel.setText(getHighScoreSyncText());
+            var syncTint = getHighScoreSyncTint();
+            this.scoreSyncLabel.setColor("#" + syncTint.toString(16).padStart(6, "0"));
         }
 
         // Keyboard start

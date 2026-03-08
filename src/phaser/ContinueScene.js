@@ -5,6 +5,7 @@ import {
     getDisplayedHighScore,
     getWorldBestLabel,
     getHighScoreSyncText,
+    getHighScoreSyncTint,
 } from "../highScoreUi.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
@@ -36,8 +37,21 @@ export class PhaserContinueScene extends Phaser.Scene {
         this.continueTitle = this.add.sprite(0, 70, "game_ui", "continueTitle.gif");
         this.continueTitle.setOrigin(0, 0);
 
+        // PIXI: AnimatedSprite with continueFace0/1 at animationSpeed 0.05 (~3fps)
+        if (!this.anims.exists("continue_face_idle")) {
+            this.anims.create({
+                key: "continue_face_idle",
+                frames: [
+                    { key: "game_ui", frame: "continueFace0.gif" },
+                    { key: "game_ui", frame: "continueFace1.gif" },
+                ],
+                frameRate: 3,
+                repeat: -1,
+            });
+        }
         this.loseFace = this.add.sprite(20, this.continueTitle.y + this.continueTitle.height + 38, "game_ui", "continueFace0.gif");
         this.loseFace.setOrigin(0, 0);
+        this.loseFace.play("continue_face_idle");
 
         this.cntTextBg = this.add.sprite(
             this.loseFace.x + this.loseFace.width + 20,
@@ -100,6 +114,7 @@ export class PhaserContinueScene extends Phaser.Scene {
             }
         );
 
+        var syncTint = getHighScoreSyncTint();
         this.scoreSyncText = this.add.text(
             32, GH - 36,
             getHighScoreSyncText(),
@@ -107,9 +122,9 @@ export class PhaserContinueScene extends Phaser.Scene {
                 fontFamily: "Arial",
                 fontSize: "8px",
                 fontStyle: "bold",
-                color: "#cccccc",
+                color: "#" + syncTint.toString(16).padStart(6, "0"),
                 stroke: "#000000",
-                strokeThickness: 1,
+                strokeThickness: 2,
             }
         );
 
@@ -127,7 +142,7 @@ export class PhaserContinueScene extends Phaser.Scene {
 
         this.countdownTimer = this.time.addEvent({
             delay: 1200,
-            repeat: 9,
+            repeat: 10, // 11 total calls: 10 for digits 9→0, 1 more to trigger selectNo
             callback: this.onCountDown,
             callbackScope: this,
         });
@@ -273,23 +288,26 @@ export class PhaserContinueScene extends Phaser.Scene {
             }
         );
 
-        var gotoBtn = this.add.text(
-            GCX, GCY + 160,
-            "TITLE",
-            {
-                fontFamily: "sans-serif",
-                fontSize: "18px",
-                fontStyle: "bold",
-                color: "#ffffff",
-                backgroundColor: "#333333",
-                padding: { x: 20, y: 8 },
-            }
-        );
-        gotoBtn.setOrigin(0.5);
+        // PIXI Ie class: gotoTitleBtn0.gif (default), 1 (over), 2 (down)
+        // Position: GAME_CENTER - width/2, GAME_MIDDLE - height/2 + 160
+        var gotoBtn = this.add.sprite(0, 0, "game_ui", "gotoTitleBtn0.gif");
+        gotoBtn.setOrigin(0, 0);
+        gotoBtn.x = GCX - gotoBtn.width / 2;
+        gotoBtn.y = GCY - gotoBtn.height / 2 + 160;
         gotoBtn.setInteractive({ useHandCursor: true });
 
         var self = this;
+        gotoBtn.on("pointerover", function () {
+            gotoBtn.setFrame("gotoTitleBtn1.gif");
+        });
+        gotoBtn.on("pointerout", function () {
+            gotoBtn.setFrame("gotoTitleBtn0.gif");
+        });
+        gotoBtn.on("pointerdown", function () {
+            gotoBtn.setFrame("gotoTitleBtn2.gif");
+        });
         gotoBtn.on("pointerup", function () {
+            gotoBtn.setFrame("gotoTitleBtn1.gif");
             self.stopAllSounds();
             self.scene.start("PhaserTitleScene");
         });
@@ -364,6 +382,8 @@ export class PhaserContinueScene extends Phaser.Scene {
         }
         if (this.scoreSyncText) {
             this.scoreSyncText.setText(getHighScoreSyncText());
+            var syncTint = getHighScoreSyncTint();
+            this.scoreSyncText.setColor("#" + syncTint.toString(16).padStart(6, "0"));
         }
 
         // Keyboard continue controls
