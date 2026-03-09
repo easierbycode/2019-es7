@@ -268,11 +268,12 @@ export class PhaserAdvScene extends Phaser.Scene {
         this.playSound("se_correct", 0.9);
         this.stopSound("adventure_bgm");
 
-        if (this.endingFlg) {
-            this.scene.start("PhaserEndingScene");
-        } else {
-            this.scene.start("PhaserGameScene");
-        }
+        var nextScene = this.endingFlg ? "PhaserEndingScene" : "PhaserGameScene";
+        var game = this.game;
+        setTimeout(function () {
+            game.scene.stop("PhaserAdvScene");
+            game.scene.start(nextScene);
+        }, 50);
     }
 
     update(time, delta) {

@@ -41,10 +41,12 @@ export class PhaserContinueScene extends Phaser.Scene {
         if (!this.anims.exists("continue_face_idle")) {
             this.anims.create({
                 key: "continue_face_idle",
-                frames: [
-                    { key: "game_ui", frame: "continueFace0.gif" },
-                    { key: "game_ui", frame: "continueFace1.gif" },
-                ],
+                frames: this.anims.generateFrameNames("game_ui", {
+                    prefix: "continueFace",
+                    start: 0,
+                    end: 1,
+                    suffix: ".gif",
+                }),
                 frameRate: 3,
                 repeat: -1,
             });
@@ -297,6 +299,7 @@ export class PhaserContinueScene extends Phaser.Scene {
         gotoBtn.setInteractive({ useHandCursor: true });
 
         var self = this;
+        var game = this.game;
         gotoBtn.on("pointerover", function () {
             gotoBtn.setFrame("gotoTitleBtn1.gif");
         });
@@ -309,7 +312,10 @@ export class PhaserContinueScene extends Phaser.Scene {
         gotoBtn.on("pointerup", function () {
             gotoBtn.setFrame("gotoTitleBtn1.gif");
             self.stopAllSounds();
-            self.scene.start("PhaserTitleScene");
+            setTimeout(function () {
+                game.scene.stop("PhaserContinueScene");
+                game.scene.start("PhaserTitleScene");
+            }, 50);
         });
     }
 
@@ -322,6 +328,7 @@ export class PhaserContinueScene extends Phaser.Scene {
             onComplete: function () {
                 self.stopAllSounds();
 
+                var nextScene;
                 if (self.sceneSwitch === 1) {
                     var recipe = gameState._phaserRecipe;
                     if (recipe && recipe.playerData) {
@@ -332,10 +339,15 @@ export class PhaserContinueScene extends Phaser.Scene {
                     }
                     gameState.continueCnt = Number(gameState.continueCnt || 0) + 1;
                     gameState.score = gameState.continueCnt;
-                    self.scene.start("PhaserGameScene");
+                    nextScene = "PhaserGameScene";
                 } else {
-                    self.scene.start("PhaserTitleScene");
+                    nextScene = "PhaserTitleScene";
                 }
+                var game = self.game;
+                setTimeout(function () {
+                    game.scene.stop("PhaserContinueScene");
+                    game.scene.start(nextScene);
+                }, 50);
             },
         });
     }
