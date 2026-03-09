@@ -5,7 +5,7 @@
 import { GAME_DIMENSIONS } from "../../constants.js";
 import { gameState } from "../../gameState.js";
 import { triggerHaptic } from "../../haptics.js";
-import { createShadow } from "./Shadow.js";
+import { createShadow, updateShadowPosition } from "./Shadow.js";
 import {
     bossPatternBison,
     bossPatternBarlog,
@@ -22,6 +22,18 @@ var GCY = GAME_DIMENSIONS.CENTER_Y;
 function clamp(v, lo, hi) {
     return v < lo ? lo : v > hi ? hi : v;
 }
+
+// Per-boss danger balloon local offsets (PIXI top-left relative coords).
+// PIXI uses anchor(0,0) and addChild so balloon position is relative to
+// the unit container's top-left corner.  pivot.y = height makes the
+// balloon's bottom edge sit at the offset point.
+var BOSS_BALLOON_OFFSETS = [
+    { x: 0, y: 20 },   // bison
+    { x: 30, y: 20 },  // barlog
+    { x: 0, y: 15 },   // sagat
+    { x: 5, y: 20 },   // vega
+    { x: 70, y: 40 },  // fang
+];
 
 /**
  * Spawns the boss sprite and begins its entry tween.
@@ -265,10 +277,29 @@ export function checkBossDanger(scene) {
         scene.bossDangerShown = true;
         triggerHaptic("warning");
 
-        var dangerBalloon = scene.add.sprite(0, -scene.bossSprite.height / 2 - 10, "game_asset", "boss_dengerous0.gif");
-        dangerBalloon.setOrigin(0.5, 1);
+        // PIXI: balloon is addChild of unit container, so it tracks the boss
+        // automatically.  pivot.y = height makes the bottom edge sit at (x, y).
+        // Each boss class sets a unique (x, y) relative to the unit top-left.
+        var stageId = scene.bossStageId || 0;
+        var offsets = BOSS_BALLOON_OFFSETS[stageId] || BOSS_BALLOON_OFFSETS[0];
+
+        // Convert PIXI top-left-relative offsets to Phaser center-relative.
+        // PIXI: balloon at (offsets.x, offsets.y) from unit top-left
+        // Phaser: bossSprite.x/y is center, so top-left = center - size/2
+        var relX = offsets.x - scene.bossSprite.width / 2;
+        var relY = offsets.y - scene.bossSprite.height / 2;
+
+        var dangerBalloon = scene.add.sprite(
+            scene.bossSprite.x + relX,
+            scene.bossSprite.y + relY,
+            "game_asset", "boss_dengerous0.gif"
+        );
+        // origin(0,1) matches PIXI pivot.y = height: bottom-left anchor
+        dangerBalloon.setOrigin(0, 1);
         dangerBalloon.setDepth(46);
         dangerBalloon.setScale(0);
+        dangerBalloon.setData("relX", relX);
+        dangerBalloon.setData("relY", relY);
         scene.bossSprite.dangerBalloon = dangerBalloon;
 
         scene.tweens.add({
@@ -287,12 +318,35 @@ export function checkBossDanger(scene) {
                 if (!dangerBalloon || !dangerBalloon.active) return;
                 dangerFrame = (dangerFrame + 1) % 3;
                 dangerBalloon.setFrame("boss_dengerous" + dangerFrame + ".gif");
-                if (scene.bossSprite && scene.bossSprite.active) {
-                    dangerBalloon.x = scene.bossSprite.x;
-                    dangerBalloon.y = scene.bossSprite.y - scene.bossSprite.height / 2 - 10;
-                }
             },
         });
+    }
+}
+
+// -----------------------------------------------------------------------
+// Per-frame boss visual sync (shadow + danger balloon)
+// -----------------------------------------------------------------------
+
+/**
+ * Syncs boss shadow position and danger balloon position each frame.
+ * Called from fixedUpdate for the boss sprite (updateEnemy is only for
+ * regular enemies, so the boss needs its own visual sync).
+ *
+ * @param {Phaser.Scene} scene
+ */
+export function syncBossVisuals(scene) {
+    if (!scene.bossSprite || !scene.bossSprite.active) return;
+
+    // Boss shadow position sync
+    if (scene.bossShadow && scene.bossShadow.active) {
+        updateShadowPosition(scene.bossShadow, scene.bossSprite);
+    }
+
+    // Danger balloon position sync
+    var balloon = scene.bossSprite.dangerBalloon;
+    if (balloon && balloon.active) {
+        balloon.x = scene.bossSprite.x + (balloon.getData("relX") || 0);
+        balloon.y = scene.bossSprite.y + (balloon.getData("relY") || 0);
     }
 }
 

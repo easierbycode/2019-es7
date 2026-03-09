@@ -44,6 +44,7 @@ import {
     bossShootRadial as _bossShootRadial,
     checkBossDanger as _checkBossDanger,
     bossDie as _bossDie,
+    syncBossVisuals,
 } from "./game-objects/Boss.js";
 
 // --- Effects ---
@@ -835,6 +836,7 @@ export class PhaserGameScene extends Phaser.Scene {
                     this.enemies.splice(e, 1);
                     continue;
                 }
+                syncBossVisuals(this);
             }
 
             animateEnemy(enemy, step);
