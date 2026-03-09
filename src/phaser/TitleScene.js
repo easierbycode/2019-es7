@@ -370,7 +370,11 @@ export class PhaserTitleScene extends Phaser.Scene {
         gameState.akebonoCnt = 0;
         gameState.shortFlg = false;
 
-        this.scene.start("PhaserAdvScene");
+        var game = this.game;
+        setTimeout(function () {
+            game.scene.stop("PhaserTitleScene");
+            game.scene.start("PhaserAdvScene");
+        }, 50);
     }
 
     update(time, delta) {
