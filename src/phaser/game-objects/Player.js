@@ -6,6 +6,7 @@ import { GAME_DIMENSIONS } from "../../constants.js";
 import { gameState } from "../../gameState.js";
 import { PLAYER_STATES } from "../../enums/player-boss-states.js";
 import { triggerHaptic } from "../../haptics.js";
+import { createShadow, updateShadowPosition } from "./Shadow.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
 var GH = GAME_DIMENSIONS.HEIGHT;
@@ -66,6 +67,10 @@ export function createPlayer(scene) {
         }
         scene.playerSprite.play("player_walk");
     }
+
+    // PIXI player shadow: shadowOffsetY=5 (app-original.js line 589)
+    scene.playerShadow = createShadow(scene, scene.playerSprite, frameKey, true, 5);
+    updateShadowPosition(scene.playerShadow, scene.playerSprite);
 
     scene.barrierActive = false;
     scene.barrierTimer = 0;

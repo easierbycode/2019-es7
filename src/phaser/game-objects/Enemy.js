@@ -3,7 +3,9 @@
 // Extracted from GameScene methods: createEnemy, enemyWave, enemyShoot, enemyDie
 
 import { GAME_DIMENSIONS } from "../../constants.js";
+import { gameState } from "../../gameState.js";
 import { PLAYER_STATES } from "../../enums/player-boss-states.js";
+import { createShadow, updateShadowPosition } from "./Shadow.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
 var GH = GAME_DIMENSIONS.HEIGHT;
@@ -40,6 +42,18 @@ export function createEnemy(scene, data, x, y, itemName) {
     enemy.setData("animIdx", 0);
     enemy.setData("animTimer", 0);
     enemy.setData("projData", data.bulletData || data.projectileData || null);
+
+    // PIXI BaseUnit shadow (same sprite, tinted black, 50% alpha, Y-flipped)
+    var shadowReverse = data.shadowReverse !== false;
+    var shadowOffsetY = data.shadowOffsetY || 10;
+    var enemyNameLower = String(data.name || "").toLowerCase();
+    var shadow = createShadow(scene, enemy, frameKey, shadowReverse, shadowOffsetY);
+    // baraA/baraB: shadow hidden in original PIXI (app-original.js line 3543)
+    if (enemyNameLower === "baraa" || enemyNameLower === "barab") {
+        shadow.setVisible(false);
+    }
+    enemy.setData("shadow", shadow);
+    updateShadowPosition(shadow, enemy);
 
     scene.enemies.push(enemy);
     return enemy;
@@ -106,17 +120,27 @@ export function enemyShoot(scene, enemy) {
     bullet.setData("score", projData.score || 0);
     bullet.setData("spgage", projData.spgage || 0);
 
+    // PIXI projectileAdd default: rotX=0, rotY=1 (straight down).
+    // soliderB aims at player only on secondLoop; special projectile types always aim.
     var enemyName = String(enemy.getData("name") || "").toLowerCase();
     var projName = String((projData && projData.name) || "").toLowerCase();
 
-    if (enemyName === "soliderb" || enemyName === "soldierb" ||
+    var isSoldierB = enemyName === "soliderb" || enemyName === "soldierb";
+
+    if (isSoldierB && !gameState.secondLoop) {
+        // PIXI original: soldierB shoots straight down like other enemies
+        bullet.setData("rotX", 0);
+        bullet.setData("rotY", 1);
+    } else if ((isSoldierB && gameState.secondLoop) ||
         projName === "beam" || projName === "smoke" || projName === "meka" || projName === "psychofield") {
+        // secondLoop soldierB + special projectile types: aimed at player
         var dx = scene.playerSprite.x - enemy.x;
         var dy = scene.playerSprite.y - enemy.y;
         var dist = Math.sqrt(dx * dx + dy * dy) || 1;
         bullet.setData("rotX", dx / dist);
         bullet.setData("rotY", dy / dist);
     } else {
+        // Default: straight down (matches PIXI)
         bullet.setData("rotX", 0);
         bullet.setData("rotY", 1);
     }
@@ -159,11 +183,13 @@ export function enemyDie(scene, enemy, isSp) {
     }
 
     scene.showExplosion(enemy.x, enemy.y);
-    scene.showScorePopup(enemy.x, enemy.y, score * ratio);
+    scene.showScorePopup(enemy.x, enemy.y, score, ratio);
     scene.playSound("se_explosion", 0.35);
 
     var idx = scene.enemies.indexOf(enemy);
     if (idx >= 0) scene.enemies.splice(idx, 1);
+    var eShadow = enemy.getData("shadow");
+    if (eShadow && eShadow.active) eShadow.destroy();
     enemy.destroy();
 }
 
@@ -199,6 +225,12 @@ export function updateEnemy(scene, enemy, step) {
         }
     }
 
+    // Update shadow position to follow enemy
+    var eShadow = enemy.getData("shadow");
+    if (eShadow && eShadow.active) {
+        updateShadowPosition(eShadow, enemy);
+    }
+
     var shootCnt = enemy.getData("shootCnt") + 1;
     enemy.setData("shootCnt", shootCnt);
     var shootInterval = enemy.getData("interval") || 300;
@@ -228,6 +260,11 @@ export function animateEnemy(enemy, step) {
             try {
                 enemy.setFrame(animFrames[animIdx]);
             } catch (err) {}
+            // Sync shadow frame with character
+            var eShadow = enemy.getData("shadow");
+            if (eShadow && eShadow.active) {
+                try { eShadow.setFrame(animFrames[animIdx]); } catch (err2) {}
+            }
         }
     }
 }

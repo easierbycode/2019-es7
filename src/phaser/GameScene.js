@@ -58,6 +58,9 @@ import { showAkebonoFinish as _showAkebonoFinish } from "./effects/AkebonoFinish
 // --- UI ---
 import { showScorePopup as _showScorePopup } from "./ui/ScorePopup.js";
 
+// --- Shadow ---
+import { updateShadowPosition } from "./game-objects/Shadow.js";
+
 var GW = GAME_DIMENSIONS.WIDTH;
 var GH = GAME_DIMENSIONS.HEIGHT;
 var GCX = GAME_DIMENSIONS.CENTER_X;
@@ -95,7 +98,7 @@ export class PhaserGameScene extends Phaser.Scene {
     showHitImpact(x, y, isGuard) { _showHitImpact(this, x, y, isGuard); }
     flashEnemyTint(enemy) { _flashEnemyTint(this, enemy); }
     showAkebonoFinish() { _showAkebonoFinish(this); }
-    showScorePopup(x, y, score) { _showScorePopup(this, x, y, score); }
+    showScorePopup(x, y, score, ratio) { _showScorePopup(this, x, y, score, ratio); }
 
     // =================================================================
     // create
@@ -790,6 +793,14 @@ export class PhaserGameScene extends Phaser.Scene {
         handleKeyboardInput(this);
         this.playerSprite.x += 0.09 * (this.playerUnitX - this.playerSprite.x);
 
+        // Sync player shadow position and frame
+        if (this.playerShadow && this.playerShadow.active) {
+            updateShadowPosition(this.playerShadow, this.playerSprite);
+            if (this.playerSprite.frame && this.playerShadow.frame.name !== this.playerSprite.frame.name) {
+                try { this.playerShadow.setFrame(this.playerSprite.frame.name); } catch (e) {}
+            }
+        }
+
         if (this.theWorldFlg) {
             this.updateHUD();
             this.updateBossHpBar();
@@ -927,6 +938,8 @@ export class PhaserGameScene extends Phaser.Scene {
             if (!isBoss && (enemy.y > GH + 20 || enemy.x < -40 || enemy.x > GW + 40)) {
                 var idx = this.enemies.indexOf(enemy);
                 if (idx >= 0) this.enemies.splice(idx, 1);
+                var osShadow = enemy.getData("shadow");
+                if (osShadow && osShadow.active) osShadow.destroy();
                 enemy.destroy();
             }
         }
@@ -990,7 +1003,7 @@ export class PhaserGameScene extends Phaser.Scene {
                             this.comboTimeCnt = 100;
                             this.spGauge = Math.min(100, this.spGauge + ebSpgage);
                             this.updateSpGauge();
-                            this.showScorePopup(eBullet.x, eBullet.y, ebScore * ebRatio);
+                            this.showScorePopup(eBullet.x, eBullet.y, ebScore, ebRatio);
                         }
                         this.showExplosion(eBullet.x, eBullet.y);
                         this.playSound("se_explosion", 0.35);
