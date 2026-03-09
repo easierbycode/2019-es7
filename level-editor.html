@@ -5,10 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Evil Invaders Level Editor (Standalone)</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
     <style>
         body { font-family: system-ui, sans-serif; }
-        .grid-cell { width: 60px; height: 60px; display: flex; align-items: center; justify-content: center; font-size: 10px; border: 1px solid #444; cursor: pointer; position: relative; }
-        .grid-cell:hover { background-color: #333; }
+        .grid-cell {
+            display: flex; align-items: center; justify-content: center;
+            font-size: 10px; border: 1px solid #333; cursor: pointer; position: relative;
+            background: #111; transition: background 0.1s;
+        }
+        .grid-cell:hover { background-color: #1a3a1a; border-color: #84cc16; }
+        .grid-cell.occupied { background: #1a1a2e; border-color: #555; }
+        .grid-cell .sprite-icon { image-rendering: pixelated; width: 80%; height: 80%; object-fit: contain; }
+        .grid-cell .code-label { position: absolute; bottom: 1px; right: 2px; font-size: 8px; color: #888; font-family: monospace; }
         .thumb { image-rendering: pixelated; }
         .modal { animation: pop 0.2s; }
         @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
@@ -23,15 +32,27 @@
                 <h1 class="text-3xl font-bold text-lime-400">EVIL INVADERS LEVEL EDITOR</h1>
                 <p class="text-zinc-400 text-sm">Standalone • Live patches game.json + atlas • Creates level JSONs</p>
             </div>
-            <div class="flex gap-3">
-                <button onclick="loadDirectory()" 
+            <div class="flex gap-3 items-center">
+                <button onclick="loadDirectory()"
                         class="px-6 py-3 bg-lime-500 hover:bg-lime-600 text-black font-medium rounded-lg flex items-center gap-2">
                     <span>📁</span> Load Game Directory
                 </button>
-                <button onclick="saveAll()" 
+                <button onclick="saveAll()"
                         class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 font-medium rounded-lg flex items-center gap-2">
                     💾 Save All (Live Patch)
                 </button>
+                <div class="border-l border-zinc-700 pl-3 flex gap-2 items-center">
+                    <input id="firebase-level-name" type="text" placeholder="Level name"
+                           class="bg-zinc-900 border border-zinc-600 rounded px-3 py-2 text-sm w-36">
+                    <button onclick="saveToFirebase()"
+                            class="px-4 py-3 bg-orange-500 hover:bg-orange-600 text-black font-medium rounded-lg text-sm">
+                        🔥 Save to Firebase
+                    </button>
+                    <button onclick="loadFromFirebasePrompt()"
+                            class="px-4 py-3 bg-sky-500 hover:bg-sky-600 text-black font-medium rounded-lg text-sm">
+                        📥 Load from Firebase
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -68,13 +89,8 @@
             </div>
 
             <!-- Grid -->
-            <div class="overflow-auto max-h-[600px] border border-zinc-700 rounded-lg bg-zinc-900 p-4" id="grid-container">
-                <table id="grid-table" class="border-collapse">
-                    <thead>
-                        <tr id="grid-header"></tr>
-                    </thead>
-                    <tbody id="grid-body"></tbody>
-                </table>
+            <div class="overflow-auto max-h-[600px] border border-zinc-700 rounded-lg bg-zinc-900 p-2" id="grid-container">
+                <div id="grid-icon-view" class="inline-block"></div>
             </div>
 
             <!-- Preview Canvas -->
@@ -317,6 +333,12 @@
             document.getElementById('frame-count').textContent = Object.keys(frameThumbs).length;
         }
 
+        function renderAll() {
+            loadCurrentStage();
+            renderEnemyList();
+            renderAtlas();
+        }
+
         function loadCurrentStage() {
             currentStageKey = document.getElementById('stage-select').value;
             const stageObj = gameData[currentStageKey] || {};
@@ -326,50 +348,59 @@
         }
 
         function renderGrid() {
-            const thead = document.getElementById('grid-header');
             currentGrid = normalizeGrid(currentGrid);
+            const container = document.getElementById('grid-icon-view');
+            container.innerHTML = '';
 
-            thead.innerHTML = '<th class="px-3 py-2 bg-zinc-800 text-xs text-left">Slot</th>';
-            currentGrid.forEach((wave, waveIdx) => {
-                const th = document.createElement('th');
-                th.className = 'px-2 py-1 bg-zinc-800 text-xs text-center';
-                th.textContent = `W${waveIdx}`;
-                thead.appendChild(th);
+            const CELL_SIZE = 52;
+
+            // Column headers (wave numbers)
+            const headerRow = document.createElement('div');
+            headerRow.style.cssText = `display: flex; gap: 2px; margin-bottom: 2px; padding-left: ${CELL_SIZE + 4}px;`;
+            currentGrid.forEach((_, waveIdx) => {
+                const hdr = document.createElement('div');
+                hdr.style.cssText = `width: ${CELL_SIZE}px; text-align: center; font-size: 10px; color: #84cc16; font-family: monospace;`;
+                hdr.textContent = `W${waveIdx}`;
+                headerRow.appendChild(hdr);
             });
+            container.appendChild(headerRow);
 
-            const tbody = document.getElementById('grid-body');
-            tbody.innerHTML = '';
+            // Rows (one per slot)
             for (let slotIdx = 0; slotIdx < 8; slotIdx++) {
-                const tr = document.createElement('tr');
-                const rowNum = document.createElement('td');
-                rowNum.className = 'px-3 py-2 bg-zinc-800 text-xs text-right';
-                rowNum.textContent = slotIdx;
-                tr.appendChild(rowNum);
+                const row = document.createElement('div');
+                row.style.cssText = 'display: flex; gap: 2px; margin-bottom: 2px;';
+
+                // Row label
+                const label = document.createElement('div');
+                label.style.cssText = `width: ${CELL_SIZE}px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #84cc16; font-family: monospace;`;
+                label.textContent = slotIdx;
+                row.appendChild(label);
 
                 currentGrid.forEach((wave, waveIdx) => {
                     const code = wave[slotIdx] || "00";
-                    const td = document.createElement('td');
-                    td.className = 'grid-cell';
-                    td.dataset.wave = waveIdx;
-                    td.dataset.slot = slotIdx;
-                    td.onclick = () => openPalette(waveIdx, slotIdx);
+                    const cell = document.createElement('div');
+                    cell.className = 'grid-cell' + (code !== '00' ? ' occupied' : '');
+                    cell.style.cssText = `width: ${CELL_SIZE}px; height: ${CELL_SIZE}px;`;
+                    cell.onclick = () => openPalette(waveIdx, slotIdx);
 
-                    const codeDiv = document.createElement('div');
-                    codeDiv.className = 'text-[10px] font-mono';
-                    codeDiv.textContent = code;
-                    td.appendChild(codeDiv);
-
-                    // Thumbnail if possible
-                    const frameName = getFrameNameForCode(code);
-                    if (frameName && frameThumbs[frameName]) {
-                        const img = document.createElement('img');
-                        img.src = frameThumbs[frameName].toDataURL();
-                        img.className = 'thumb absolute bottom-1 right-1 w-8 h-8 opacity-80';
-                        td.appendChild(img);
+                    if (code !== '00') {
+                        const frameName = getFrameNameForCode(code);
+                        if (frameName && frameThumbs[frameName]) {
+                            const img = document.createElement('img');
+                            img.src = frameThumbs[frameName].toDataURL();
+                            img.className = 'sprite-icon';
+                            img.title = code;
+                            cell.appendChild(img);
+                        }
+                        const codeLabel = document.createElement('span');
+                        codeLabel.className = 'code-label';
+                        codeLabel.textContent = code;
+                        cell.appendChild(codeLabel);
                     }
-                    tr.appendChild(td);
+
+                    row.appendChild(cell);
                 });
-                tbody.appendChild(tr);
+                container.appendChild(row);
             }
         }
 
@@ -400,7 +431,7 @@
 
         function createPaletteButton(code, frameName, label) {
             const btn = document.createElement('button');
-            btn.className = 'flex flex-col items-center gap-1 p-2 hover:bg-zinc-800 rounded-xl w-full';
+            btn.className = 'flex flex-col items-center gap-1 p-3 hover:bg-zinc-700 rounded-xl w-full border border-zinc-700 hover:border-lime-400 transition-colors';
             btn.onclick = () => {
                 if (selectedCell) {
                     currentGrid[selectedCell.row][selectedCell.col] = code;
@@ -410,17 +441,18 @@
                 }
             };
 
-            const codeEl = document.createElement('div');
-            codeEl.className = 'font-mono text-xs';
-            codeEl.textContent = label;
-            btn.appendChild(codeEl);
-
             if (frameName && frameThumbs[frameName]) {
                 const img = document.createElement('img');
                 img.src = frameThumbs[frameName].toDataURL();
-                img.className = 'thumb w-12 h-12';
+                img.className = 'thumb w-10 h-10';
                 btn.appendChild(img);
             }
+
+            const codeEl = document.createElement('div');
+            codeEl.className = 'font-mono text-[10px] text-zinc-400';
+            codeEl.textContent = label;
+            btn.appendChild(codeEl);
+
             return btn;
         }
 
@@ -785,11 +817,143 @@
             }
         });
 
+        // ================== FIREBASE LEVEL PERSISTENCE ==================
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyAHY_agipyNEXvY2J4jDgnlk9kLeM6O37Y",
+            authDomain: "evil-invaders.firebaseapp.com",
+            databaseURL: "https://evil-invaders-default-rtdb.firebaseio.com",
+            projectId: "evil-invaders",
+            storageBucket: "evil-invaders.firebasestorage.app",
+            messagingSenderId: "149257705855",
+            appId: "1:149257705855:web:3f048481dfc66cef61224a",
+        };
+        const FIREBASE_LEVELS_PATH = "levels";
+
+        let firebaseApp = null;
+        let firebaseDb = null;
+
+        function initFirebase() {
+            if (firebaseDb) return;
+            if (typeof firebase === 'undefined') {
+                console.warn('Firebase SDK not loaded');
+                return;
+            }
+            if (!firebase.apps || firebase.apps.length === 0) {
+                firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
+            } else {
+                firebaseApp = firebase.apps[0];
+            }
+            firebaseDb = firebase.database();
+        }
+
+        function sanitizeLevelName(name) {
+            return name.replace(/[.#$/\[\]]/g, '_').trim();
+        }
+
+        async function saveToFirebase() {
+            initFirebase();
+            if (!firebaseDb) {
+                alert('Firebase not available.');
+                return;
+            }
+
+            let levelName = document.getElementById('firebase-level-name').value.trim();
+            if (!levelName) {
+                levelName = prompt('Enter a name for this level:');
+                if (!levelName) return;
+            }
+            levelName = sanitizeLevelName(levelName);
+
+            const levelData = {
+                name: levelName,
+                stageKey: currentStageKey,
+                enemylist: normalizeGrid(currentGrid),
+                enemyData: enemyData || {},
+                width: 8,
+                savedAt: firebase.database.ServerValue.TIMESTAMP,
+            };
+
+            try {
+                await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${levelName}`).set(levelData);
+                document.getElementById('firebase-level-name').value = levelName;
+                alert(`Level "${levelName}" saved to Firebase!`);
+            } catch (e) {
+                alert('Firebase save failed: ' + e.message);
+            }
+        }
+
+        async function loadFromFirebase(levelName) {
+            initFirebase();
+            if (!firebaseDb) {
+                alert('Firebase not available.');
+                return false;
+            }
+
+            levelName = sanitizeLevelName(levelName);
+
+            try {
+                const snapshot = await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${levelName}`).once('value');
+                const data = snapshot.val();
+                if (!data) {
+                    alert(`Level "${levelName}" not found in Firebase.`);
+                    return false;
+                }
+
+                currentGrid = normalizeGrid(data.enemylist || []);
+                if (data.enemyData && typeof data.enemyData === 'object') {
+                    enemyData = data.enemyData;
+                }
+                if (data.stageKey) {
+                    currentStageKey = data.stageKey;
+                }
+
+                document.getElementById('firebase-level-name').value = levelName;
+                renderGrid();
+                renderPreview();
+                renderEnemyList();
+
+                document.getElementById('status').innerHTML = `
+                    <div class="w-2 h-2 bg-orange-400 rounded-full"></div>
+                    Loaded from Firebase: ${levelName}
+                `;
+
+                return true;
+            } catch (e) {
+                alert('Firebase load failed: ' + e.message);
+                return false;
+            }
+        }
+
+        function loadFromFirebasePrompt() {
+            const name = prompt('Enter level name to load:');
+            if (name) loadFromFirebase(name);
+        }
+
+        // ================== URL PARAM LEVEL LOADING ==================
+        function getLevelFromURL() {
+            return new URLSearchParams(window.location.search).get('level');
+        }
+
         // Init
         window.onload = () => {
             switchTab(0);
-            // Tailwind script already loaded
             console.log('%cEvil Invaders Level Editor ready. Click Load Game Directory.', 'color:lime; font-size:13px');
+
+            // Auto-load level from URL param if present
+            const urlLevel = getLevelFromURL();
+            if (urlLevel) {
+                document.getElementById('firebase-level-name').value = urlLevel;
+                initFirebase();
+                if (firebaseDb) {
+                    loadFromFirebase(urlLevel);
+                } else {
+                    // Firebase SDK may still be loading, retry after short delay
+                    setTimeout(() => {
+                        initFirebase();
+                        loadFromFirebase(urlLevel);
+                    }, 1000);
+                }
+            }
         };
     </script>
 </body>
