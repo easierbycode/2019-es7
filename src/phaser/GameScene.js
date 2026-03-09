@@ -170,8 +170,17 @@ export class PhaserGameScene extends Phaser.Scene {
         var frames = pd.texture || [];
         var frameKey = frames[0] || "player00.gif";
 
+        // Shadow sprite (PIXI: same frames, tint 0x000000, alpha 0.5, shadowReverse=true, shadowOffsetY=5)
+        this.playerShadow = this.add.sprite(GCX, GH - 80, "game_asset", frameKey);
+        this.playerShadow.setOrigin(0.5);
+        this.playerShadow.setTint(0x000000);
+        this.playerShadow.setAlpha(0.5);
+        this.playerShadow.setFlipY(true);
+        this.playerShadow.setDepth(49);
+
         this.playerSprite = this.add.sprite(GCX, GH - 80, "game_asset", frameKey);
         this.playerSprite.setOrigin(0.5);
+        this.playerSprite.setDepth(50);
 
         this.playerHitAreaHalfWidth = (this.playerSprite.width - 14) / 2;
         if (!isFinite(this.playerHitAreaHalfWidth) || this.playerHitAreaHalfWidth <= 0) {
@@ -202,6 +211,7 @@ export class PhaserGameScene extends Phaser.Scene {
                 });
             }
             this.playerSprite.play("player_walk");
+            this.playerShadow.play("player_walk");
         }
 
         this.barrierActive = false;
@@ -1173,6 +1183,29 @@ export class PhaserGameScene extends Phaser.Scene {
         });
     }
 
+    // Boss death explosion (PIXI: animationSpeed=0.15 at 120fps ≈ 18fps, scale 1.0)
+    showBossExplosion(x, y) {
+        if (!this.anims.exists("boss_explosion_anim")) {
+            var frames = [];
+            for (var i = 0; i < 7; i++) {
+                frames.push({ key: "game_asset", frame: "explosion0" + i + ".gif" });
+            }
+            this.anims.create({
+                key: "boss_explosion_anim",
+                frames: frames,
+                frameRate: 18,
+                repeat: 0,
+            });
+        }
+        var ex = this.add.sprite(x, y, "game_asset", "explosion00.gif");
+        ex.setOrigin(0.5);
+        ex.setDepth(60);
+        ex.play("boss_explosion_anim");
+        ex.once("animationcomplete", function () {
+            ex.destroy();
+        });
+    }
+
     // 5-frame hit/guard impact at bullet position (PIXI enemy onDamage explosion)
     // hit0-4.gif for regular hits, guard0-4.gif for invulnerable ("infinity" HP) enemies
     showHitImpact(x, y, isGuard) {
@@ -1195,13 +1228,13 @@ export class PhaserGameScene extends Phaser.Scene {
         impact.once("animationcomplete", function () { impact.destroy(); });
     }
 
-    // Red tint flash on surviving enemy (PIXI: TweenMax 0.1s red, 0.1s back to white)
+    // Tint flash on surviving enemy (PIXI: TweenMax.to tint:16711680, 0.1s, then delay 0.1 back to white)
     flashEnemyTint(enemy) {
         if (!enemy || !enemy.active) return;
         var existing = enemy.getData("_tintTimer");
         if (existing) existing.remove(false);
-        enemy.setTint(0xFF0000);
-        var timer = this.time.delayedCall(100, function () {
+        enemy.setTint(16711680);
+        var timer = this.time.delayedCall(200, function () {
             if (enemy && enemy.active) {
                 enemy.clearTint();
                 enemy.setData("_tintTimer", null);
@@ -1287,6 +1320,7 @@ export class PhaserGameScene extends Phaser.Scene {
 
         this.showExplosion(this.playerSprite.x, this.playerSprite.y);
         this.playerSprite.setVisible(false);
+        if (this.playerShadow) this.playerShadow.setVisible(false);
 
         gameState.maxCombo = Math.max(gameState.maxCombo || 0, this.maxCombo);
 
@@ -1444,6 +1478,12 @@ export class PhaserGameScene extends Phaser.Scene {
         this.handleKeyboardInput();
 
         this.playerSprite.x += 0.09 * (this.playerUnitX - this.playerSprite.x);
+
+        // Shadow follows player (PIXI: shadowReverse=true, shadowOffsetY=5)
+        if (this.playerShadow && this.playerShadow.active) {
+            this.playerShadow.x = this.playerSprite.x;
+            this.playerShadow.y = this.playerSprite.y + this.playerSprite.height - 5;
+        }
 
         if (this.theWorldFlg) {
             this.updateHUD();
@@ -2384,8 +2424,70 @@ export class PhaserGameScene extends Phaser.Scene {
         var ratio = Math.max(1, Math.ceil(this.comboCount / 10));
         this.scoreCount += this.bossScore * ratio;
 
-        this.showExplosion(boss.x, boss.y);
         this.showScorePopup(boss.x, boss.y, this.bossScore * ratio);
+
+        // PIXI bossRemove: destroy all player bullets and clear list
+        for (var pb = this.playerBullets.length - 1; pb >= 0; pb--) {
+            if (this.playerBullets[pb] && this.playerBullets[pb].active) {
+                this.playerBullets[pb].destroy();
+            }
+        }
+        this.playerBullets = [];
+
+        // PIXI boss.dead(): 5 staggered explosions at random positions within boss hitArea
+        var bossX = boss.x;
+        var bossY = boss.y;
+        var bossW = boss.width || 64;
+        var bossH = boss.height || 64;
+        var self = this;
+        for (var ei = 0; ei < 5; ei++) {
+            this.time.delayedCall(250 * ei, function () {
+                var ex = bossX - bossW / 2 + Math.random() * bossW;
+                var ey = bossY - bossH / 2 + Math.random() * bossH;
+                self.showBossExplosion(ex, ey);
+                self.playSound("se_explosion", 0.35);
+            });
+        }
+
+        // PIXI boss.dead(): shake animation (two cycles of position jitter)
+        var startX = boss.x;
+        var startY = boss.y;
+        var shakeSteps = [
+            { dx: 4, dy: -2, dt: 0 },
+            { dx: -3, dy: 1, dt: 80 },
+            { dx: 2, dy: -1, dt: 70 },
+            { dx: -2, dy: 1, dt: 50 },
+            { dx: 1, dy: 1, dt: 50 },
+            { dx: 0, dy: 0, dt: 40 },
+            { dx: 4, dy: -2, dt: 0 },
+            { dx: -3, dy: 1, dt: 80 },
+            { dx: 2, dy: -1, dt: 70 },
+            { dx: -2, dy: 1, dt: 50 },
+            { dx: 1, dy: 1, dt: 50 },
+            { dx: 0, dy: 0, dt: 40 },
+        ];
+        var shakeDelay = 0;
+        for (var si = 0; si < shakeSteps.length; si++) {
+            shakeDelay += shakeSteps[si].dt;
+            (function (step) {
+                self.time.delayedCall(shakeDelay, function () {
+                    if (boss && boss.active) {
+                        boss.x = startX + step.dx;
+                        boss.y = startY + step.dy;
+                    }
+                });
+            })(shakeSteps[si]);
+        }
+        // PIXI boss.dead(): fade out unit after shake (1s fade with 0.5s delay after shake)
+        this.tweens.add({
+            targets: boss,
+            alpha: 0,
+            duration: 1000,
+            delay: shakeDelay + 500,
+            onComplete: function () {
+                if (boss && boss.active) boss.destroy();
+            },
+        });
 
         var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
         var stageId = gameState.stageId || 0;
@@ -2395,7 +2497,6 @@ export class PhaserGameScene extends Phaser.Scene {
         this.playSound("se_finish_akebono", 0.9);
 
         // PIXI: if boss killed during SP move, show akebonofinish background
-        // (akebonoBg0-2.gif animated at 0.7 speed, app-original.js lines 7526-7528)
         if (this.spFired) {
             this.showAkebonoFinish();
         }
@@ -2407,7 +2508,6 @@ export class PhaserGameScene extends Phaser.Scene {
 
         var idx = this.enemies.indexOf(boss);
         if (idx >= 0) this.enemies.splice(idx, 1);
-        boss.destroy();
 
         this.bossSprite = null;
         this.bossActive = false;
@@ -2422,7 +2522,6 @@ export class PhaserGameScene extends Phaser.Scene {
         }
         this.enemyBullets = [];
 
-        var self = this;
         // PIXI uses 2.5s delay before stageClear
         this.time.delayedCall(2500, function () {
             self.stageClear();
