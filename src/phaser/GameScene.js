@@ -1,6 +1,7 @@
 import { BGM_INFO, GAME_DIMENSIONS, RESOURCE_PATHS } from "../constants.js";
 import { gameState, saveHighScore } from "../gameState.js";
 import { PLAYER_STATES } from "../enums/player-boss-states.js";
+import { triggerHaptic } from "../haptics.js";
 import {
     getDisplayedHighScore,
     getWorldBestLabel,
@@ -61,6 +62,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this.spGauge = gameState.spgage || 0;
         this.spFired = false;
         this.spFiredDuringBoss = false;
+        this.spReadyHapticPlayed = false;
 
         var stageId = gameState.stageId || 0;
         this.stageKey = "stage" + String(stageId);
@@ -439,6 +441,10 @@ export class PhaserGameScene extends Phaser.Scene {
 
         if (ratio >= 1) {
             this.spBtnReadyBg.setAlpha(1);
+            if (!this.spReadyHapticPlayed) {
+                triggerHaptic("ready");
+                this.spReadyHapticPlayed = true;
+            }
             if (!this.spReadyTween) {
                 this.spReadyTween = this.tweens.add({
                     targets: this.spBtnPulse,
@@ -449,6 +455,7 @@ export class PhaserGameScene extends Phaser.Scene {
                 });
             }
         } else {
+            this.spReadyHapticPlayed = false;
             this.spBtnReadyBg.setAlpha(0);
             this.spBtnPulse.setAlpha(0);
             if (this.spReadyTween) {
@@ -496,6 +503,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this.spFiredDuringBoss = this.bossActive;
         this.spGauge = 0;
         this.updateSpGauge();
+        triggerHaptic("special");
         this.playSound("se_sp", 0.8);
         this.playSound("g_sp_voice", 0.7);
 
@@ -831,6 +839,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this.bossProjDataC = bossData.bulletDataC || bossData.projectileDataC || null;
         // Fall back to bulletDataA when bulletData is absent (stages 2-4)
         this.bossProjData = bossData.bulletData || bossData.projectileData || this.bossProjDataA;
+        triggerHaptic("bossEnter");
 
         var bossFrames = (bossData.anim && bossData.anim.idle) || bossData.texture || [];
         var bossFrame = bossFrames[0] || "bison_idle0.gif";
@@ -1189,6 +1198,7 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         this.hpBar.setScale(Math.max(0, this.playerHp / this.playerMaxHp), 1);
+        triggerHaptic("damage");
         this.playSound("se_damage", 0.15);
         this.playSound("g_damage_voice", 0.5);
 
@@ -1246,6 +1256,7 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         var self = this;
+        triggerHaptic("stageClear");
 
         // PIXI: stageClearBg (white 0.4 alpha fullscreen) + stageclear.gif sprite
         var clearBg = this.add.graphics();
@@ -2260,6 +2271,7 @@ export class PhaserGameScene extends Phaser.Scene {
         var spDamage = this.recipe.playerData.spDamage || 50;
         if (this.bossHp <= spDamage) {
             this.bossDangerShown = true;
+            triggerHaptic("warning");
 
             // Create danger balloon sprite above boss (matches PIXI: boss_dengerous0-2.gif, 28x29px)
             var dangerBalloon = this.add.sprite(0, -this.bossSprite.height / 2 - 10, "game_asset", "boss_dengerous0.gif");
@@ -2318,6 +2330,7 @@ export class PhaserGameScene extends Phaser.Scene {
         var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
         var stageId = gameState.stageId || 0;
         var voiceKey = "boss_" + (bossNames[stageId] || "bison") + "_voice_ko";
+        triggerHaptic("bossDefeat");
         this.playSound(voiceKey, 0.9);
         this.playSound("se_finish_akebono", 0.9);
 
@@ -2413,6 +2426,7 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     collectItem(itemName) {
+        triggerHaptic("pickup");
         this.playSound("g_powerup_voice", 0.55);
 
         switch (itemName) {

@@ -49,8 +49,47 @@ function readCookie(name) {
     return null;
 }
 
+function readSearchParam(name) {
+    if (typeof window === "undefined" || !window.location || typeof window.location.search !== "string") {
+        return null;
+    }
+
+    try {
+        return new URLSearchParams(window.location.search).get(name);
+    } catch (error) {
+        return null;
+    }
+}
+
+function readBooleanSearchParam(name, defaultValue) {
+    const value = readSearchParam(name);
+
+    if (value == null || value === "") {
+        return defaultValue;
+    }
+
+    return !/^(0|false|off|no)$/i.test(String(value));
+}
+
+function ensureRuntimeState(state) {
+    if (typeof state.vibrateFlg !== "boolean") {
+        state.vibrateFlg = true;
+    }
+}
+
 export const gameState = ensureGameState();
 ensureScoreState(gameState);
+ensureRuntimeState(gameState);
+
+export function syncRuntimeFlagsFromLocation(state = gameState) {
+    if (!state || typeof state !== "object") {
+        return;
+    }
+
+    state.vibrateFlg = readBooleanSearchParam("vibrate", typeof state.vibrateFlg === "boolean" ? state.vibrateFlg : true);
+}
+
+syncRuntimeFlagsFromLocation(gameState);
 
 export function setHighScore(value, source = "merged") {
     const normalized = normalizeScore(value);

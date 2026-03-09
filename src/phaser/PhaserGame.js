@@ -1,6 +1,7 @@
 // src/phaser/PhaserGame.js  ← corrected & ready for Phaser 4.0.0-rc.6
 
 import { GAME_DIMENSIONS } from "../constants.js";
+import { syncRuntimeFlagsFromLocation } from "../gameState.js";
 
 import { BootScene } from "./BootScene.js";
 import { PhaserTitleScene } from "./TitleScene.js";
@@ -10,6 +11,8 @@ import { PhaserContinueScene } from "./ContinueScene.js";
 import { PhaserEndingScene } from "./EndingScene.js";
 
 export function createPhaserGame() {
+    syncRuntimeFlagsFromLocation();
+
     // Hide old PIXI canvas, show new Phaser one
     const pixiCanvas = document.getElementById("canvas");
     const phaserContainer = document.getElementById("phaser-canvas");
