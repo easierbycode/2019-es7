@@ -41,20 +41,18 @@ export class BaseUnit extends BaseCast {
 
         this.character = createAnimatedSprite(animationFrames);
         this.character.animationSpeed = 0.1;
-        this.character.anchor.set(0.5);
 
         this.shadow = createAnimatedSprite(animationFrames);
         this.shadow.animationSpeed = 0.1;
         this.shadow.tint = 0x000000;
         this.shadow.alpha = 0.5;
-        this.shadow.anchor.set(0.5);
 
         this.unit = new PIXI.Container();
         this.unit.interactive = true;
         this.unit.name = "unit";
         this.unit.hitArea = new PIXI.Rectangle(
-            -this.character.width / 2,
-            -this.character.height / 2,
+            0,
+            0,
             this.character.width,
             this.character.height
         );
@@ -65,7 +63,6 @@ export class BaseUnit extends BaseCast {
 
         if (explosionFrames) {
             this.explosion = createAnimatedSprite(explosionFrames);
-            this.explosion.anchor.set(0.5);
             const scaleFactor = Math.min(1, (this.character.height + 50) / this.explosion.height) + 0.2;
             this.explosion.scale.set(scaleFactor);
             this.explosion.animationSpeed = 0.4;
@@ -103,9 +100,14 @@ export class BaseUnit extends BaseCast {
             return;
         }
 
-        this.shadow.scale.y = this.shadowReverse ? -1 : 1;
-        this.shadow.x = this.character.x;
-        this.shadow.y = this.character.y + this.character.height - this.shadowOffsetY;
+        this.shadow.x = 0;
+        if (this.shadowReverse) {
+            this.shadow.scale.y = -1;
+            this.shadow.y = 2 * this.shadow.height - this.shadowOffsetY;
+        } else {
+            this.shadow.scale.y = 1;
+            this.shadow.y = this.shadow.height - this.shadowOffsetY;
+        }
     }
 
     drawHitbox() {

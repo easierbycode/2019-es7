@@ -134,7 +134,8 @@ export class BossSagat extends Boss {
 
         if (seed >= 0.31 && seed <= 0.6) {
             this.projectileData = this.projectileDataA;
-            this.tlShoot.to(this.unit, 0.25, { x: targetX });
+            const randomShootX = Math.random() * (GAME_DIMENSIONS.WIDTH - this.unit.width);
+            this.tlShoot.to(this.unit, 0.25, { x: randomShootX });
             this.tlShoot.addCallback(this.onCharge, "+=0", null, this);
             this.tlShoot.addCallback(this.onShoot, "+=0.2", null, this);
             this.tlShoot.addCallback(this.onCharge, "+=0.2", null, this);
@@ -157,7 +158,8 @@ export class BossSagat extends Boss {
 
         if (seed >= 0.61 && seed <= 0.8) {
             this.projectileData = this.projectileDataB;
-            this.tlShoot.to(this.unit, 0.25, { x: targetX });
+            const randomBigX = Math.random() * (GAME_DIMENSIONS.WIDTH - this.unit.width);
+            this.tlShoot.to(this.unit, 0.25, { x: randomBigX });
             this.tlShoot.addCallback(this.onCharge, "+=0", null, this);
             this.tlShoot.addCallback(this.onBigShoot, "+=1.3", null, this);
             this.tlShoot.addCallback(() => {

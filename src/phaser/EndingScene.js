@@ -35,11 +35,12 @@ export class PhaserEndingScene extends Phaser.Scene {
         if (!this.anims.exists("congra_txt_anim")) {
             this.anims.create({
                 key: "congra_txt_anim",
-                frames: [
-                    { key: "game_ui", frame: "congraTxt0.gif" },
-                    { key: "game_ui", frame: "congraTxt1.gif" },
-                    { key: "game_ui", frame: "congraTxt2.gif" },
-                ],
+                frames: this.anims.generateFrameNames("game_ui", {
+                    prefix: "congraTxt",
+                    start: 0,
+                    end: 2,
+                    suffix: ".gif",
+                }),
                 frameRate: 5,
                 repeat: -1,
             });
@@ -152,9 +153,13 @@ export class PhaserEndingScene extends Phaser.Scene {
         titleBtn.setOrigin(0.5);
         titleBtn.setInteractive({ useHandCursor: true });
 
+        var game = this.game;
         titleBtn.on("pointerup", function () {
             self.stopAllSounds();
-            self.scene.start("PhaserTitleScene");
+            setTimeout(function () {
+                game.scene.stop("PhaserEndingScene");
+                game.scene.start("PhaserTitleScene");
+            }, 50);
         });
 
         this.staffRollContainer = null;
@@ -171,7 +176,7 @@ export class PhaserEndingScene extends Phaser.Scene {
         var bg = this.add.rectangle(GCX, GCY, GW, GH, 0x000000, 0.92);
         this.staffRollContainer.add(bg);
 
-        var staffG = this.add.sprite(GCX, 55, "game_ui", "staffrollG0");
+        var staffG = this.add.sprite(GCX, 55, "game_ui", "staffrollG0.gif");
         staffG.setOrigin(0.5);
         this.staffRollContainer.add(staffG);
 
@@ -183,7 +188,7 @@ export class PhaserEndingScene extends Phaser.Scene {
                         prefix: "staffrollG",
                         start: 0,
                         end: 7,
-                        suffix: "",
+                        suffix: ".gif",
                     }),
                     frameRate: 8,
                     repeat: -1,
@@ -193,7 +198,7 @@ export class PhaserEndingScene extends Phaser.Scene {
         } catch (e) {}
 
         try {
-            var namePanel = this.add.sprite(15, 90, "game_ui", "staffrollName");
+            var namePanel = this.add.sprite(15, 90, "game_ui", "staffrollName.gif");
             namePanel.setOrigin(0, 0);
             this.staffRollContainer.add(namePanel);
         } catch (e) {}

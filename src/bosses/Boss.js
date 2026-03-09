@@ -97,6 +97,7 @@ export class Boss extends BaseUnit {
         this.deadFlg = false;
         this.gokiFlg = false;
         this.dengerousFlg = false;
+        this.akebonoFlg = false;
 
         this.unit.hitArea = new PIXI.Rectangle(
             5,
@@ -106,10 +107,6 @@ export class Boss extends BaseUnit {
         );
 
         this.tlShoot = null;
-
-        // BaseUnit uses centered anchors; original app logic is top-left based.
-        this.character.anchor.set(0, 0);
-        this.shadow.anchor.set(0, 0);
     }
 
     static get CUSTOM_EVENT_DEAD() {
@@ -224,7 +221,7 @@ export class Boss extends BaseUnit {
 
         const startX = this.unit.x;
         const startY = this.unit.y;
-        new TimelineMax()
+        const shakeTimeline = new TimelineMax()
             .call(() => {
                 this.unit.x = startX + 4;
                 this.unit.y = startY - 2;
@@ -272,11 +269,14 @@ export class Boss extends BaseUnit {
             .call(() => {
                 this.unit.x = startX;
                 this.unit.y = startY;
-            }, null, this, "+=0.04")
-            .to(this.unit, 1, {
+            }, null, this, "+=0.04");
+
+        if (!this.akebonoFlg) {
+            shakeTimeline.to(this.unit, 1, {
                 delay: 0.5,
                 alpha: 0,
             });
+        }
 
         this.onDead();
     }
@@ -286,7 +286,7 @@ export class Boss extends BaseUnit {
             explosion.parent.removeChild(explosion);
         }
 
-        if (this.explotionCnt === 4) {
+        if (this.explotionCnt === 4 && !this.akebonoFlg) {
             if (this.shadow && this.shadow.parent === this.unit) {
                 this.unit.removeChild(this.shadow);
             }

@@ -897,6 +897,7 @@ export class GameScene extends BaseScene {
         }, null, this);
 
         if (this.hud.spFireFlg) {
+            boss.akebonoFlg = true;
             this.stageBg.akebonofinish();
             this.title.akebonofinish();
             gameState.akebonoCnt += 1;

@@ -1,3 +1,6 @@
+// src/phaser/GameScene.js — slimmed coordinator
+// All subsystem logic extracted to game-objects/, bosses/, effects/, ui/
+
 import { BGM_INFO, GAME_DIMENSIONS, RESOURCE_PATHS } from "../constants.js";
 import { gameState, saveHighScore } from "../gameState.js";
 import { PLAYER_STATES } from "../enums/player-boss-states.js";
@@ -7,6 +10,57 @@ import {
     getWorldBestLabel,
     getHighScoreSyncText,
 } from "../highScoreUi.js";
+
+// --- Game-objects ---
+import {
+    createPlayer,
+    createDragArea,
+    clampPlayerX,
+    handleKeyboardInput,
+    playerDamage as _playerDamage,
+    playerDie as _playerDie,
+    updateBarrier,
+    collectItem as _collectItem,
+} from "./game-objects/Player.js";
+import {
+    createEnemy as _createEnemy,
+    enemyWave as _enemyWave,
+    enemyShoot as _enemyShoot,
+    enemyDie as _enemyDie,
+    updateEnemy,
+    animateEnemy,
+} from "./game-objects/Enemy.js";
+import {
+    shootBullets,
+    updatePlayerBullets,
+} from "./game-objects/Bullet.js";
+import {
+    bossAdd as _bossAdd,
+    _bossAlive,
+    bossShootStart as _bossShootStart,
+    bossShootStraight as _bossShootStraight,
+    bossShootAimed as _bossShootAimed,
+    bossShootSpread as _bossShootSpread,
+    bossShootRadial as _bossShootRadial,
+    checkBossDanger as _checkBossDanger,
+    bossDie as _bossDie,
+    syncBossVisuals,
+} from "./game-objects/Boss.js";
+
+// --- Effects ---
+import {
+    showExplosion as _showExplosion,
+    spExplosions as _spExplosions,
+    showHitImpact as _showHitImpact,
+    flashEnemyTint as _flashEnemyTint,
+} from "./effects/index.js";
+import { showAkebonoFinish as _showAkebonoFinish } from "./effects/AkebonoFinish.js";
+
+// --- UI ---
+import { showScorePopup as _showScorePopup } from "./ui/ScorePopup.js";
+
+// --- Shadow ---
+import { updateShadowPosition } from "./game-objects/Shadow.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
 var GH = GAME_DIMENSIONS.HEIGHT;
@@ -21,35 +75,43 @@ function clamp(v, lo, hi) {
     return v < lo ? lo : v > hi ? hi : v;
 }
 
-function pointerId(pointer) {
-    if (!pointer) {
-        return null;
-    }
-    if (pointer.id !== undefined && pointer.id !== null) {
-        return pointer.id;
-    }
-    if (pointer.pointerId !== undefined && pointer.pointerId !== null) {
-        return pointer.pointerId;
-    }
-    return null;
-}
-
 function rectOverlap(a, b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
-
-// No more sine-wave boss patterns — replaced by timeline-based attack
-// patterns in bossShootStart() / bossPattern*() methods below.
 
 export class PhaserGameScene extends Phaser.Scene {
     constructor() {
         super({ key: "PhaserGameScene" });
     }
 
+    // === Thin wrappers so boss-pattern modules can call scene.xxx() ===
+    _bossAlive() { return _bossAlive(this); }
+    bossShootStart() { _bossShootStart(this); }
+    bossShootStraight(projData) { _bossShootStraight(this, projData); }
+    bossShootAimed(projData) { _bossShootAimed(this, projData); }
+    bossShootSpread(projData, count, angleDeg) { _bossShootSpread(this, projData, count, angleDeg); }
+    bossShootRadial(projData, count) { _bossShootRadial(this, projData, count); }
+    checkBossDanger() { _checkBossDanger(this); }
+    bossDie(boss) { _bossDie(this, boss); }
+    bossAdd() { _bossAdd(this); }
+    enemyDie(enemy, isSp) { _enemyDie(this, enemy, isSp); }
+    showExplosion(x, y) { _showExplosion(this, x, y); }
+    showHitImpact(x, y, isGuard) { _showHitImpact(this, x, y, isGuard); }
+    flashEnemyTint(enemy) { _flashEnemyTint(this, enemy); }
+    showAkebonoFinish() { _showAkebonoFinish(this); }
+    showScorePopup(x, y, score, ratio) { _showScorePopup(this, x, y, score, ratio); }
+
+    // =================================================================
+    // create
+    // =================================================================
     create() {
         this.recipe = recipeData();
         if (!this.recipe) {
-            this.scene.start("PhaserTitleScene");
+            var game = this.game;
+            setTimeout(function () {
+                game.scene.stop("PhaserGameScene");
+                game.scene.start("PhaserTitleScene");
+            }, 50);
             return;
         }
 
@@ -103,8 +165,9 @@ export class PhaserGameScene extends Phaser.Scene {
         this.isDragging = false;
         this.dragPointerId = null;
 
-        this.createPlayer();
-        this.createDragArea();
+        // --- Subsystem init ---
+        createPlayer(this);
+        createDragArea(this);
         this.createHUD();
         this.createCover();
 
@@ -124,7 +187,12 @@ export class PhaserGameScene extends Phaser.Scene {
         this.showTitle();
 
         this.input.setTopOnly(true);
-        this.input.on("pointerup", this.onScreenDragEnd, this);
+        this.input.on("pointerup", function (pointer) {
+            var _pointerId = pointer && (pointer.id !== undefined ? pointer.id : pointer.pointerId);
+            if (this.dragPointerId !== null && _pointerId !== null && _pointerId !== this.dragPointerId) return;
+            this.isDragging = false;
+            this.dragPointerId = null;
+        }, this);
         this.shootTimer = 0;
         this.shootInterval = this.recipe.playerData.shootNormal.interval || 23;
         this.shootMode = gameState.shootMode || "normal";
@@ -132,7 +200,6 @@ export class PhaserGameScene extends Phaser.Scene {
 
         this.enemyWaveFrameCounter = 0;
 
-        // Keyboard controls for PC mode
         this.cursors = null;
         this.wasd = null;
         try {
@@ -150,84 +217,15 @@ export class PhaserGameScene extends Phaser.Scene {
         this.stageBgmName = "";
         this.playBossBgm(stageId);
 
-        // Play stage voice after round title
         var self = this;
         this.time.delayedCall(2600, function () {
             self.playSound("g_stage_voice_" + String(stageId), 0.7);
         });
     }
 
-    playBossBgm(stageId) {
-        var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
-        var name = bossNames[stageId] || "bison";
-        var key = "boss_" + name + "_bgm";
-        this.stageBgmName = key;
-        this.playBgm(key, 0.4);
-    }
-
-    createPlayer() {
-        var pd = this.recipe.playerData;
-        var frames = pd.texture || [];
-        var frameKey = frames[0] || "player00.gif";
-
-        // Shadow sprite (PIXI: same frames, tint 0x000000, alpha 0.5, shadowReverse=true, shadowOffsetY=5)
-        this.playerShadow = this.add.sprite(GCX, GH - 80, "game_asset", frameKey);
-        this.playerShadow.setOrigin(0.5);
-        this.playerShadow.setTint(0x000000);
-        this.playerShadow.setAlpha(0.5);
-        this.playerShadow.setFlipY(true);
-        this.playerShadow.setDepth(49);
-
-        this.playerSprite = this.add.sprite(GCX, GH - 80, "game_asset", frameKey);
-        this.playerSprite.setOrigin(0.5);
-        this.playerSprite.setDepth(50);
-
-        this.playerHitAreaHalfWidth = (this.playerSprite.width - 14) / 2;
-        if (!isFinite(this.playerHitAreaHalfWidth) || this.playerHitAreaHalfWidth <= 0) {
-            this.playerHitAreaHalfWidth = 16;
-        }
-        this.playerUnitX = this.playerSprite.x;
-        this.playerUnitY = this.playerSprite.y;
-
-        this.playerHp = gameState.playerHp || pd.maxHp;
-        this.playerMaxHp = gameState.playerMaxHp || pd.maxHp;
-
-        this.playerAnimFrames = frames;
-        this.playerAnimIdx = 0;
-        this.playerAnimTimer = 0;
-
-        // Create player walk animation (PIXI animationSpeed=0.35 at 120 logical fps ≈ 42 fps)
-        if (frames.length > 1) {
-            var animFrames = [];
-            for (var i = 0; i < frames.length; i++) {
-                animFrames.push({ key: "game_asset", frame: frames[i] });
-            }
-            if (!this.anims.exists("player_walk")) {
-                this.anims.create({
-                    key: "player_walk",
-                    frames: animFrames,
-                    frameRate: 42,
-                    repeat: -1,
-                });
-            }
-            this.playerSprite.play("player_walk");
-            this.playerShadow.play("player_walk");
-        }
-
-        this.barrierActive = false;
-        this.barrierTimer = 0;
-        this.barrierSprite = null;
-    }
-
-    createDragArea() {
-        this.dragArea = this.add.zone(0, 0, GW, GH);
-        this.dragArea.setOrigin(0, 0);
-        this.dragArea.setInteractive(new Phaser.Geom.Rectangle(0, 0, GW, GH), Phaser.Geom.Rectangle.Contains);
-        this.dragArea.on("pointerdown", this.onScreenDragStart, this);
-        this.dragArea.on("pointermove", this.onScreenDragMove, this);
-        this.dragArea.on("pointerup", this.onScreenDragEnd, this);
-    }
-
+    // =================================================================
+    // HUD (kept inline — number-display helpers are scene-specific)
+    // =================================================================
     createHUD() {
         this.hudBg = this.add.sprite(0, 0, "game_ui", "hudBg0.gif");
         this.hudBg.setOrigin(0, 0);
@@ -242,10 +240,9 @@ export class PhaserGameScene extends Phaser.Scene {
         this.scoreLabel.setOrigin(0, 0);
         this.scoreLabel.setDepth(101);
 
-        // PIXI uses sprite-based smallNum (ei class with 10 digits) for in-game score
         this.scoreSmallNum = this._initSmallNum(10);
         this.scoreSmallNum.container.x = this.scoreLabel.x + this.scoreLabel.width + 2;
-        this.scoreSmallNum.container.y = 25; // same y as label (PIXI line 6148)
+        this.scoreSmallNum.container.y = 25;
         this.scoreSmallNum.container.setDepth(101);
         this._setSmallNum(this.scoreSmallNum, this.scoreCount);
 
@@ -267,6 +264,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this._lastComboNum = -1;
         this._setComboNum(0);
 
+        // SP button
         this.spBtnWrap = this.add.container(GW - 70, GCY + 15);
         this.spBtnWrap.setDepth(103);
 
@@ -281,9 +279,6 @@ export class PhaserGameScene extends Phaser.Scene {
         this.spBtnBarBg = this.add.sprite(0, 0, "game_ui", "hudCabtn100per.gif");
         this.spBtnBarBg.setOrigin(0, 0);
 
-        // Fill bar — revealed by crop mask (PIXI CaButton mask approach)
-        // PIXI: Graphics mask rect (8, 8, 51, 50) with scale.y = percent
-        // Phaser 4 RC6 WebGL: setMask unsupported; use setCrop for equivalent clipping
         this.spBtnBar = this.add.sprite(0, 0, "game_ui", "hudCabtn0per.gif");
         this.spBtnBar.setOrigin(0, 0);
 
@@ -298,14 +293,10 @@ export class PhaserGameScene extends Phaser.Scene {
             Phaser.Geom.Circle.Contains
         );
         this.spBtnBarBg.on("pointerover", function () {
-            if (this.game && this.game.canvas) {
-                this.game.canvas.style.cursor = "pointer";
-            }
+            if (this.game && this.game.canvas) this.game.canvas.style.cursor = "pointer";
         }, this);
         this.spBtnBarBg.on("pointerout", function () {
-            if (this.game && this.game.canvas) {
-                this.game.canvas.style.cursor = "default";
-            }
+            if (this.game && this.game.canvas) this.game.canvas.style.cursor = "default";
         }, this);
         this.spBtnBarBg.on("pointerup", this.onSpFire, this);
         this.spBtn = this.spBtnWrap;
@@ -313,20 +304,20 @@ export class PhaserGameScene extends Phaser.Scene {
         this.spReadyTween = null;
         this.updateSpGauge();
 
-        // PIXI: timeTxt.gif sprite (42x15) + bigNum (2 digits) for boss timer
+        // Boss timer
         this.bossTimerLabel = this.add.sprite(GCX - 42, 58, "game_ui", "timeTxt.gif");
         this.bossTimerLabel.setOrigin(0, 0);
         this.bossTimerLabel.setDepth(101);
         this.bossTimerLabel.setVisible(false);
 
         this.bossTimerNum = this._initBigNum(2);
-        this.bossTimerNum.container.x = this.bossTimerLabel.x + 42 + 3; // 3px gap
-        this.bossTimerNum.container.y = 56; // 2px higher than label
+        this.bossTimerNum.container.x = this.bossTimerLabel.x + 42 + 3;
+        this.bossTimerNum.container.y = 56;
         this.bossTimerNum.container.setDepth(101);
         this.bossTimerNum.container.setVisible(false);
         this._setBigNum(this.bossTimerNum, 99);
 
-        // Boss HP bar (hidden until boss appears)
+        // Boss HP bar
         this.bossHpBarBg = this.add.graphics();
         this.bossHpBarBg.setDepth(101);
         this.bossHpBarBg.setVisible(false);
@@ -340,67 +331,65 @@ export class PhaserGameScene extends Phaser.Scene {
             this.coverOverlay = null;
             return;
         }
-
-        this.coverOverlay = this.add.tileSprite(0, 0, GW, GH, "game_asset", "stagebgOver.gif");
-        this.coverOverlay.setOrigin(0, 0);
+        // Phaser 4 RC6: tileSprite does not properly support atlas frames.
+        // Use regular sprites to tile the 256x256 frame over the 256x480 stage.
+        this.coverOverlay = this.add.container(0, 0);
         this.coverOverlay.setDepth(99);
+        var frameH = 256; // stagebgOver.gif is 256x256
+        for (var ty = 0; ty < GH; ty += frameH) {
+            var tile = this.add.sprite(0, ty, "game_asset", "stagebgOver.gif");
+            tile.setOrigin(0, 0);
+            this.coverOverlay.add(tile);
+        }
     }
 
+    // =================================================================
+    // Title / game flow
+    // =================================================================
     showTitle() {
         var stageId = gameState.stageId || 0;
         var self = this;
 
-        // PIXI: gameStartBg = white 0.2 alpha fullscreen overlay
         var bg = this.add.graphics();
         bg.fillStyle(0xffffff, 0.2);
         bg.fillRect(0, 0, GW, GH);
         bg.setDepth(200);
         bg.setAlpha(0);
 
-        // PIXI: stageNum at (0, GAME_HEIGHT/2 - 20) top-left origin, 256×64 bitmap
         var stageNumIdx = Math.min(stageId + 1, 4);
         var stageNumSprite = this.add.image(0, GCY - 20, "game_ui", "stageNum" + String(stageNumIdx) + ".gif");
         stageNumSprite.setOrigin(0, 0);
         stageNumSprite.setDepth(201);
         stageNumSprite.setAlpha(0);
 
-        // PIXI: stageFight at center (width/2, GAME_HEIGHT/2 + height/2 - 20) anchor(0.5)
-        // = (128, 252). Starts at scale 1.2, animates down to 1.
         var fightSprite = this.add.image(GCX, GCY + 12, "game_ui", "stageFight.gif");
         fightSprite.setOrigin(0.5);
         fightSprite.setDepth(201);
         fightSprite.setAlpha(0);
         fightSprite.setScale(1.2);
 
-        // PIXI timeline (times in ms):
-        // [0-300] BG fade in
         this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
 
-        // [300] voice_round + [300-600] stageNum fade in
         this.time.delayedCall(300, function () {
             self.playSound("voice_round" + String(Math.min(stageId, 3)), 0.7);
             self.tweens.add({ targets: stageNumSprite, alpha: 1, duration: 300 });
         });
 
-        // [1600-1700] stageNum fade out + [1600-1800] fight fade in & scale 1.2→1
         this.time.delayedCall(1600, function () {
             self.tweens.add({ targets: stageNumSprite, alpha: 0, duration: 100 });
             self.tweens.add({ targets: fightSprite, alpha: 1, duration: 200 });
             self.tweens.add({ targets: fightSprite, scaleX: 1, scaleY: 1, duration: 200 });
         });
 
-        // [1800] voice_fight
         this.time.delayedCall(1800, function () {
             self.playSound("voice_fight", 0.7);
         });
 
-        // [2200-2400] fight scale 1→1.5 + fade out
         this.time.delayedCall(2200, function () {
             self.tweens.add({ targets: fightSprite, scaleX: 1.5, scaleY: 1.5, duration: 200 });
             self.tweens.add({ targets: fightSprite, alpha: 0, duration: 200 });
         });
 
-        // [2300-2500] BG fade out → startGame
         this.time.delayedCall(2300, function () {
             self.tweens.add({
                 targets: bg,
@@ -426,79 +415,227 @@ export class PhaserGameScene extends Phaser.Scene {
         this.playerUnitY = this.playerSprite.y;
     }
 
-    clampPlayerX(x) {
-        return clamp(x, this.playerHitAreaHalfWidth, GW - this.playerHitAreaHalfWidth);
+    stageClear() {
+        if (this.stageCleared) return;
+        this.stageCleared = true;
+        this.gameStarted = false;
+
+        gameState.score = this.scoreCount;
+        gameState.playerHp = this.playerHp;
+        gameState.spgage = this.spGauge;
+        gameState.maxCombo = Math.max(gameState.maxCombo || 0, this.maxCombo);
+
+        if (this.spFiredDuringBoss) {
+            gameState.akebonoCnt = (gameState.akebonoCnt || 0) + 1;
+        }
+
+        var self = this;
+        triggerHaptic("stageClear");
+
+        var clearBg = this.add.graphics();
+        clearBg.fillStyle(0xffffff, 0.4);
+        clearBg.fillRect(0, 0, GW, GH);
+        clearBg.setDepth(200);
+        clearBg.setAlpha(0);
+
+        var clearSprite = this.add.sprite(GCX, GCY - 44, "game_ui", "stageclear.gif");
+        clearSprite.setOrigin(0.5);
+        clearSprite.setDepth(201);
+        clearSprite.setAlpha(0);
+
+        this.tweens.add({
+            targets: [clearBg, clearSprite],
+            alpha: 1,
+            duration: 500,
+            delay: 300,
+        });
+
+        var game = this.game;
+        this.time.delayedCall(2500, function () {
+            self.stopAllSounds();
+            gameState.stageId++;
+            setTimeout(function () {
+                game.scene.stop("PhaserGameScene");
+                game.scene.start("PhaserAdvScene");
+            }, 50);
+        });
     }
 
-    onScreenDragStart(pointer) {
-        if (!this.gameStarted || this.playerDead || this.theWorldFlg) {
-            return;
-        }
-        this.playerUnitX = pointer.x;
-        this.isDragging = true;
-        this.dragPointerId = pointerId(pointer);
+    timeoverComplete() {
+        gameState.score = this.scoreCount;
+        gameState.maxCombo = Math.max(gameState.maxCombo || 0, this.maxCombo);
+
+        var timeOverText = this.add.text(GCX, GCY, "TIME OVER", {
+            fontFamily: "sans-serif",
+            fontSize: "22px",
+            fontStyle: "bold",
+            color: "#ff4444",
+            stroke: "#000000",
+            strokeThickness: 3,
+        });
+        timeOverText.setOrigin(0.5);
+        timeOverText.setDepth(200);
+
+        this.gameStarted = false;
+
+        var self = this;
+        var game = this.game;
+        this.time.delayedCall(2500, function () {
+            self.stopAllSounds();
+            setTimeout(function () {
+                game.scene.stop("PhaserGameScene");
+                game.scene.start("PhaserContinueScene");
+            }, 50);
+        });
     }
 
-    onScreenDragEnd(pointer) {
-        var activePointerId = pointerId(pointer);
-        if (this.dragPointerId !== null && activePointerId !== null && activePointerId !== this.dragPointerId) {
-            return;
-        }
-        this.isDragging = false;
-        this.dragPointerId = null;
+    // =================================================================
+    // SP fire (orchestrates cutin, explosions, damage — touches many subsystems)
+    // =================================================================
+    onSpFire() {
+        if (this.spGauge < 100 || this.spFired || !this.gameStarted) return;
+        this.doSpFire();
     }
 
-    onScreenDragMove(pointer) {
-        if (!this.isDragging || !this.gameStarted || this.playerDead || this.theWorldFlg) {
-            return;
+    doSpFire() {
+        this.spFired = true;
+        this.spFiredDuringBoss = this.bossActive;
+        this.spGauge = 0;
+        this.updateSpGauge();
+        triggerHaptic("special");
+        this.playSound("se_sp", 0.8);
+        this.playSound("g_sp_voice", 0.7);
+
+        this.theWorldFlg = true;
+
+        for (var i = this.playerBullets.length - 1; i >= 0; i--) {
+            this.playerBullets[i].destroy();
         }
-        if (this.dragPointerId !== null && pointerId(pointer) !== this.dragPointerId) {
-            return;
+        this.playerBullets = [];
+
+        for (var eb = this.enemyBullets.length - 1; eb >= 0; eb--) {
+            if (this.enemyBullets[eb] && this.enemyBullets[eb].active) {
+                this.enemyBullets[eb].destroy();
+            }
         }
-        this.playerUnitX = this.clampPlayerX(pointer.x);
+        this.enemyBullets = [];
+
+        var self = this;
+
+        // Cutin overlay
+        var cutinBg = this.add.graphics();
+        cutinBg.setDepth(160);
+        cutinBg.fillStyle(0x000000, 0.9);
+        cutinBg.fillRect(0, 0, GW, GH);
+        cutinBg.setAlpha(0);
+
+        var cutinSprite = this.add.sprite(0, GCY - 71, "game_asset", "cutin0.gif");
+        cutinSprite.setOrigin(0, 0);
+        cutinSprite.setDepth(161);
+        cutinSprite.setAlpha(0);
+
+        var cutinFlash = this.add.graphics();
+        cutinFlash.setDepth(162);
+        cutinFlash.fillStyle(0xeeeeee, 1);
+        cutinFlash.fillRect(0, 0, GW, GH);
+        cutinFlash.setAlpha(0);
+
+        this.tweens.add({ targets: cutinBg, alpha: 1, duration: 250 });
+
+        var cutinFrames = [
+            { frame: "cutin0.gif", delay: 0 },
+            { frame: "cutin1.gif", delay: 80 },
+            { frame: "cutin2.gif", delay: 160 },
+            { frame: "cutin3.gif", delay: 240 },
+            { frame: "cutin4.gif", delay: 320 },
+            { frame: "cutin5.gif", delay: 400 },
+            { frame: "cutin6.gif", delay: 700 },
+            { frame: "cutin7.gif", delay: 800 },
+            { frame: "cutin8.gif", delay: 900 },
+        ];
+
+        this.time.delayedCall(250, function () {
+            cutinSprite.setAlpha(1);
+            for (var cf = 0; cf < cutinFrames.length; cf++) {
+                (function (f) {
+                    self.time.delayedCall(f.delay, function () {
+                        if (cutinSprite.active) cutinSprite.setFrame(f.frame);
+                    });
+                })(cutinFrames[cf]);
+            }
+        });
+
+        this.time.delayedCall(550, function () {
+            cutinFlash.setAlpha(1);
+            self.tweens.add({ targets: cutinFlash, alpha: 0, duration: 300 });
+        });
+
+        this.time.delayedCall(1700, function () {
+            self.tweens.add({
+                targets: [cutinBg, cutinSprite],
+                alpha: 0,
+                duration: 200,
+                onComplete: function () {
+                    cutinBg.destroy();
+                    cutinSprite.destroy();
+                    cutinFlash.destroy();
+                },
+            });
+        });
+
+        // SP line
+        var spLine = this.add.graphics();
+        spLine.setDepth(150);
+        spLine.fillStyle(0xff0000, 1);
+        spLine.fillRect(this.playerSprite.x - 1, 0, 3, GH);
+        this.tweens.add({
+            targets: spLine,
+            alpha: 0,
+            duration: 600,
+            onComplete: function () { spLine.destroy(); },
+        });
+
+        this.time.delayedCall(300, function () {
+            _spExplosions(self);
+        });
+
+        this.time.delayedCall(1100, function () {
+            var spDamage = self.recipe.playerData.spDamage || 50;
+            var enemySnap = self.enemies.slice();
+            for (var e = enemySnap.length - 1; e >= 0; e--) {
+                var en = enemySnap[e];
+                if (en && en.active) {
+                    var ex = en.x, ey = en.y, ew = en.width || 0;
+                    if (ex < -ew / 2 || ex > GW || ey < 20 || ey > GH) continue;
+                    var isBoss = en.getData("type") === "boss";
+                    if (isBoss) {
+                        var ehp = en.getData("hp") - spDamage;
+                        en.setData("hp", ehp);
+                        self.bossHp = ehp;
+                        self.checkBossDanger();
+                        if (ehp <= 0) {
+                            self.bossDie(en);
+                        }
+                    } else {
+                        self.enemyDie(en, true);
+                    }
+                }
+            }
+        });
+
+        this.time.delayedCall(2500, function () {
+            self.theWorldFlg = false;
+            self.spFired = false;
+        });
     }
 
-    handleKeyboardInput() {
-        if (!this.gameStarted || this.playerDead || this.theWorldFlg || !this.cursors || !this.wasd) {
-            return;
-        }
-
-        var moveX = 0;
-        var moveY = 0;
-
-        if (this.cursors.left.isDown || this.wasd.left.isDown) {
-            moveX = -this.keyMoveSpeed;
-        } else if (this.cursors.right.isDown || this.wasd.right.isDown) {
-            moveX = this.keyMoveSpeed;
-        }
-
-        if (this.cursors.up.isDown || this.wasd.up.isDown) {
-            moveY = -this.keyMoveSpeed;
-        } else if (this.cursors.down.isDown || this.wasd.down.isDown) {
-            moveY = this.keyMoveSpeed;
-        }
-
-        if (moveX !== 0 || moveY !== 0) {
-            this.playerUnitX = this.clampPlayerX(this.playerUnitX + moveX);
-            this.playerSprite.y = clamp(this.playerSprite.y + moveY, 50, GH - 20);
-            this.playerUnitY = this.playerSprite.y;
-        }
-
-        // Space bar triggers SP
-        if (this.wasd.sp && Phaser.Input.Keyboard.JustDown(this.wasd.sp)) {
-            this.onSpFire();
-        }
-    }
-
+    // =================================================================
+    // SP gauge
+    // =================================================================
     updateSpGauge() {
-        if (!this.spBtnBar) {
-            return;
-        }
+        if (!this.spBtnBar) return;
 
         var ratio = Math.min(this.spGauge / 100, 1);
-        // PIXI CaButton mask: rect (8, 8, 51, 50) scaled on Y by percent
-        // When PIXI Graphics.scale.y = s, rect(8, 8, 51, 50) → (8, 8*s, 51, 50*s)
-        // setCrop equivalent: clip the fill sprite to the same region
         if (ratio <= 0) {
             this.spBtnBar.setCrop(0, 0, 0, 0);
         } else {
@@ -559,710 +696,9 @@ export class PhaserGameScene extends Phaser.Scene {
         this.bossHpBarFg.fillRect(barX, barY, barW * hpRatio, barH);
     }
 
-    onSpFire() {
-        if (this.spGauge < 100 || this.spFired || !this.gameStarted) {
-            return;
-        }
-        this.doSpFire();
-    }
-
-    doSpFire() {
-        this.spFired = true;
-        this.spFiredDuringBoss = this.bossActive;
-        this.spGauge = 0;
-        this.updateSpGauge();
-        triggerHaptic("special");
-        this.playSound("se_sp", 0.8);
-        this.playSound("g_sp_voice", 0.7);
-
-        this.theWorldFlg = true;
-
-        for (var i = this.playerBullets.length - 1; i >= 0; i--) {
-            this.playerBullets[i].destroy();
-        }
-        this.playerBullets = [];
-
-        // Destroy all enemy bullets on screen
-        for (var eb = this.enemyBullets.length - 1; eb >= 0; eb--) {
-            if (this.enemyBullets[eb] && this.enemyBullets[eb].active) {
-                this.enemyBullets[eb].destroy();
-            }
-        }
-        this.enemyBullets = [];
-
-        var self = this;
-
-        // --- G cutin overlay (matches PIXI CutinContainer) ---
-        var cutinBg = this.add.graphics();
-        cutinBg.setDepth(160);
-        cutinBg.fillStyle(0x000000, 0.9);
-        cutinBg.fillRect(0, 0, GW, GH);
-        cutinBg.setAlpha(0);
-
-        var cutinSprite = this.add.sprite(0, GCY - 71, "game_asset", "cutin0.gif");
-        cutinSprite.setOrigin(0, 0);
-        cutinSprite.setDepth(161);
-        cutinSprite.setAlpha(0);
-
-        var cutinFlash = this.add.graphics();
-        cutinFlash.setDepth(162);
-        cutinFlash.fillStyle(0xeeeeee, 1);
-        cutinFlash.fillRect(0, 0, GW, GH);
-        cutinFlash.setAlpha(0);
-
-        // Fade in black BG
-        this.tweens.add({ targets: cutinBg, alpha: 1, duration: 250 });
-
-        // 9-frame cutin animation with PIXI-matching timing
-        var cutinFrames = [
-            { frame: "cutin0.gif", delay: 0 },
-            { frame: "cutin1.gif", delay: 80 },
-            { frame: "cutin2.gif", delay: 160 },
-            { frame: "cutin3.gif", delay: 240 },
-            { frame: "cutin4.gif", delay: 320 },
-            { frame: "cutin5.gif", delay: 400 },
-            { frame: "cutin6.gif", delay: 700 },
-            { frame: "cutin7.gif", delay: 800 },
-            { frame: "cutin8.gif", delay: 900 },
-        ];
-
-        this.time.delayedCall(250, function () {
-            cutinSprite.setAlpha(1);
-            for (var cf = 0; cf < cutinFrames.length; cf++) {
-                (function (f) {
-                    self.time.delayedCall(f.delay, function () {
-                        if (cutinSprite.active) {
-                            cutinSprite.setFrame(f.frame);
-                        }
-                    });
-                })(cutinFrames[cf]);
-            }
-        });
-
-        // White flash at 550ms
-        this.time.delayedCall(550, function () {
-            cutinFlash.setAlpha(1);
-            self.tweens.add({
-                targets: cutinFlash,
-                alpha: 0,
-                duration: 300,
-            });
-        });
-
-        // Remove cutin overlay at 1700ms (matching PIXI)
-        this.time.delayedCall(1700, function () {
-            self.tweens.add({
-                targets: [cutinBg, cutinSprite],
-                alpha: 0,
-                duration: 200,
-                onComplete: function () {
-                    cutinBg.destroy();
-                    cutinSprite.destroy();
-                    cutinFlash.destroy();
-                },
-            });
-        });
-
-        // --- SP line effect ---
-        var spLine = this.add.graphics();
-        spLine.setDepth(150);
-        spLine.fillStyle(0xff0000, 1);
-        spLine.fillRect(this.playerSprite.x - 1, 0, 3, GH);
-
-        this.tweens.add({
-            targets: spLine,
-            alpha: 0,
-            duration: 600,
-            onComplete: function () {
-                spLine.destroy();
-            },
-        });
-
-        this.time.delayedCall(300, function () {
-            self.spExplosions();
-        });
-
-        // PIXI applies SP damage at "+=0.8" (800ms after explosions start at 300ms)
-        // Total delay from spFire: 300 + 800 = 1100ms
-        this.time.delayedCall(1100, function () {
-            // Apply SP damage to all enemies including boss (PIXI: onDamage(D.spDamage))
-            var spDamage = self.recipe.playerData.spDamage || 50;
-            var enemySnap = self.enemies.slice();
-            for (var e = enemySnap.length - 1; e >= 0; e--) {
-                var en = enemySnap[e];
-                if (en && en.active) {
-                    // PIXI bounds check: x >= -width/2 && x <= GW && y >= 20 && y <= GH
-                    var ex = en.x, ey = en.y, ew = en.width || 0;
-                    if (ex < -ew / 2 || ex > GW || ey < 20 || ey > GH) continue;
-                    var isBoss = en.getData("type") === "boss";
-                    if (isBoss) {
-                        var ehp = en.getData("hp") - spDamage;
-                        en.setData("hp", ehp);
-                        self.bossHp = ehp;
-                        self.checkBossDanger();
-                        if (ehp <= 0) {
-                            self.bossDie(en);
-                        }
-                    } else {
-                        self.enemyDie(en, true);
-                    }
-                }
-            }
-        });
-
-        this.time.delayedCall(2500, function () {
-            self.theWorldFlg = false;
-            self.spFired = false;
-        });
-    }
-
-    spExplosions() {
-        // Matches PIXI: 64 animated sprites in rows (8 per row, 8 rows)
-        // Row-alternating x offsets, 30px horizontal spacing, 45px vertical spacing
-        // spExplosion00-07.gif animated at speed 0.2
-        var self = this;
-
-        // Create spExplosion animation if it doesn't exist
-        if (!this.anims.exists("sp_explosion_anim")) {
-            var frames = [];
-            for (var f = 0; f < 8; f++) {
-                frames.push({ key: "game_asset", frame: "spExplosion0" + f + ".gif" });
-            }
-            this.anims.create({
-                key: "sp_explosion_anim",
-                frames: frames,
-                frameRate: 24, // PIXI animationSpeed 0.2 at 120fps = 24fps
-                repeat: 0,
-            });
-        }
-
-        for (var n = 0; n < 64; n++) {
-            (function (idx) {
-                self.time.delayedCall(10 * idx, function () {
-                    var col = idx % 8;
-                    var row = Math.floor(idx / 8);
-                    // Alternating row start: even rows start at -30, odd rows at -45 (PIXI pattern)
-                    var startX = row % 2 === 0 ? -30 : -45;
-                    var x = startX + col * 30;
-                    var y = GH - 45 * (row + 1) - 120;
-
-                    // Clamp x into visible area
-                    if (x < 0) x += GW;
-                    if (x > GW) x -= GW;
-
-                    var explosion = self.add.sprite(x, y, "game_asset", "spExplosion00.gif");
-                    explosion.setOrigin(0.5);
-                    explosion.setDepth(140);
-                    explosion.play("sp_explosion_anim");
-                    explosion.once("animationcomplete", function () {
-                        explosion.destroy();
-                    });
-
-                    // Sound every 16 sprites (4 times total)
-                    if (idx % 16 === 0) {
-                        self.playSound("se_sp_explosion", 0.3);
-                    }
-                });
-            })(n);
-        }
-    }
-
-    shoot() {
-        if (!this.gameStarted || this.playerDead || this.theWorldFlg) {
-            return;
-        }
-
-        var pd = this.recipe.playerData;
-        var shootData;
-
-        switch (this.shootMode) {
-        case "big":
-            shootData = pd.shootBig;
-            break;
-        case "3way":
-            shootData = pd.shoot3way;
-            break;
-        default:
-            shootData = pd.shootNormal;
-            break;
-        }
-
-        var frameKey = (shootData.texture && shootData.texture[0]) || "shot00.gif";
-
-        if (this.shootMode === "3way") {
-            for (var a = -1; a <= 1; a++) {
-                var b = this.add.sprite(this.playerSprite.x + a * 10, this.playerSprite.y - 20, "game_asset", frameKey);
-                b.setOrigin(0.5);
-                b.setDepth(50);
-                b.setData("damage", shootData.damage);
-                b.setData("hp", shootData.hp);
-                b.setData("angle", a * 0.15);
-                b.setData("bulletId", this.bulletIdCnt++);
-                b.setRotation(-Math.PI / 2 + a * 0.2);
-                this.playerBullets.push(b);
-            }
-        } else {
-            var bullet = this.add.sprite(this.playerSprite.x, this.playerSprite.y - 20, "game_asset", frameKey);
-            bullet.setOrigin(0.5);
-            bullet.setDepth(50);
-            bullet.setData("damage", shootData.damage);
-            bullet.setData("hp", shootData.hp);
-            bullet.setData("angle", 0);
-            bullet.setData("bulletId", this.bulletIdCnt++);
-            bullet.setRotation(-Math.PI / 2);
-            if (this.shootMode === "big") {
-                bullet.setScale(1.5);
-            }
-            this.playerBullets.push(bullet);
-        }
-
-        this.playSound("se_shoot", 0.3);
-    }
-
-    createEnemy(data, x, y, itemName) {
-        var frames = data.texture || [];
-        var frameKey = frames[0] || "soliderA0.gif";
-
-        var enemy = this.add.sprite(x, y, "game_asset", frameKey);
-        enemy.setOrigin(0.5);
-        enemy.setDepth(40);
-        enemy.setData("type", "enemy");
-        enemy.setData("name", data.name || "");
-        enemy.setData("hp", data.hp || 1);
-        enemy.setData("maxHp", data.hp || 1);
-        enemy.setData("speed", data.speed || 0.8);
-        enemy.setData("score", data.score || 100);
-        enemy.setData("spgage", data.spgage || 1);
-        enemy.setData("interval", data.interval || 300);
-        enemy.setData("shootCnt", 0);
-        enemy.setData("itemName", itemName || null);
-        enemy.setData("spawnX", x); // Store initial spawn column for soliderB direction
-        enemy.setData("frames", frames);
-        enemy.setData("animIdx", 0);
-        enemy.setData("animTimer", 0);
-        enemy.setData("projData", data.bulletData || data.projectileData || null);
-
-        this.enemies.push(enemy);
-        return enemy;
-    }
-
-    enemyWave() {
-        if (this.waveCount >= this.stageEnemyPositionList.length) {
-            this.bossAdd();
-            return;
-        }
-
-        var row = this.stageEnemyPositionList[this.waveCount] || [];
-
-        for (var i = 0; i < row.length; i++) {
-            var code = String(row[i]);
-            if (code === "00") continue;
-
-            var enemyType = code.substr(0, 1);
-            var itemCode = code.substr(1, 1);
-            var dataKey = "enemy" + enemyType;
-            var enemyData = this.recipe.enemyData ? this.recipe.enemyData[dataKey] : null;
-            if (!enemyData) continue;
-
-            var itemName = null;
-            switch (itemCode) {
-            case "1": itemName = PLAYER_STATES.SHOOT_NAME_BIG; break;
-            case "2": itemName = PLAYER_STATES.SHOOT_NAME_3WAY; break;
-            case "3": itemName = PLAYER_STATES.SHOOT_SPEED_HIGH; break;
-            case "9": itemName = PLAYER_STATES.BARRIER; break;
-            }
-
-            this.createEnemy(enemyData, 32 * i + 16, -16, itemName);
-        }
-
-        this.waveCount++;
-    }
-
-    bossAdd() {
-        if (this.bossActive) return;
-        this.bossActive = true;
-        this.bossEntering = true;
-        this.enemyWaveFlg = false;
-
-        var stageId = gameState.stageId || 0;
-        this.bossStageId = stageId;
-        var bossData = this.recipe.bossData ? this.recipe.bossData["boss" + String(stageId)] : null;
-        if (!bossData) {
-            this.stageClear();
-            return;
-        }
-
-        this.bossHp = bossData.hp || 100;
-        this.bossMaxHp = this.bossHp;
-        this.bossScore = bossData.score || 5000;
-        this.bossInterval = bossData.interval || 60;
-        this.bossIntervalCnt = 0;
-        this.bossIntervalCounter = 0;
-        this.bossName = bossData.name || "boss";
-        this.bossProjCnt = 0;
-
-        // Store all projectile data variants for boss-specific patterns
-        this.bossProjDataA = bossData.bulletDataA || bossData.projectileDataA || null;
-        this.bossProjDataB = bossData.bulletDataB || bossData.projectileDataB || null;
-        this.bossProjDataC = bossData.bulletDataC || bossData.projectileDataC || null;
-        // Fall back to bulletDataA when bulletData is absent (stages 2-4)
-        this.bossProjData = bossData.bulletData || bossData.projectileData || this.bossProjDataA;
-        triggerHaptic("bossEnter");
-
-        var bossFrames = (bossData.anim && bossData.anim.idle) || bossData.texture || [];
-        var bossFrame = bossFrames[0] || "bison_idle0.gif";
-
-        this.bossSprite = this.add.sprite(GCX, -50, "game_asset", bossFrame);
-        this.bossSprite.setOrigin(0.5);
-        this.bossSprite.setDepth(45);
-        this.bossSprite.setData("type", "boss");
-        this.bossSprite.setData("hp", this.bossHp);
-        this.bossSprite.setData("frames", bossFrames);
-        this.bossSprite.setData("animIdx", 0);
-        this.bossSprite.setData("animTimer", 0);
-        this.bossSprite.setData("projData", this.bossProjData);
-        this.bossSprite.setData("score", this.bossScore);
-        this.bossSprite.setData("spgage", bossData.spgage || 5);
-
-        this.enemies.push(this.bossSprite);
-
-        var self = this;
-
-        var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
-        var voiceKey = "boss_" + (bossNames[stageId] || "bison") + "_voice_add";
-        this.playSound(voiceKey, 0.7);
-
-        this.tweens.add({
-            targets: this.bossSprite,
-            y: 80,
-            duration: 2000,
-            ease: "Quint.easeOut",
-            onComplete: function () {
-                self.bossEntering = false;
-                self.bossTimerCountDown = 99;
-                self.bossTimerFrameCnt = 0;
-
-                // Start boss attack patterns after a brief pause
-                self.time.delayedCall(1500, function () {
-                    self.bossShootStart();
-                });
-
-                self.time.delayedCall(3000, function () {
-                    self.bossTimerStartFlg = true;
-                    self.bossTimerLabel.setVisible(true);
-                    self.bossTimerNum.container.setVisible(true);
-                    self.spBtn.setAlpha(1);
-                });
-            },
-        });
-
-        this.stageEndBg.setVisible(true);
-        this.tweens.add({
-            targets: this.stageEndBg,
-            y: 0,
-            duration: 3000,
-        });
-    }
-
-    bossShoot() {
-        if (!this.bossSprite || !this.bossSprite.active || this.bossEntering) return;
-
-        var stageId = this.bossStageId;
-
-        switch (stageId) {
-        case 0:
-            // Bison: melee-only, no projectiles (PIXI BossBison.js)
-            return;
-        case 1:
-            // Barlog: projectiles go straight down (PIXI default case rotX=0,rotY=1)
-            this.bossShootStraight(this.bossProjData);
-            break;
-        case 2:
-            // Sagat: alternating aimed and spread with two projectile types
-            this.bossProjCnt++;
-            if (this.bossProjCnt % 4 === 0) {
-                this.bossShootSpread(this.bossProjDataB || this.bossProjData, 5, 20);
-            } else {
-                this.bossShootAimed(this.bossProjDataA || this.bossProjData);
-            }
-            break;
-        case 3:
-            // Vega: radial burst every 5th shot, else aimed with two projectile types
-            this.bossProjCnt++;
-            if (this.bossProjCnt % 5 === 0) {
-                this.bossShootRadial(this.bossProjDataB || this.bossProjData, 12);
-            } else {
-                this.bossShootAimed(this.bossProjDataA || this.bossProjData);
-            }
-            break;
-        case 4:
-            // Fang: rapid spread + radial combo with two projectile types
-            this.bossProjCnt++;
-            if (this.bossProjCnt % 6 === 0) {
-                this.bossShootRadial(this.bossProjDataB || this.bossProjData, 18);
-            } else if (this.bossProjCnt % 3 === 0) {
-                this.bossShootSpread(this.bossProjDataA || this.bossProjData, 5, 15);
-            } else {
-                this.bossShootAimed(this.bossProjDataA || this.bossProjData);
-            }
-            break;
-        default:
-            this.bossShootAimed(this.bossProjData);
-            break;
-        }
-    }
-
-    // PIXI default projectile: rotX=0, rotY=1 (straight down)
-    // Used by Barlog and any boss whose projectileData.name is not special
-    bossShootStraight(projData) {
-        if (!projData || !this.bossSprite) return;
-
-        var frames = projData.texture || [];
-        var frameKey = frames[0] || "normalProjectile0.gif";
-        var speed = projData.speed || 1;
-
-        var bullet = this.add.sprite(this.bossSprite.x, this.bossSprite.y + 20, "game_asset", frameKey);
-        bullet.setOrigin(0.5);
-        bullet.setDepth(41);
-        bullet.setData("speed", speed);
-        bullet.setData("damage", projData.damage || 1);
-        bullet.setData("hp", projData.hp || 1);
-        bullet.setData("score", projData.score || 0);
-        bullet.setData("spgage", projData.spgage || 0);
-        bullet.setData("rotX", 0);
-        bullet.setData("rotY", 1);
-
-        // Animate projectile frames if available
-        if (frames.length > 1) {
-            bullet.setData("frames", frames);
-            bullet.setData("animIdx", 0);
-            bullet.setData("animTimer", 0);
-        }
-
-        this.enemyBullets.push(bullet);
-    }
-
-    bossShootAimed(projData) {
-        if (!projData || !this.bossSprite) return;
-
-        var frames = projData.texture || [];
-        var frameKey = frames[0] || "normalProjectile0.gif";
-        var speed = projData.speed || 1;
-
-        var bullet = this.add.sprite(this.bossSprite.x, this.bossSprite.y + 20, "game_asset", frameKey);
-        bullet.setOrigin(0.5);
-        bullet.setDepth(41);
-        bullet.setData("speed", speed);
-        bullet.setData("damage", projData.damage || 1);
-        bullet.setData("hp", projData.hp || 1);
-        bullet.setData("score", projData.score || 0);
-        bullet.setData("spgage", projData.spgage || 0);
-
-        var dx = this.playerSprite.x - this.bossSprite.x;
-        var dy = this.playerSprite.y - this.bossSprite.y;
-        var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-
-        bullet.setData("rotX", dx / dist);
-        bullet.setData("rotY", dy / dist);
-
-        this.enemyBullets.push(bullet);
-    }
-
-    bossShootSpread(projData, count, angleDeg) {
-        if (!projData || !this.bossSprite) return;
-
-        var frames = projData.texture || [];
-        var frameKey = frames[0] || "normalProjectile0.gif";
-        var speed = projData.speed || 1;
-
-        var dx = this.playerSprite.x - this.bossSprite.x;
-        var dy = this.playerSprite.y - this.bossSprite.y;
-        var baseAngle = Math.atan2(dy, dx);
-        var spreadRad = angleDeg * Math.PI / 180;
-        var half = Math.floor(count / 2);
-
-        for (var i = 0; i < count; i++) {
-            var offset = (i - half) * (spreadRad / Math.max(count - 1, 1));
-            var angle = baseAngle + offset;
-
-            var bullet = this.add.sprite(this.bossSprite.x, this.bossSprite.y + 20, "game_asset", frameKey);
-            bullet.setOrigin(0.5);
-            bullet.setDepth(41);
-            bullet.setData("speed", speed);
-            bullet.setData("damage", projData.damage || 1);
-            bullet.setData("hp", projData.hp || 1);
-            bullet.setData("score", projData.score || 0);
-            bullet.setData("spgage", projData.spgage || 0);
-            bullet.setData("rotX", Math.cos(angle));
-            bullet.setData("rotY", Math.sin(angle));
-
-            this.enemyBullets.push(bullet);
-        }
-    }
-
-    bossShootRadial(projData, count) {
-        if (!projData || !this.bossSprite) return;
-
-        var frames = projData.texture || [];
-        var frameKey = frames[0] || "normalProjectile0.gif";
-        var speed = (projData.speed || 1) * 0.8;
-
-        for (var i = 0; i < count; i++) {
-            var angle = (i / count) * Math.PI * 2;
-            var bullet = this.add.sprite(this.bossSprite.x, this.bossSprite.y, "game_asset", frameKey);
-            bullet.setOrigin(0.5);
-            bullet.setDepth(41);
-            bullet.setData("speed", speed);
-            bullet.setData("damage", projData.damage || 1);
-            bullet.setData("hp", projData.hp || 1);
-            bullet.setData("score", projData.score || 0);
-            bullet.setData("spgage", projData.spgage || 0);
-            bullet.setData("rotX", Math.cos(angle));
-            bullet.setData("rotY", Math.sin(angle));
-
-            this.enemyBullets.push(bullet);
-        }
-    }
-
-    enemyDie(enemy, isSp) {
-        if (!enemy || !enemy.active) return;
-
-        var score = enemy.getData("score") || 100;
-        var spgage = enemy.getData("spgage") || 1;
-
-        this.comboCount++;
-        if (this.comboCount > this.maxCombo) {
-            this.maxCombo = this.comboCount;
-        }
-        var ratio = Math.max(1, Math.ceil(this.comboCount / 10));
-        this.scoreCount += score * ratio;
-        this.comboTimeCnt = 100;
-
-        if (!isSp) {
-            this.spGauge = Math.min(100, this.spGauge + spgage);
-            this.updateSpGauge();
-            if (this.spGauge >= 100) {
-                this.spBtn.setAlpha(1);
-            }
-        }
-
-        var itemName = enemy.getData("itemName");
-        if (itemName) {
-            this.dropItem(enemy.x, enemy.y, itemName);
-        }
-
-        this.showExplosion(enemy.x, enemy.y);
-        this.showScorePopup(enemy.x, enemy.y, score * ratio);
-        this.playSound("se_explosion", 0.35);
-
-        var idx = this.enemies.indexOf(enemy);
-        if (idx >= 0) this.enemies.splice(idx, 1);
-        enemy.destroy();
-    }
-
-    showExplosion(x, y) {
-        // 7-frame animated explosion matching PIXI (animationSpeed=0.4 at 120fps ≈ 48fps)
-        if (!this.anims.exists("explosion_anim")) {
-            var frames = [];
-            for (var i = 0; i < 7; i++) {
-                frames.push({ key: "game_asset", frame: "explosion0" + i + ".gif" });
-            }
-            this.anims.create({
-                key: "explosion_anim",
-                frames: frames,
-                frameRate: 48,
-                repeat: 0,
-            });
-        }
-        var ex = this.add.sprite(x, y, "game_asset", "explosion00.gif");
-        ex.setOrigin(0.5);
-        ex.setDepth(60);
-        ex.play("explosion_anim");
-        ex.once("animationcomplete", function () {
-            ex.destroy();
-        });
-    }
-
-    // Boss death explosion (PIXI: animationSpeed=0.15 at 120fps ≈ 18fps, scale 1.0)
-    showBossExplosion(x, y) {
-        if (!this.anims.exists("boss_explosion_anim")) {
-            var frames = [];
-            for (var i = 0; i < 7; i++) {
-                frames.push({ key: "game_asset", frame: "explosion0" + i + ".gif" });
-            }
-            this.anims.create({
-                key: "boss_explosion_anim",
-                frames: frames,
-                frameRate: 18,
-                repeat: 0,
-            });
-        }
-        var ex = this.add.sprite(x, y, "game_asset", "explosion00.gif");
-        ex.setOrigin(0.5);
-        ex.setDepth(60);
-        ex.play("boss_explosion_anim");
-        ex.once("animationcomplete", function () {
-            ex.destroy();
-        });
-    }
-
-    // 5-frame hit/guard impact at bullet position (PIXI enemy onDamage explosion)
-    // hit0-4.gif for regular hits, guard0-4.gif for invulnerable ("infinity" HP) enemies
-    showHitImpact(x, y, isGuard) {
-        var animKey = isGuard ? "guard_impact_anim" : "hit_impact_anim";
-        if (!this.anims.exists(animKey)) {
-            var prefix = isGuard ? "guard" : "hit";
-            var frames = [];
-            for (var i = 0; i < 5; i++) {
-                frames.push({ key: "game_asset", frame: prefix + i + ".gif" });
-            }
-            this.anims.create({ key: animKey, frames: frames, frameRate: 48, repeat: 0 });
-        }
-        var frameKey = isGuard ? "guard0.gif" : "hit0.gif";
-        var impact = this.add.sprite(x, y - 10, "game_asset", frameKey);
-        impact.setOrigin(0.5);
-        impact.setDepth(60);
-        // PIXI scale: min(1, (unitHeight + 50) / 32) + 0.2 ≈ 1.2 for typical bullets
-        impact.setScale(1.2);
-        impact.play(animKey);
-        impact.once("animationcomplete", function () { impact.destroy(); });
-    }
-
-    // Tint flash on surviving enemy (PIXI: TweenMax.to tint:16711680, 0.1s, then delay 0.1 back to white)
-    flashEnemyTint(enemy) {
-        if (!enemy || !enemy.active) return;
-        var existing = enemy.getData("_tintTimer");
-        if (existing) existing.remove(false);
-        enemy.setTint(16711680);
-        var timer = this.time.delayedCall(200, function () {
-            if (enemy && enemy.active) {
-                enemy.clearTint();
-                enemy.setData("_tintTimer", null);
-            }
-        });
-        enemy.setData("_tintTimer", timer);
-    }
-
-    showScorePopup(x, y, score) {
-        var txt = this.add.text(x, y, String(score), {
-            fontFamily: "Arial",
-            fontSize: "10px",
-            fontStyle: "bold",
-            color: "#ffff00",
-            stroke: "#000000",
-            strokeThickness: 2,
-        });
-        txt.setOrigin(0.5);
-        txt.setDepth(110);
-        this.tweens.add({
-            targets: txt,
-            y: y - 20,
-            alpha: 0,
-            duration: 800,
-            onComplete: function () { txt.destroy(); },
-        });
-    }
-
+    // =================================================================
+    // Items
+    // =================================================================
     dropItem(x, y, itemName) {
         var frameMap = {
             big: "powerupBig0.gif",
@@ -1279,130 +715,23 @@ export class PhaserGameScene extends Phaser.Scene {
         this.items.push(item);
     }
 
+    collectItem(itemName) {
+        _collectItem(this, itemName);
+    }
+
     playerDamage(amount) {
-        if (this.barrierActive) return;
-
-        this.playerHp -= amount;
-        if (this.playerHp <= 0) {
-            this.playerHp = 0;
-            this.playerDie();
-        }
-
-        this.hpBar.setScale(Math.max(0, this.playerHp / this.playerMaxHp), 1);
-        triggerHaptic("damage");
-        this.playSound("se_damage", 0.15);
-        this.playSound("g_damage_voice", 0.5);
-
-        this.cameras.main.shake(150, 0.01);
-
-        this.tweens.add({
-            targets: this.hudBg,
-            alpha: 0.5,
-            duration: 100,
-            yoyo: true,
-            repeat: 2,
-        });
-
-        // Flash player sprite on damage
-        this.tweens.add({
-            targets: this.playerSprite,
-            alpha: 0.3,
-            duration: 80,
-            yoyo: true,
-            repeat: 3,
-        });
+        _playerDamage(this, amount);
     }
 
-    playerDie() {
-        if (this.playerDead) return;
-        this.playerDead = true;
-        this.gameStarted = false;
-
-        this.showExplosion(this.playerSprite.x, this.playerSprite.y);
-        this.playerSprite.setVisible(false);
-        if (this.playerShadow) this.playerShadow.setVisible(false);
-
-        gameState.maxCombo = Math.max(gameState.maxCombo || 0, this.maxCombo);
-
-        var self = this;
-        this.time.delayedCall(2000, function () {
-            gameState.score = self.scoreCount;
-            gameState.spgage = self.spGauge;
-            self.stopAllSounds();
-            self.scene.start("PhaserContinueScene");
-        });
-    }
-
-    stageClear() {
-        if (this.stageCleared) return;
-        this.stageCleared = true;
-        this.gameStarted = false;
-
-        gameState.score = this.scoreCount;
-        gameState.playerHp = this.playerHp;
-        gameState.spgage = this.spGauge;
-        gameState.maxCombo = Math.max(gameState.maxCombo || 0, this.maxCombo);
-
-        if (this.spFiredDuringBoss) {
-            gameState.akebonoCnt = (gameState.akebonoCnt || 0) + 1;
-        }
-
-        var self = this;
-        triggerHaptic("stageClear");
-
-        // PIXI: stageClearBg (white 0.4 alpha fullscreen) + stageclear.gif sprite
-        var clearBg = this.add.graphics();
-        clearBg.fillStyle(0xffffff, 0.4);
-        clearBg.fillRect(0, 0, GW, GH);
-        clearBg.setDepth(200);
-        clearBg.setAlpha(0);
-
-        // stageclear.gif (212×88) positioned: x centered, y = GAME_HEIGHT/2 - height
-        // PIXI: x = GAME_WIDTH/2 - width/2, y = GAME_HEIGHT/2 - height (top-left origin)
-        // Center of sprite: (GCX, GCY - 88 + 44) = (GCX, GCY - 44)
-        var clearSprite = this.add.sprite(GCX, GCY - 44, "game_ui", "stageclear.gif");
-        clearSprite.setOrigin(0.5);
-        clearSprite.setDepth(201);
-        clearSprite.setAlpha(0);
-
-        // PIXI animation: 0.3s delay, then fade in 0.5s
-        this.tweens.add({
-            targets: [clearBg, clearSprite],
-            alpha: 1,
-            duration: 500,
-            delay: 300,
-        });
-
-        this.time.delayedCall(2500, function () {
-            self.stopAllSounds();
-            gameState.stageId++;
-            self.scene.start("PhaserAdvScene");
-        });
-    }
-
-    timeoverComplete() {
-        gameState.score = this.scoreCount;
-        gameState.maxCombo = Math.max(gameState.maxCombo || 0, this.maxCombo);
-
-        // Show TIME OVER text
-        var timeOverText = this.add.text(GCX, GCY, "TIME OVER", {
-            fontFamily: "sans-serif",
-            fontSize: "22px",
-            fontStyle: "bold",
-            color: "#ff4444",
-            stroke: "#000000",
-            strokeThickness: 3,
-        });
-        timeOverText.setOrigin(0.5);
-        timeOverText.setDepth(200);
-
-        this.gameStarted = false;
-
-        var self = this;
-        this.time.delayedCall(2500, function () {
-            self.stopAllSounds();
-            self.scene.start("PhaserContinueScene");
-        });
+    // =================================================================
+    // Sound
+    // =================================================================
+    playBossBgm(stageId) {
+        var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
+        var name = bossNames[stageId] || "bison";
+        var key = "boss_" + name + "_bgm";
+        this.stageBgmName = key;
+        this.playBgm(key, 0.4);
     }
 
     playSound(key, volume) {
@@ -1436,25 +765,14 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     stopAllSounds() {
-        try {
-            this.sound.stopAll();
-        } catch (e) {}
+        try { this.sound.stopAll(); } catch (e) {}
     }
 
-    // -----------------------------------------------------------------------
-    // Fixed-timestep game loop (matches PIXI's 120-Hz accumulator exactly)
-    // -----------------------------------------------------------------------
-    // PIXI BaseScene._onTick does:
-    //   this._accumulator += Math.min((delta||0) * 2, 8);   // delta normalised to 60fps
-    //   while (this._accumulator >= 1) { this._accumulator -= 1; this.loop(1); }
-    // That fires loop(1) at 120 logical fps regardless of display Hz.
-    //
-    // We replicate the same pattern using Phaser's ms-based delta.
-    // STEP = 1000/120 = 8.3333 ms per logical frame.
-    // -----------------------------------------------------------------------
-
+    // =================================================================
+    // Fixed-timestep game loop
+    // =================================================================
     update(time, delta) {
-        var STEP = 8.333333;                          // 1000 / 120
+        var STEP = 8.333333;
         this._accumulator = (this._accumulator || 0) + Math.min(delta, 66.67);
         while (this._accumulator >= STEP) {
             this._accumulator -= STEP;
@@ -1464,7 +782,6 @@ export class PhaserGameScene extends Phaser.Scene {
 
     fixedUpdate(time, step) {
         if (this.stageBg && !this.playerDead && !this.stageCleared) {
-            // Stop background scrolling once boss phase starts
             if (!this.bossActive) {
                 var bgMove = this.gameStarted ? (this.stageBgAmountMove || 0.7) : 0.7;
                 this.stageBg.tilePositionY -= bgMove;
@@ -1474,15 +791,15 @@ export class PhaserGameScene extends Phaser.Scene {
         if (!this.gameStarted) return;
         if (this.playerDead || this.stageCleared) return;
 
-        // Handle keyboard input every logical frame
-        this.handleKeyboardInput();
-
+        handleKeyboardInput(this);
         this.playerSprite.x += 0.09 * (this.playerUnitX - this.playerSprite.x);
 
-        // Shadow follows player (PIXI: shadowReverse=true, shadowOffsetY=5)
+        // Sync player shadow position and frame
         if (this.playerShadow && this.playerShadow.active) {
-            this.playerShadow.x = this.playerSprite.x;
-            this.playerShadow.y = this.playerSprite.y + this.playerSprite.height - 5;
+            updateShadowPosition(this.playerShadow, this.playerSprite);
+            if (this.playerSprite.frame && this.playerShadow.frame.name !== this.playerSprite.frame.name) {
+                try { this.playerShadow.setFrame(this.playerSprite.frame.name); } catch (e) {}
+            }
         }
 
         if (this.theWorldFlg) {
@@ -1491,31 +808,18 @@ export class PhaserGameScene extends Phaser.Scene {
             return;
         }
 
-        // Frame-based shoot timer (matching PIXI: bulletFrameCnt % interval == 0)
+        // Shooting
         this.shootTimer += 1;
         var interval = this.shootSpeed === "speed_high" ? Math.floor(this.shootInterval * 0.6) : this.shootInterval;
         if (this.shootTimer >= interval) {
             this.shootTimer = 0;
-            this.shoot();
+            shootBullets(this);
         }
 
-        for (var b = this.playerBullets.length - 1; b >= 0; b--) {
-            var bullet = this.playerBullets[b];
-            if (!bullet.active) {
-                this.playerBullets.splice(b, 1);
-                continue;
-            }
+        // Player bullets
+        updatePlayerBullets(this);
 
-            var angle = bullet.getData("angle") || 0;
-            bullet.y -= 3.5;
-            bullet.x += angle * 3.5;
-
-            if (bullet.y < -20) {
-                bullet.destroy();
-                this.playerBullets.splice(b, 1);
-            }
-        }
-
+        // --- Enemy loop (collision, movement, animation) ---
         for (var e = this.enemies.length - 1; e >= 0; e--) {
             var enemy = this.enemies[e];
             if (!enemy || !enemy.active) {
@@ -1526,101 +830,46 @@ export class PhaserGameScene extends Phaser.Scene {
             var isBoss = enemy.getData("type") === "boss";
 
             if (!isBoss) {
-                var speed = enemy.getData("speed") || 0.8;
-                enemy.y += speed;
-
-                // PIXI soliderB: starts off-screen to one side, moves horizontally
-                // across screen once past 1/3 height (app-original.js lines 3586-3590)
-                var enemyName = enemy.getData("name");
-                if (enemyName === "soliderB") {
-                    if (!enemy.getData("posName")) {
-                        // First-frame positioning: push to screen edge
-                        if ((enemy.getData("spawnX") || 0) >= GW / 2) {
-                            enemy.x = GW;
-                            enemy.setData("posName", "right");
-                        } else {
-                            enemy.x = -enemy.width;
-                            enemy.setData("posName", "left");
-                        }
-                    }
-                    if (enemy.y >= GH / 3) {
-                        if (enemy.getData("posName") === "right") {
-                            enemy.x -= 1;
-                        } else {
-                            enemy.x += 1;
-                        }
-                    }
-                }
-
-                var shootCnt = enemy.getData("shootCnt") + 1;
-                enemy.setData("shootCnt", shootCnt);
-                var shootInterval = enemy.getData("interval") || 300;
-                if (shootInterval > 0 && shootCnt >= shootInterval) {
-                    enemy.setData("shootCnt", shootCnt - shootInterval);
-                    // Only shoot when enemy is above the player (not from the side or past)
-                    if (enemy.y < this.playerSprite.y - 20) {
-                        this.enemyShoot(enemy);
-                    }
-                }
+                updateEnemy(this, enemy, step);
             } else {
-                // Boss movement is driven by bossShootStart() pattern timelines
-                // (no per-frame sine-wave or interval shooting here)
-
                 if (!this.bossSprite || !this.bossSprite.active) {
                     this.enemies.splice(e, 1);
                     continue;
                 }
+                syncBossVisuals(this);
             }
 
-            var animFrames = enemy.getData("frames");
-            if (animFrames && animFrames.length > 1) {
-                var animTimer = enemy.getData("animTimer") + step;
-                enemy.setData("animTimer", animTimer);
-                if (animTimer > 150) {
-                    enemy.setData("animTimer", 0);
-                    var animIdx = (enemy.getData("animIdx") + 1) % animFrames.length;
-                    enemy.setData("animIdx", animIdx);
-                    try {
-                        enemy.setFrame(animFrames[animIdx]);
-                    } catch (err) {}
-                }
-            }
+            animateEnemy(enemy, step);
 
             var eRect = { x: enemy.x - enemy.width / 2, y: enemy.y - enemy.height / 2, w: enemy.width, h: enemy.height };
 
+            // Bullet-enemy collision
             for (var bb = this.playerBullets.length - 1; bb >= 0; bb--) {
                 var pb = this.playerBullets[bb];
                 if (!pb || !pb.active) continue;
 
                 var bRect = { x: pb.x - pb.width / 2, y: pb.y - pb.height / 2, w: pb.width, h: pb.height };
 
-                // Boss is invulnerable during entry tween
                 if (isBoss && this.bossEntering) continue;
 
                 if (enemy.y >= 40 && rectOverlap(eRect, bRect)) {
                     var applyDamage = true;
 
-                    // PIXI SHOOT_BIG rate-limiting: max 2 damage per bullet per enemy,
-                    // with 15-frame cooldown between hits (app-original.js lines 7124-7131)
                     if (this.shootMode === "big") {
                         var bid = pb.getData("bulletId");
                         var bkey = "bulletid_" + bid;
                         var bfkey = "bulletframeCnt_" + bid;
                         var prevHit = enemy.getData(bkey);
                         if (prevHit == null) {
-                            // First contact with this bullet
                             enemy.setData(bkey, 0);
                             enemy.setData(bfkey, 0);
                         } else {
-                            // Already hit before — rate limit
                             var fc = (enemy.getData(bfkey) || 0) + 1;
                             enemy.setData(bfkey, fc);
                             if (fc % 15 === 0) {
                                 var hitCnt = (enemy.getData(bkey) || 0) + 1;
                                 enemy.setData(bkey, hitCnt);
-                                if (hitCnt > 1) {
-                                    applyDamage = false; // Max 2 hits (0 and 1)
-                                }
+                                if (hitCnt > 1) applyDamage = false;
                             } else {
                                 applyDamage = false;
                             }
@@ -1633,7 +882,6 @@ export class PhaserGameScene extends Phaser.Scene {
                         var isGuard = (hpBefore === "infinity");
 
                         if (!isGuard) {
-                            // Normal damage path
                             var ehp = hpBefore - dmg;
                             enemy.setData("hp", ehp);
 
@@ -1642,7 +890,6 @@ export class PhaserGameScene extends Phaser.Scene {
                                 this.checkBossDanger();
                             }
 
-                            // Hit impact at bullet position (PIXI: r.onDamage explosion)
                             this.showHitImpact(pb.x, pb.y, false);
                             this.playSound("se_damage", 0.15);
 
@@ -1655,10 +902,8 @@ export class PhaserGameScene extends Phaser.Scene {
                                 break;
                             }
 
-                            // Red tint flash on surviving enemy
                             this.flashEnemyTint(enemy);
                         } else {
-                            // Guard: invulnerable enemy ("infinity" HP), no HP change
                             this.showHitImpact(pb.x, pb.y, true);
                             this.playSound("se_guard", 0.2);
                             this.flashEnemyTint(enemy);
@@ -1674,6 +919,7 @@ export class PhaserGameScene extends Phaser.Scene {
 
             if (!enemy.active) continue;
 
+            // Barrier collision
             if (this.barrierActive && this.barrierSprite) {
                 var barRect = { x: this.barrierSprite.x - 20, y: this.barrierSprite.y - 20, w: 40, h: 40 };
                 if (rectOverlap(eRect, barRect) && !isBoss) {
@@ -1682,6 +928,7 @@ export class PhaserGameScene extends Phaser.Scene {
                 }
             }
 
+            // Player-enemy collision
             var pRect = { x: this.playerSprite.x - 8, y: this.playerSprite.y - 16, w: 16, h: 32 };
             if (rectOverlap(eRect, pRect) && !isBoss) {
                 this.playerDamage(1);
@@ -1689,13 +936,17 @@ export class PhaserGameScene extends Phaser.Scene {
                 continue;
             }
 
+            // Off-screen cleanup
             if (!isBoss && (enemy.y > GH + 20 || enemy.x < -40 || enemy.x > GW + 40)) {
                 var idx = this.enemies.indexOf(enemy);
                 if (idx >= 0) this.enemies.splice(idx, 1);
+                var osShadow = enemy.getData("shadow");
+                if (osShadow && osShadow.active) osShadow.destroy();
                 enemy.destroy();
             }
         }
 
+        // --- Enemy bullets ---
         for (var eb = this.enemyBullets.length - 1; eb >= 0; eb--) {
             var eBullet = this.enemyBullets[eb];
             if (!eBullet || !eBullet.active) {
@@ -1715,6 +966,7 @@ export class PhaserGameScene extends Phaser.Scene {
                 continue;
             }
 
+            // Barrier blocks enemy bullets
             if (this.barrierActive && this.barrierSprite) {
                 var barRect2 = { x: this.barrierSprite.x - 20, y: this.barrierSprite.y - 20, w: 40, h: 40 };
                 var ebRect0 = { x: eBullet.x - eBullet.width / 2, y: eBullet.y - eBullet.height / 2, w: eBullet.width, h: eBullet.height };
@@ -1726,7 +978,7 @@ export class PhaserGameScene extends Phaser.Scene {
                 }
             }
 
-            // Player bullets can destroy enemy bullets (matching PIXI behaviour)
+            // Player bullets destroy enemy bullets
             var ebDestroyed = false;
             var ebRect1 = { x: eBullet.x - eBullet.width / 2, y: eBullet.y - eBullet.height / 2, w: eBullet.width, h: eBullet.height };
             var ebHp = eBullet.getData("hp") || 1;
@@ -1753,7 +1005,7 @@ export class PhaserGameScene extends Phaser.Scene {
                             this.comboTimeCnt = 100;
                             this.spGauge = Math.min(100, this.spGauge + ebSpgage);
                             this.updateSpGauge();
-                            this.showScorePopup(eBullet.x, eBullet.y, ebScore * ebRatio);
+                            this.showScorePopup(eBullet.x, eBullet.y, ebScore, ebRatio);
                         }
                         this.showExplosion(eBullet.x, eBullet.y);
                         this.playSound("se_explosion", 0.35);
@@ -1766,6 +1018,7 @@ export class PhaserGameScene extends Phaser.Scene {
             }
             if (ebDestroyed) continue;
 
+            // Enemy bullet hits player
             var ebRect = { x: eBullet.x - eBullet.width / 2, y: eBullet.y - eBullet.height / 2, w: eBullet.width, h: eBullet.height };
             var pRect2 = { x: this.playerSprite.x - 8, y: this.playerSprite.y - 16, w: 16, h: 32 };
 
@@ -1777,6 +1030,7 @@ export class PhaserGameScene extends Phaser.Scene {
             }
         }
 
+        // --- Items ---
         for (var it = this.items.length - 1; it >= 0; it--) {
             var item = this.items[it];
             if (!item || !item.active) {
@@ -1803,14 +1057,16 @@ export class PhaserGameScene extends Phaser.Scene {
             }
         }
 
+        // --- Wave spawning ---
         if (this.enemyWaveFlg) {
             this.enemyWaveFrameCounter += 1;
             if (this.enemyWaveFrameCounter >= this.waveInterval) {
                 this.enemyWaveFrameCounter -= this.waveInterval;
-                this.enemyWave();
+                _enemyWave(this);
             }
         }
 
+        // --- Boss timer ---
         if (this.bossTimerStartFlg) {
             this.bossTimerFrameCnt += step;
             if (this.bossTimerFrameCnt >= 1000) {
@@ -1824,798 +1080,24 @@ export class PhaserGameScene extends Phaser.Scene {
             this._setBigNum(this.bossTimerNum, Math.max(0, this.bossTimerCountDown));
         }
 
+        // --- Combo decay ---
         this.comboTimeCnt -= 0.1;
         if (this.comboTimeCnt <= 0) {
             this.comboTimeCnt = 0;
             this.comboCount = 0;
         }
 
-        if (this.barrierActive) {
-            this.barrierTimer -= step / 1000;
-            if (this.barrierTimer <= 0) {
-                this.barrierActive = false;
-                if (this.barrierSprite) {
-                    this.barrierSprite.destroy();
-                    this.barrierSprite = null;
-                }
-                this.playSound("se_barrier_end", 0.9);
-            } else if (this.barrierSprite) {
-                this.barrierSprite.x = this.playerSprite.x;
-                this.barrierSprite.y = this.playerSprite.y;
-            }
-        }
+        // --- Barrier ---
+        updateBarrier(this, step);
 
-        // Player animation is handled by Phaser's anim system (player_walk)
-
+        // --- HUD ---
         this.updateHUD();
         this.updateBossHpBar();
     }
 
-    enemyShoot(enemy) {
-        var projData = enemy.getData("projData");
-        if (!projData) return;
-
-        var frames = projData.texture || [];
-        var frameKey = frames[0] || "normalProjectile0.gif";
-        var speed = projData.speed || 1;
-
-        var bullet = this.add.sprite(enemy.x, enemy.y + (enemy.height / 2), "game_asset", frameKey);
-        bullet.setOrigin(0.5);
-        bullet.setDepth(41);
-        bullet.setData("speed", speed);
-        bullet.setData("damage", projData.damage || 1);
-        bullet.setData("hp", projData.hp || 1);
-        bullet.setData("score", projData.score || 0);
-        bullet.setData("spgage", projData.spgage || 0);
-
-        // PIXI projectileAdd default: rotX=0, rotY=1 (straight down).
-        // soliderB aims at player; special projectile types (beam, smoke, etc.) also aim.
-        // All other regular enemies (soliderA, launchpad, etc.) shoot straight down.
-        var enemyName = String(enemy.getData("name") || "").toLowerCase();
-        var projName = String((projData && projData.name) || "").toLowerCase();
-
-        if (enemyName === "soliderb" || enemyName === "soldierb" ||
-            projName === "beam" || projName === "smoke" || projName === "meka" || projName === "psychofield") {
-            // Aimed at player
-            var dx = this.playerSprite.x - enemy.x;
-            var dy = this.playerSprite.y - enemy.y;
-            var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-            bullet.setData("rotX", dx / dist);
-            bullet.setData("rotY", dy / dist);
-        } else {
-            // Default: straight down (matches PIXI)
-            bullet.setData("rotX", 0);
-            bullet.setData("rotY", 1);
-        }
-
-        this.enemyBullets.push(bullet);
-    }
-
-    // -----------------------------------------------------------------------
-    // Boss attack pattern system (replaces sine-wave BOSS_PATTERNS)
-    // Each boss has 2–3 seed-based patterns matching the PIXI TimelineMax
-    // timelines.  Movement and shooting are tightly coupled: the boss moves
-    // to a position, fires, then picks the next pattern.
-    // -----------------------------------------------------------------------
-
-    _bossAlive() {
-        return this.bossSprite && this.bossSprite.active && !this.stageCleared && !this.playerDead;
-    }
-
-    bossShootStart() {
-        if (!this._bossAlive() || this.theWorldFlg) {
-            // Retry after SP freeze ends
-            if (this.theWorldFlg && this._bossAlive()) {
-                var self = this;
-                this.time.delayedCall(500, function () { self.bossShootStart(); });
-            }
-            return;
-        }
-        var seed = Math.random();
-        switch (this.bossStageId) {
-        case 0: this.bossPatternBison(seed); break;
-        case 1: this.bossPatternBarlog(seed); break;
-        case 2: this.bossPatternSagat(seed); break;
-        case 3: this.bossPatternVega(seed); break;
-        case 4: this.bossPatternFang(seed); break;
-        default: this.bossPatternBison(seed); break;
-        }
-    }
-
-    // --- Bison (stage 0) ---------------------------------------------------
-    bossPatternBison(seed) {
-        var self = this;
-        var boss = this.bossSprite;
-        var baseY = 80;
-        var downY = GH - 60;
-
-        if (seed < 0.6) {
-            // Pattern A — random X, rise, dive down, return
-            var targetX = clamp(Math.random() * GW, 30, GW - 30);
-            this.tweens.add({
-                targets: boss, x: targetX, duration: 300,
-                onComplete: function () {
-                    if (!self._bossAlive()) return;
-                    self.tweens.add({
-                        targets: boss, y: baseY - 10, duration: 500,
-                        onComplete: function () {
-                            if (!self._bossAlive()) return;
-                            // Bison is melee-only — no projectiles (PIXI BossBison.js)
-                            self.tweens.add({
-                                targets: boss, y: downY, duration: 350,
-                                onComplete: function () {
-                                    if (!self._bossAlive()) return;
-                                    self.tweens.add({
-                                        targets: boss, y: baseY, duration: 200,
-                                        onComplete: function () {
-                                            self.time.delayedCall(500, function () { self.bossShootStart(); });
-                                        },
-                                    });
-                                },
-                            });
-                        },
-                    });
-                },
-            });
-        } else if (seed < 0.8) {
-            // Pattern B — zigzag left-right then dive (faint pattern)
-            var steps = [
-                { x: 30, y: baseY - 20, d: 400 },
-                { x: GW - 60, y: baseY, d: 400 },
-                { x: 30, y: baseY + 30, d: 400 },
-                { x: GW - 60, y: baseY + 60, d: 400 },
-            ];
-            var idx = 0;
-            var runStep = function () {
-                if (!self._bossAlive() || idx >= steps.length) {
-                    if (!self._bossAlive()) return;
-                    // Bison is melee-only — no projectiles (PIXI BossBison.js)
-                    self.tweens.add({
-                        targets: boss, y: downY, duration: 300,
-                        onComplete: function () {
-                            if (!self._bossAlive()) return;
-                            self.tweens.add({
-                                targets: boss, y: baseY, duration: 200,
-                                onComplete: function () {
-                                    self.time.delayedCall(500, function () { self.bossShootStart(); });
-                                },
-                            });
-                        },
-                    });
-                    return;
-                }
-                var s = steps[idx++];
-                self.tweens.add({
-                    targets: boss, x: s.x, y: s.y, duration: s.d,
-                    onComplete: function () {
-                        self.time.delayedCall(100, runStep);
-                    },
-                });
-            };
-            runStep();
-        } else {
-            // Pattern C — mirror zigzag (starts from right)
-            var steps2 = [
-                { x: GW - 30, y: baseY - 20, d: 400 },
-                { x: 60, y: baseY, d: 400 },
-                { x: GW - 30, y: baseY + 30, d: 400 },
-                { x: 60, y: baseY + 60, d: 400 },
-            ];
-            var idx2 = 0;
-            var runStep2 = function () {
-                if (!self._bossAlive() || idx2 >= steps2.length) {
-                    if (!self._bossAlive()) return;
-                    // Bison is melee-only — no projectiles (PIXI BossBison.js)
-                    self.tweens.add({
-                        targets: boss, y: downY, duration: 300,
-                        onComplete: function () {
-                            if (!self._bossAlive()) return;
-                            self.tweens.add({
-                                targets: boss, y: baseY, duration: 200,
-                                onComplete: function () {
-                                    self.time.delayedCall(500, function () { self.bossShootStart(); });
-                                },
-                            });
-                        },
-                    });
-                    return;
-                }
-                var s = steps2[idx2++];
-                self.tweens.add({
-                    targets: boss, x: s.x, y: s.y, duration: s.d,
-                    onComplete: function () {
-                        self.time.delayedCall(100, runStep2);
-                    },
-                });
-            };
-            runStep2();
-        }
-    }
-
-    // --- Barlog (stage 1) --------------------------------------------------
-    bossPatternBarlog(seed) {
-        var self = this;
-        var boss = this.bossSprite;
-        var baseY = 80;
-        var diveY = GH - 40;
-
-        if (seed < 0.3) {
-            // Pattern A — random movement to a position, shoot straight down
-            var rx = clamp(Math.random() * GW, 30, GW - 30);
-            var ry = clamp(60 + Math.random() * 120, 60, 200);
-            this.tweens.add({
-                targets: boss, x: rx, y: ry, duration: 600,
-                onComplete: function () {
-                    if (!self._bossAlive()) return;
-                    // PIXI: Barlog projectiles go straight down (default case rotX=0,rotY=1)
-                    self.bossShootStraight(self.bossProjData);
-                    self.time.delayedCall(600, function () { self.bossShootStart(); });
-                },
-            });
-        } else if (seed < 0.8) {
-            // Pattern B — approach player X, shoot straight down, return
-            var px = clamp(this.playerSprite.x, 30, GW - 30);
-            this.tweens.add({
-                targets: boss, x: px, duration: 300,
-                onComplete: function () {
-                    if (!self._bossAlive()) return;
-                    self.time.delayedCall(400, function () {
-                        if (!self._bossAlive()) return;
-                        // PIXI: Barlog projectiles go straight down
-                        self.bossShootStraight(self.bossProjData);
-                        self.time.delayedCall(500, function () { self.bossShootStart(); });
-                    });
-                },
-            });
-        } else {
-            // Pattern C — charge dive toward player then return
-            var px2 = clamp(this.playerSprite.x, 30, GW - 30);
-            this.tweens.add({
-                targets: boss, x: px2, duration: 500,
-                onComplete: function () {
-                    if (!self._bossAlive()) return;
-                    // PIXI: Barlog projectiles go straight down
-                    self.bossShootStraight(self.bossProjData);
-                    self.tweens.add({
-                        targets: boss, y: baseY - 70, duration: 300,
-                        onComplete: function () {
-                            if (!self._bossAlive()) return;
-                            self.tweens.add({
-                                targets: boss, y: diveY, duration: 600,
-                                onComplete: function () {
-                                    if (!self._bossAlive()) return;
-                                    self.tweens.add({
-                                        targets: boss, y: baseY, duration: 200,
-                                        onComplete: function () {
-                                            self.time.delayedCall(500, function () { self.bossShootStart(); });
-                                        },
-                                    });
-                                },
-                            });
-                        },
-                    });
-                },
-            });
-        }
-    }
-
-    // --- Sagat (stage 2) ---------------------------------------------------
-    bossPatternSagat(seed) {
-        var self = this;
-        var boss = this.bossSprite;
-        var baseY = 80;
-        var diveY = GH - 40;
-        var projA = this.bossProjDataA || this.bossProjData;
-        var projB = this.bossProjDataB || this.bossProjData;
-
-        if (seed < 0.3) {
-            // Pattern A — horizontal sweep with shots at each position
-            var positions = [-20, 10, 50, 100, 150, 200];
-            var pi = 0;
-            var sweepStep = function () {
-                if (!self._bossAlive() || pi >= positions.length) {
-                    if (self._bossAlive()) {
-                        self.time.delayedCall(500, function () { self.bossShootStart(); });
-                    }
-                    return;
-                }
-                var px = clamp(positions[pi], 20, GW - 20);
-                pi++;
-                self.tweens.add({
-                    targets: boss, x: px, duration: 250,
-                    onComplete: function () {
-                        if (!self._bossAlive()) return;
-                        self.bossShootAimed(projA);
-                        self.time.delayedCall(250, sweepStep);
-                    },
-                });
-            };
-            sweepStep();
-        } else if (seed < 0.6) {
-            // Pattern B — rapid barrage from current position
-            var px3 = clamp(this.playerSprite.x, 30, GW - 30);
-            this.tweens.add({
-                targets: boss, x: px3, duration: 250,
-                onComplete: function () {
-                    if (!self._bossAlive()) return;
-                    var shotCount = 0;
-                    self.time.addEvent({
-                        delay: 200, repeat: 6,
-                        callback: function () {
-                            if (!self._bossAlive()) return;
-                            self.bossShootAimed(projA);
-                            shotCount++;
-                            if (shotCount >= 7) {
-                                self.time.delayedCall(500, function () { self.bossShootStart(); });
-                            }
-                        },
-                    });
-                },
-            });
-        } else if (seed < 0.8) {
-            // Pattern C — big projectile
-            var px4 = clamp(this.playerSprite.x, 30, GW - 30);
-            this.tweens.add({
-                targets: boss, x: px4, duration: 250,
-                onComplete: function () {
-                    if (!self._bossAlive()) return;
-                    self.time.delayedCall(500, function () {
-                        if (!self._bossAlive()) return;
-                        self.bossShootSpread(projB, 5, 20);
-                        self.time.delayedCall(800, function () { self.bossShootStart(); });
-                    });
-                },
-            });
-        } else {
-            // Pattern D — Tiger Knee dive
-            var px5 = clamp(this.playerSprite.x, 30, GW - 30);
-            this.tweens.add({
-                targets: boss, x: px5, y: baseY - 20, duration: 400,
-                onComplete: function () {
-                    if (!self._bossAlive()) return;
-                    self.bossShootAimed(projA);
-                    self.time.delayedCall(500, function () {
-                        if (!self._bossAlive()) return;
-                        self.tweens.add({
-                            targets: boss, y: diveY, duration: 300,
-                            onComplete: function () {
-                                if (!self._bossAlive()) return;
-                                self.tweens.add({
-                                    targets: boss, y: baseY, duration: 200,
-                                    onComplete: function () {
-                                        self.time.delayedCall(400, function () { self.bossShootStart(); });
-                                    },
-                                });
-                            },
-                        });
-                    });
-                },
-            });
-        }
-    }
-
-    // --- Vega (stage 3) ----------------------------------------------------
-    bossPatternVega(seed) {
-        var self = this;
-        var boss = this.bossSprite;
-        var baseY = 80;
-        var diveY = GH - 20;
-        var projA = this.bossProjDataA || this.bossProjData;
-        var projB = this.bossProjDataB || this.bossProjData;
-
-        if (seed < 0.1) {
-            // Pattern A — teleport warp to 3 positions (no shots)
-            var warpPositions = [
-                30,
-                GW - 30,
-                clamp(Math.random() * GW, 30, GW - 30),
-            ];
-            var wi = 0;
-            var warpStep = function () {
-                if (!self._bossAlive() || wi >= warpPositions.length) {
-                    if (self._bossAlive()) {
-                        self.time.delayedCall(500, function () { self.bossShootStart(); });
-                    }
-                    return;
-                }
-                // Flash out
-                self.tweens.add({
-                    targets: boss, alpha: 0, duration: 100,
-                    onComplete: function () {
-                        if (!self._bossAlive()) return;
-                        boss.x = warpPositions[wi++];
-                        self.tweens.add({
-                            targets: boss, alpha: 1, duration: 100,
-                            onComplete: function () {
-                                self.time.delayedCall(200, warpStep);
-                            },
-                        });
-                    },
-                });
-            };
-            warpStep();
-        } else if (seed < 0.4) {
-            // Pattern B — multi-position psycho shots (warp between positions)
-            var shotPositions = [30, GW - 60, 50, GCX, GW - 40, 60, GCX];
-            var si = 0;
-            var psychoStep = function () {
-                if (!self._bossAlive() || si >= shotPositions.length) {
-                    if (self._bossAlive()) {
-                        self.time.delayedCall(800, function () { self.bossShootStart(); });
-                    }
-                    return;
-                }
-                // Warp to position
-                self.tweens.add({
-                    targets: boss, alpha: 0, duration: 100,
-                    onComplete: function () {
-                        if (!self._bossAlive()) return;
-                        boss.x = shotPositions[si++];
-                        self.tweens.add({
-                            targets: boss, alpha: 1, duration: 100,
-                            onComplete: function () {
-                                if (!self._bossAlive()) return;
-                                self.bossShootAimed(projA);
-                                self.time.delayedCall(300, psychoStep);
-                            },
-                        });
-                    },
-                });
-            };
-            psychoStep();
-        } else if (seed < 0.7) {
-            // Pattern C — psycho field: move to center, rapid fire
-            this.tweens.add({
-                targets: boss, x: GCX, y: baseY + 10, duration: 300,
-                onComplete: function () {
-                    if (!self._bossAlive()) return;
-                    var fieldCount = 0;
-                    self.time.addEvent({
-                        delay: 300, repeat: 4,
-                        callback: function () {
-                            if (!self._bossAlive()) return;
-                            self.bossShootRadial(projB, 12);
-                            fieldCount++;
-                            if (fieldCount >= 5) {
-                                self.time.delayedCall(800, function () { self.bossShootStart(); });
-                            }
-                        },
-                    });
-                },
-            });
-        } else {
-            // Pattern D — crusher dive: warp to player X, dive down, jump back
-            var px6 = clamp(this.playerSprite.x, 30, GW - 30);
-            this.tweens.add({
-                targets: boss, alpha: 0, duration: 100,
-                onComplete: function () {
-                    if (!self._bossAlive()) return;
-                    boss.x = px6;
-                    self.tweens.add({
-                        targets: boss, alpha: 1, y: baseY - 20, duration: 200,
-                        onComplete: function () {
-                            if (!self._bossAlive()) return;
-                            self.bossShootSpread(projA, 3, 30);
-                            self.tweens.add({
-                                targets: boss, y: diveY, duration: 900,
-                                onComplete: function () {
-                                    if (!self._bossAlive()) return;
-                                    // Jump back to top
-                                    boss.x = GCX;
-                                    boss.y = -50;
-                                    self.tweens.add({
-                                        targets: boss, y: baseY, duration: 1000,
-                                        onComplete: function () {
-                                            self.time.delayedCall(500, function () { self.bossShootStart(); });
-                                        },
-                                    });
-                                },
-                            });
-                        },
-                    });
-                },
-            });
-        }
-    }
-
-    // --- Fang (stage 4) ----------------------------------------------------
-    bossPatternFang(seed) {
-        var self = this;
-        var boss = this.bossSprite;
-        var baseY = 60;
-        var projA = this.bossProjDataA || this.bossProjData;
-        var projB = this.bossProjDataB || this.bossProjData;
-        var projC = this.bossProjDataC || this.bossProjData;
-
-        if (seed < 0.3) {
-            // Pattern A — rapid beam shots (3 volleys)
-            var volleys = 0;
-            var beamStep = function () {
-                if (!self._bossAlive() || volleys >= 3) {
-                    if (self._bossAlive()) {
-                        self.time.delayedCall(1000, function () { self.bossShootStart(); });
-                    }
-                    return;
-                }
-                volleys++;
-                self.bossShootSpread(projA, 3, 25);
-                self.time.delayedCall(500, beamStep);
-            };
-            this.time.delayedCall(300, beamStep);
-        } else if (seed < 0.7) {
-            // Pattern B — meka attack: single large projectile
-            this.bossShootRadial(projC || projA, 8);
-            this.time.delayedCall(1500, function () { self.bossShootStart(); });
-        } else {
-            // Pattern C — smoke spray: rapid fire from shifting position
-            var smokeCount = 0;
-            var smokeTotal = 12;
-            this.time.addEvent({
-                delay: 300, repeat: smokeTotal - 1,
-                callback: function () {
-                    if (!self._bossAlive()) return;
-                    // Slight horizontal drift while spraying
-                    boss.x = clamp(boss.x + (Math.random() - 0.5) * 20, 30, GW - 30);
-                    self.bossShootAimed(projB || projA);
-                    smokeCount++;
-                    if (smokeCount >= smokeTotal) {
-                        self.time.delayedCall(1000, function () { self.bossShootStart(); });
-                    }
-                },
-            });
-        }
-    }
-
-    checkBossDanger() {
-        if (this.bossDangerShown || !this.bossSprite || !this.bossSprite.active) return;
-        var spDamage = this.recipe.playerData.spDamage || 50;
-        if (this.bossHp <= spDamage) {
-            this.bossDangerShown = true;
-            triggerHaptic("warning");
-
-            // Create danger balloon sprite above boss (matches PIXI: boss_dengerous0-2.gif, 28x29px)
-            var dangerBalloon = this.add.sprite(0, -this.bossSprite.height / 2 - 10, "game_asset", "boss_dengerous0.gif");
-            dangerBalloon.setOrigin(0.5, 1);
-            dangerBalloon.setDepth(46);
-            dangerBalloon.setScale(0);
-            this.bossSprite.dangerBalloon = dangerBalloon;
-
-            // Elastic scale-in animation matching PIXI
-            this.tweens.add({
-                targets: dangerBalloon,
-                scaleX: 1,
-                scaleY: 1,
-                duration: 1000,
-                ease: "Back.easeOut",
-            });
-
-            // Animate through 3 danger frames
-            var self = this;
-            var dangerFrame = 0;
-            this.time.addEvent({
-                delay: 250,
-                loop: true,
-                callback: function () {
-                    if (!dangerBalloon || !dangerBalloon.active) return;
-                    dangerFrame = (dangerFrame + 1) % 3;
-                    dangerBalloon.setFrame("boss_dengerous" + dangerFrame + ".gif");
-                    // Keep position synced with boss
-                    if (self.bossSprite && self.bossSprite.active) {
-                        dangerBalloon.x = self.bossSprite.x;
-                        dangerBalloon.y = self.bossSprite.y - self.bossSprite.height / 2 - 10;
-                    }
-                },
-            });
-        }
-    }
-
-    bossDie(boss) {
-        if (this.stageCleared) return;
-
-        this.bossTimerStartFlg = false;
-        this.bossTimerLabel.setVisible(false);
-        this.bossTimerNum.container.setVisible(false);
-        this.theWorldFlg = true;
-
-        this.comboCount++;
-        if (this.comboCount > this.maxCombo) {
-            this.maxCombo = this.comboCount;
-        }
-        var ratio = Math.max(1, Math.ceil(this.comboCount / 10));
-        this.scoreCount += this.bossScore * ratio;
-
-        this.showScorePopup(boss.x, boss.y, this.bossScore * ratio);
-
-        // PIXI bossRemove: destroy all player bullets and clear list
-        for (var pb = this.playerBullets.length - 1; pb >= 0; pb--) {
-            if (this.playerBullets[pb] && this.playerBullets[pb].active) {
-                this.playerBullets[pb].destroy();
-            }
-        }
-        this.playerBullets = [];
-
-        // PIXI boss.dead(): 5 staggered explosions at random positions within boss hitArea
-        var bossX = boss.x;
-        var bossY = boss.y;
-        var bossW = boss.width || 64;
-        var bossH = boss.height || 64;
-        var self = this;
-        for (var ei = 0; ei < 5; ei++) {
-            this.time.delayedCall(250 * ei, function () {
-                var ex = bossX - bossW / 2 + Math.random() * bossW;
-                var ey = bossY - bossH / 2 + Math.random() * bossH;
-                self.showBossExplosion(ex, ey);
-                self.playSound("se_explosion", 0.35);
-            });
-        }
-
-        // PIXI boss.dead(): shake animation (two cycles of position jitter)
-        var startX = boss.x;
-        var startY = boss.y;
-        var shakeSteps = [
-            { dx: 4, dy: -2, dt: 0 },
-            { dx: -3, dy: 1, dt: 80 },
-            { dx: 2, dy: -1, dt: 70 },
-            { dx: -2, dy: 1, dt: 50 },
-            { dx: 1, dy: 1, dt: 50 },
-            { dx: 0, dy: 0, dt: 40 },
-            { dx: 4, dy: -2, dt: 0 },
-            { dx: -3, dy: 1, dt: 80 },
-            { dx: 2, dy: -1, dt: 70 },
-            { dx: -2, dy: 1, dt: 50 },
-            { dx: 1, dy: 1, dt: 50 },
-            { dx: 0, dy: 0, dt: 40 },
-        ];
-        var shakeDelay = 0;
-        for (var si = 0; si < shakeSteps.length; si++) {
-            shakeDelay += shakeSteps[si].dt;
-            (function (step) {
-                self.time.delayedCall(shakeDelay, function () {
-                    if (boss && boss.active) {
-                        boss.x = startX + step.dx;
-                        boss.y = startY + step.dy;
-                    }
-                });
-            })(shakeSteps[si]);
-        }
-        // PIXI boss.dead(): fade out unit after shake (1s fade with 0.5s delay after shake)
-        this.tweens.add({
-            targets: boss,
-            alpha: 0,
-            duration: 1000,
-            delay: shakeDelay + 500,
-            onComplete: function () {
-                if (boss && boss.active) boss.destroy();
-            },
-        });
-
-        var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
-        var stageId = gameState.stageId || 0;
-        var voiceKey = "boss_" + (bossNames[stageId] || "bison") + "_voice_ko";
-        triggerHaptic("bossDefeat");
-        this.playSound(voiceKey, 0.9);
-        this.playSound("se_finish_akebono", 0.9);
-
-        // PIXI: if boss killed during SP move, show akebonofinish background
-        if (this.spFired) {
-            this.showAkebonoFinish();
-        }
-
-        // Clean up danger balloon if present
-        if (boss.dangerBalloon && boss.dangerBalloon.active) {
-            boss.dangerBalloon.destroy();
-        }
-
-        var idx = this.enemies.indexOf(boss);
-        if (idx >= 0) this.enemies.splice(idx, 1);
-
-        this.bossSprite = null;
-        this.bossActive = false;
-        this.bossDangerShown = false;
-        this.bossHpBarBg.setVisible(false);
-        this.bossHpBarFg.setVisible(false);
-
-        for (var eb = this.enemyBullets.length - 1; eb >= 0; eb--) {
-            if (this.enemyBullets[eb] && this.enemyBullets[eb].active) {
-                this.enemyBullets[eb].destroy();
-            }
-        }
-        this.enemyBullets = [];
-
-        // PIXI uses 2.5s delay before stageClear
-        this.time.delayedCall(2500, function () {
-            self.stageClear();
-        });
-    }
-
-    showAkebonoFinish() {
-        // PIXI: akebonoBg0-2.gif animated sprite at animationSpeed 0.7
-        // Full-screen background (256x512) added to stage background layer
-        if (!this.anims.exists("akebono_bg_anim")) {
-            this.anims.create({
-                key: "akebono_bg_anim",
-                frames: [
-                    { key: "game_ui", frame: "akebonoBg0.gif" },
-                    { key: "game_ui", frame: "akebonoBg1.gif" },
-                    { key: "game_ui", frame: "akebonoBg2.gif" },
-                ],
-                // PIXI animationSpeed 0.7 at 120fps base ≈ 0.7 * 24 = ~17fps
-                frameRate: 17,
-                repeat: -1,
-            });
-        }
-
-        var akebonoBg = this.add.sprite(0, 0, "game_ui", "akebonoBg0.gif");
-        akebonoBg.setOrigin(0, 0);
-        akebonoBg.setDepth(5); // Above stage background, below enemies/player
-        akebonoBg.play("akebono_bg_anim");
-        this.akebonoBgSprite = akebonoBg;
-
-        // PIXI title.akebonofinish(): knockoutK.gif + knockoutO.gif scale-in
-        // K at GAME_CENTER - width/2, O at GAME_CENTER + width/2, both anchor(0.5)
-        var koK = this.add.sprite(GCX - 41, GCY, "game_ui", "knockoutK.gif");
-        koK.setOrigin(0.5);
-        koK.setDepth(200);
-        koK.setScale(0);
-
-        var koO = this.add.sprite(GCX + 41, GCY, "game_ui", "knockoutO.gif");
-        koO.setOrigin(0.5);
-        koO.setDepth(200);
-        koO.setScale(0);
-
-        // K: scale 0→1, 0.4s, Back.easeOut
-        this.tweens.add({
-            targets: koK,
-            scaleX: 1,
-            scaleY: 1,
-            duration: 400,
-            ease: "Back.easeOut",
-        });
-        // O: same but delayed 0.15s (PIXI overlap "-=0.25" from 0.4s = 0.15s offset)
-        this.tweens.add({
-            targets: koO,
-            scaleX: 1,
-            scaleY: 1,
-            duration: 400,
-            delay: 150,
-            ease: "Back.easeOut",
-        });
-
-        this.playSound("voice_ko", 0.7);
-    }
-
-    collectItem(itemName) {
-        triggerHaptic("pickup");
-        this.playSound("g_powerup_voice", 0.55);
-
-        switch (itemName) {
-        case PLAYER_STATES.SHOOT_SPEED_HIGH:
-            this.shootSpeed = "speed_high";
-            break;
-        case PLAYER_STATES.BARRIER:
-            this.barrierActive = true;
-            this.barrierTimer = 4;
-            this.playSound("se_barrier_start", 0.9);
-            if (this.barrierSprite) this.barrierSprite.destroy();
-            this.barrierSprite = this.add.sprite(this.playerSprite.x, this.playerSprite.y, "game_asset", "barrier0.gif");
-            this.barrierSprite.setOrigin(0.5);
-            this.barrierSprite.setDepth(51);
-            this.barrierSprite.setAlpha(0.6);
-            break;
-        case PLAYER_STATES.SHOOT_NAME_BIG:
-            this.shootMode = "big";
-            this.shootSpeed = "speed_normal";
-            break;
-        case PLAYER_STATES.SHOOT_NAME_3WAY:
-            this.shootMode = "3way";
-            this.shootSpeed = "speed_normal";
-            break;
-        default:
-            this.shootMode = "normal";
-            break;
-        }
-    }
-
+    // =================================================================
+    // HUD update + number display helpers
+    // =================================================================
     updateHUD() {
         this._setSmallNum(this.scoreSmallNum, this.scoreCount);
         this._setComboNum(this.comboCount);
@@ -2638,8 +1120,8 @@ export class PhaserGameScene extends Phaser.Scene {
         this._comboNumSprites = [];
         var text = String(num);
         var x = 0;
-        for (var i = 0; i < text.length; i++) {
-            var frame = "comboNum" + text[i] + ".gif";
+        for (var j = 0; j < text.length; j++) {
+            var frame = "comboNum" + text[j] + ".gif";
             try {
                 var sprite = this.add.image(x, 0, "game_ui", frame);
                 sprite.setOrigin(0, 0);
@@ -2650,8 +1132,6 @@ export class PhaserGameScene extends Phaser.Scene {
         }
     }
 
-    // Sprite-based number display using smallNum0-9.gif (8×11px, 6px spacing)
-    // Matches PIXI ei class: right-aligned, leading zeros at alpha=0.5
     _initSmallNum(maxDigit) {
         var container = this.add.container(0, 0);
         var sprites = [];
@@ -2676,13 +1156,10 @@ export class PhaserGameScene extends Phaser.Scene {
             try {
                 sprites[i].setFrame("smallNum" + digit + ".gif");
             } catch (e) {}
-            // PIXI ei class: leading zeros (positions beyond the number length) get alpha=0.5
             sprites[i].setAlpha(i < text.length ? 1 : 0.5);
         }
     }
 
-    // Sprite-based number display using bigNum0-9.gif (12×19px, 11px spacing)
-    // Matches PIXI qt class: right-aligned, fixed maxDigit slots
     _initBigNum(maxDigit) {
         var container = this.add.container(0, 0);
         var sprites = [];
