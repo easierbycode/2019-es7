@@ -1734,7 +1734,7 @@ export class PhaserGameScene extends Phaser.Scene {
                             this.comboTimeCnt = 100;
                             this.spGauge = Math.min(100, this.spGauge + ebSpgage);
                             this.updateSpGauge();
-                            this.showScorePopup(eBullet.x, eBullet.y, ebScore * ebRatio);
+                            this.showScorePopup(eBullet.x, eBullet.y, ebScore * ebRatio, ebRatio);
                         }
                         this.showExplosion(eBullet.x, eBullet.y);
                         this.playSound("se_explosion", 0.35);
