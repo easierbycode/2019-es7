@@ -1142,7 +1142,7 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         this.showExplosion(enemy.x, enemy.y);
-        this.showScorePopup(enemy.x, enemy.y, score * ratio);
+        this.showScorePopup(enemy.x, enemy.y, score, ratio);
         this.playSound("se_explosion", 0.35);
 
         var idx = this.enemies.indexOf(enemy);
@@ -1210,23 +1210,44 @@ export class PhaserGameScene extends Phaser.Scene {
         enemy.setData("_tintTimer", timer);
     }
 
-    showScorePopup(x, y, score) {
-        var txt = this.add.text(x, y, String(score), {
-            fontFamily: "Arial",
-            fontSize: "10px",
-            fontStyle: "bold",
-            color: "#ffff00",
-            stroke: "#000000",
-            strokeThickness: 2,
-        });
-        txt.setOrigin(0.5);
-        txt.setDepth(110);
+    showScorePopup(x, y, score, ratio) {
+        // Sprite-based bitmap number popup matching PIXI ScorePopup
+        var container = this.add.container(0, 0);
+        container.setDepth(110);
+
+        var scoreText = String(score);
+        var lastX = 0;
+        for (var i = 0; i < scoreText.length; i++) {
+            var digit = this.add.image(0, 0, "game_ui", "smallNum" + scoreText[i] + ".gif");
+            digit.setOrigin(0, 0);
+            digit.x = i * (digit.width - 2);
+            lastX = digit.x;
+            container.add(digit);
+        }
+
+        var kakeru = this.add.image(0, 0, "game_ui", "smallNumKakeru.gif");
+        kakeru.setOrigin(0, 0);
+        kakeru.x = lastX + 8;
+        container.add(kakeru);
+
+        var ratioText = String(ratio);
+        for (var j = 0; j < ratioText.length; j++) {
+            var rDigit = this.add.image(0, 0, "game_ui", "smallNum" + ratioText[j] + ".gif");
+            rDigit.setOrigin(0, 0);
+            rDigit.x = kakeru.x + kakeru.width + 1 + j * (rDigit.width - 1);
+            container.add(rDigit);
+        }
+
+        // Get container bounds for centering
+        var bounds = container.getBounds();
+        container.x = Math.floor(x - bounds.width / 2);
+        container.y = Math.floor(y - bounds.height);
+
         this.tweens.add({
-            targets: txt,
-            y: y - 20,
-            alpha: 0,
+            targets: container,
+            y: container.y - 20,
             duration: 800,
-            onComplete: function () { txt.destroy(); },
+            onComplete: function () { container.destroy(true); },
         });
     }
 
@@ -2092,8 +2113,8 @@ export class PhaserGameScene extends Phaser.Scene {
             };
             sweepStep();
         } else if (seed < 0.6) {
-            // Pattern B — rapid barrage from current position
-            var px3 = clamp(this.playerSprite.x, 30, GW - 30);
+            // Pattern B — rapid barrage from random position (not player-aimed)
+            var px3 = clamp(Math.random() * GW, 30, GW - 30);
             this.tweens.add({
                 targets: boss, x: px3, duration: 250,
                 onComplete: function () {
@@ -2113,8 +2134,8 @@ export class PhaserGameScene extends Phaser.Scene {
                 },
             });
         } else if (seed < 0.8) {
-            // Pattern C — big projectile
-            var px4 = clamp(this.playerSprite.x, 30, GW - 30);
+            // Pattern C — big projectile from random position (not player-aimed)
+            var px4 = clamp(Math.random() * GW, 30, GW - 30);
             this.tweens.add({
                 targets: boss, x: px4, duration: 250,
                 onComplete: function () {
@@ -2385,7 +2406,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this.scoreCount += this.bossScore * ratio;
 
         this.showExplosion(boss.x, boss.y);
-        this.showScorePopup(boss.x, boss.y, this.bossScore * ratio);
+        this.showScorePopup(boss.x, boss.y, this.bossScore, ratio);
 
         var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
         var stageId = gameState.stageId || 0;
@@ -2407,7 +2428,48 @@ export class PhaserGameScene extends Phaser.Scene {
 
         var idx = this.enemies.indexOf(boss);
         if (idx >= 0) this.enemies.splice(idx, 1);
-        boss.destroy();
+
+        if (this.spFired) {
+            // Akebonofinish: keep boss visible with 5 sequential explosions + shake
+            var startX = boss.x;
+            var startY = boss.y;
+            var bw = boss.width || 80;
+            var bh = boss.height || 80;
+            var self2 = this;
+            for (var ei = 0; ei < 5; ei++) {
+                (function (i) {
+                    self2.time.delayedCall(250 * i, function () {
+                        if (!boss || !boss.active) return;
+                        var ex = startX + Math.random() * bw - bw / 2;
+                        var ey = startY + Math.random() * bh - bh / 2;
+                        self2.showExplosion(ex, ey);
+                        self2.playSound("se_explosion", 0.35);
+                    });
+                })(ei);
+            }
+            // Shake animation
+            var shakeOffsets = [
+                { x: 4, y: -2 }, { x: -3, y: 1 }, { x: 2, y: -1 },
+                { x: -2, y: 1 }, { x: 1, y: 1 }, { x: 0, y: 0 },
+                { x: 4, y: -2 }, { x: -3, y: 1 }, { x: 2, y: -1 },
+                { x: -2, y: 1 }, { x: 1, y: 1 }, { x: 0, y: 0 },
+            ];
+            var shakeDelays = [0, 80, 70, 50, 50, 40, 0, 80, 70, 50, 50, 40];
+            var cumDelay = 0;
+            for (var si = 0; si < shakeOffsets.length; si++) {
+                cumDelay += shakeDelays[si];
+                (function (offset, delay) {
+                    self2.time.delayedCall(delay, function () {
+                        if (!boss || !boss.active) return;
+                        boss.x = startX + offset.x;
+                        boss.y = startY + offset.y;
+                    });
+                })(shakeOffsets[si], cumDelay);
+            }
+            // Boss stays visible (no destroy, no fade) during akebonofinish
+        } else {
+            boss.destroy();
+        }
 
         this.bossSprite = null;
         this.bossActive = false;
