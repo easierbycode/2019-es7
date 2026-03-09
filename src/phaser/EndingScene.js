@@ -35,11 +35,12 @@ export class PhaserEndingScene extends Phaser.Scene {
         if (!this.anims.exists("congra_txt_anim")) {
             this.anims.create({
                 key: "congra_txt_anim",
-                frames: [
-                    { key: "game_ui", frame: "congraTxt0.gif" },
-                    { key: "game_ui", frame: "congraTxt1.gif" },
-                    { key: "game_ui", frame: "congraTxt2.gif" },
-                ],
+                frames: this.anims.generateFrameNames("game_ui", {
+                    prefix: "congraTxt",
+                    start: 0,
+                    end: 2,
+                    suffix: ".gif",
+                }),
                 frameRate: 5,
                 repeat: -1,
             });
@@ -183,7 +184,7 @@ export class PhaserEndingScene extends Phaser.Scene {
                         prefix: "staffrollG",
                         start: 0,
                         end: 7,
-                        suffix: "",
+                        suffix: ".gif",
                     }),
                     frameRate: 8,
                     repeat: -1,

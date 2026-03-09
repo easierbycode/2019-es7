@@ -41,10 +41,12 @@ export class PhaserContinueScene extends Phaser.Scene {
         if (!this.anims.exists("continue_face_idle")) {
             this.anims.create({
                 key: "continue_face_idle",
-                frames: [
-                    { key: "game_ui", frame: "continueFace0.gif" },
-                    { key: "game_ui", frame: "continueFace1.gif" },
-                ],
+                frames: this.anims.generateFrameNames("game_ui", {
+                    prefix: "continueFace",
+                    start: 0,
+                    end: 1,
+                    suffix: ".gif",
+                }),
                 frameRate: 3,
                 repeat: -1,
             });

@@ -189,14 +189,16 @@ export class PhaserGameScene extends Phaser.Scene {
 
         // Create player walk animation (PIXI animationSpeed=0.35 at 120 logical fps ≈ 42 fps)
         if (frames.length > 1) {
-            var animFrames = [];
-            for (var i = 0; i < frames.length; i++) {
-                animFrames.push({ key: "game_asset", frame: frames[i] });
-            }
             if (!this.anims.exists("player_walk")) {
                 this.anims.create({
                     key: "player_walk",
-                    frames: animFrames,
+                    frames: this.anims.generateFrameNames("game_asset", {
+                        prefix: "player",
+                        start: 0,
+                        end: frames.length - 1,
+                        zeroPad: 2,
+                        suffix: ".gif",
+                    }),
                     frameRate: 42,
                     repeat: -1,
                 });
@@ -331,9 +333,16 @@ export class PhaserGameScene extends Phaser.Scene {
             return;
         }
 
-        this.coverOverlay = this.add.tileSprite(0, 0, GW, GH, "game_asset", "stagebgOver.gif");
-        this.coverOverlay.setOrigin(0, 0);
+        // Phaser 4 RC6: tileSprite does not properly support atlas frames.
+        // Use regular sprites to tile the 256x256 frame over the 256x480 stage.
+        this.coverOverlay = this.add.container(0, 0);
         this.coverOverlay.setDepth(99);
+        var frameH = 256; // stagebgOver.gif is 256x256
+        for (var ty = 0; ty < GH; ty += frameH) {
+            var tile = this.add.sprite(0, ty, "game_asset", "stagebgOver.gif");
+            tile.setOrigin(0, 0);
+            this.coverOverlay.add(tile);
+        }
     }
 
     showTitle() {
@@ -714,13 +723,15 @@ export class PhaserGameScene extends Phaser.Scene {
 
         // Create spExplosion animation if it doesn't exist
         if (!this.anims.exists("sp_explosion_anim")) {
-            var frames = [];
-            for (var f = 0; f < 8; f++) {
-                frames.push({ key: "game_asset", frame: "spExplosion0" + f + ".gif" });
-            }
             this.anims.create({
                 key: "sp_explosion_anim",
-                frames: frames,
+                frames: this.anims.generateFrameNames("game_asset", {
+                    prefix: "spExplosion",
+                    start: 0,
+                    end: 7,
+                    zeroPad: 2,
+                    suffix: ".gif",
+                }),
                 frameRate: 24, // PIXI animationSpeed 0.2 at 120fps = 24fps
                 repeat: 0,
             });
@@ -1153,13 +1164,15 @@ export class PhaserGameScene extends Phaser.Scene {
     showExplosion(x, y) {
         // 7-frame animated explosion matching PIXI (animationSpeed=0.4 at 120fps ≈ 48fps)
         if (!this.anims.exists("explosion_anim")) {
-            var frames = [];
-            for (var i = 0; i < 7; i++) {
-                frames.push({ key: "game_asset", frame: "explosion0" + i + ".gif" });
-            }
             this.anims.create({
                 key: "explosion_anim",
-                frames: frames,
+                frames: this.anims.generateFrameNames("game_asset", {
+                    prefix: "explosion",
+                    start: 0,
+                    end: 6,
+                    zeroPad: 2,
+                    suffix: ".gif",
+                }),
                 frameRate: 48,
                 repeat: 0,
             });
@@ -1179,11 +1192,17 @@ export class PhaserGameScene extends Phaser.Scene {
         var animKey = isGuard ? "guard_impact_anim" : "hit_impact_anim";
         if (!this.anims.exists(animKey)) {
             var prefix = isGuard ? "guard" : "hit";
-            var frames = [];
-            for (var i = 0; i < 5; i++) {
-                frames.push({ key: "game_asset", frame: prefix + i + ".gif" });
-            }
-            this.anims.create({ key: animKey, frames: frames, frameRate: 48, repeat: 0 });
+            this.anims.create({
+                key: animKey,
+                frames: this.anims.generateFrameNames("game_asset", {
+                    prefix: prefix,
+                    start: 0,
+                    end: 4,
+                    suffix: ".gif",
+                }),
+                frameRate: 48,
+                repeat: 0,
+            });
         }
         var frameKey = isGuard ? "guard0.gif" : "hit0.gif";
         var impact = this.add.sprite(x, y - 10, "game_asset", frameKey);
@@ -2497,11 +2516,12 @@ export class PhaserGameScene extends Phaser.Scene {
         if (!this.anims.exists("akebono_bg_anim")) {
             this.anims.create({
                 key: "akebono_bg_anim",
-                frames: [
-                    { key: "game_ui", frame: "akebonoBg0.gif" },
-                    { key: "game_ui", frame: "akebonoBg1.gif" },
-                    { key: "game_ui", frame: "akebonoBg2.gif" },
-                ],
+                frames: this.anims.generateFrameNames("game_ui", {
+                    prefix: "akebonoBg",
+                    start: 0,
+                    end: 2,
+                    suffix: ".gif",
+                }),
                 // PIXI animationSpeed 0.7 at 120fps base ≈ 0.7 * 24 = ~17fps
                 frameRate: 17,
                 repeat: -1,
