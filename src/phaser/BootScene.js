@@ -4,6 +4,54 @@ import { globals } from "../globals.js";
 
 var EDITOR_PLAY_RECIPE_KEY = "__editorPhaserRecipe__";
 var EDITOR_PLAY_STAGE_KEY = "__editorPhaserStageId__";
+var FIREBASE_LEVELS_PATH = "levels";
+
+function readLevelParam() {
+    if (typeof window === "undefined") {
+        return null;
+    }
+    try {
+        var name = new URLSearchParams(window.location.search).get("level");
+        return name ? name.replace(/[.#$/\[\]]/g, "_").trim() : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function readStageParam() {
+    if (typeof window === "undefined") {
+        return null;
+    }
+    try {
+        return new URLSearchParams(window.location.search).get("stage");
+    } catch (e) {
+        return null;
+    }
+}
+
+function fetchFirebaseLevel(levelName) {
+    if (typeof firebase === "undefined" || !firebase.database) {
+        return Promise.reject(new Error("Firebase not available"));
+    }
+
+    var db;
+    if (firebase.apps && firebase.apps.length > 0) {
+        db = firebase.database();
+    } else if (window.firebaseConfig || window.__FIREBASE_CONFIG__) {
+        firebase.initializeApp(window.firebaseConfig || window.__FIREBASE_CONFIG__);
+        db = firebase.database();
+    } else {
+        return Promise.reject(new Error("No Firebase config"));
+    }
+
+    return db.ref(FIREBASE_LEVELS_PATH + "/" + levelName).once("value").then(function (snapshot) {
+        var data = snapshot.val();
+        if (!data || !data.enemylist) {
+            return Promise.reject(new Error("Level \"" + levelName + "\" not found"));
+        }
+        return data;
+    });
+}
 
 function parseStageId(value) {
     var stageId = Number(value);
@@ -159,6 +207,49 @@ export class BootScene extends Phaser.Scene {
     }
 
     create() {
+        var self = this;
+        var levelName = readLevelParam();
+
+        if (levelName) {
+            this._loadFirebaseLevel(levelName);
+            return;
+        }
+
+        this._finishBoot();
+    }
+
+    _loadFirebaseLevel(levelName) {
+        var self = this;
+        var game = this.game;
+        var stageParam = readStageParam();
+
+        fetchFirebaseLevel(levelName).then(function (data) {
+            var baseRecipe = self.cache.json.get("recipe") || {};
+            var stageKey = data.stageKey || "stage0";
+            baseRecipe[stageKey] = { enemylist: data.enemylist };
+
+            if (data.enemyData) {
+                baseRecipe.enemyData = data.enemyData;
+            }
+
+            gameState._phaserRecipe = baseRecipe;
+
+            var stageId = stageParam != null
+                ? parseStageId(stageParam)
+                : parseStageId(stageKey.replace("stage", ""));
+            primeGameStateForStage(baseRecipe, stageId);
+
+            setTimeout(function () {
+                game.scene.stop("BootScene");
+                game.scene.start("PhaserGameScene");
+            }, 50);
+        }).catch(function (err) {
+            console.warn("Firebase level load failed:", err);
+            self._finishBoot();
+        });
+    }
+
+    _finishBoot() {
         var editorPlay = readEditorPlayRequest();
         var recipe = editorPlay && editorPlay.recipe ? editorPlay.recipe : this.cache.json.get("recipe");
         if (recipe) {

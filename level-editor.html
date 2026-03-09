@@ -52,6 +52,10 @@
                             class="px-4 py-3 bg-sky-500 hover:bg-sky-600 text-black font-medium rounded-lg text-sm">
                         📥 Load from Firebase
                     </button>
+                    <button onclick="playFirebaseLevel()"
+                            class="px-4 py-3 bg-green-500 hover:bg-green-600 text-black font-medium rounded-lg text-sm">
+                        ▶ Play Level
+                    </button>
                 </div>
             </div>
         </div>
@@ -927,6 +931,21 @@
         function loadFromFirebasePrompt() {
             const name = prompt('Enter level name to load:');
             if (name) loadFromFirebase(name);
+        }
+
+        function playFirebaseLevel() {
+            let levelName = document.getElementById('firebase-level-name').value.trim();
+            if (!levelName) {
+                alert('Enter a Firebase level name first, or save/load a level.');
+                return;
+            }
+            levelName = sanitizeLevelName(levelName);
+            const stageId = getCurrentStageId();
+            const url = `phaser-game.html?level=${encodeURIComponent(levelName)}&stage=${stageId}`;
+            const popup = window.open(url, '_blank');
+            if (!popup) {
+                alert('Popup blocked. Allow popups for this page to launch the game.');
+            }
         }
 
         // ================== URL PARAM LEVEL LOADING ==================
