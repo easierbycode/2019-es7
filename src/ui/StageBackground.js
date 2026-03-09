@@ -80,10 +80,7 @@ export class StageBackground extends BaseCast {
             this.scrollCount += scrollAmount;
             this.bg.y += this.scrollAmount;
             this.bgEnd.y += this.scrollAmount;
-            if (this.scrollAmount >= 214) {
-                this.scrollAmount = 0;
-            }
-            if (this.bgEnd.y >= 42) {
+            if (this.scrollCount >= 214 || this.bgEnd.y >= 42) {
                 this.bossAppearFlg = false;
             }
         }
