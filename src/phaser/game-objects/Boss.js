@@ -5,6 +5,7 @@
 import { GAME_DIMENSIONS } from "../../constants.js";
 import { gameState } from "../../gameState.js";
 import { triggerHaptic } from "../../haptics.js";
+import { createShadow } from "./Shadow.js";
 import {
     bossPatternBison,
     bossPatternBarlog,
@@ -70,6 +71,12 @@ export function bossAdd(scene) {
     scene.bossSprite.setData("projData", scene.bossProjData);
     scene.bossSprite.setData("score", scene.bossScore);
     scene.bossSprite.setData("spgage", bossData.spgage || 5);
+
+    // Boss shadow
+    var bossShadowReverse = bossData.shadowReverse !== false;
+    var bossShadowOffsetY = bossData.shadowOffsetY || 10;
+    scene.bossShadow = createShadow(scene, scene.bossSprite, bossFrame, bossShadowReverse, bossShadowOffsetY);
+    scene.bossSprite.setData("shadow", scene.bossShadow);
 
     scene.enemies.push(scene.bossSprite);
 
@@ -296,6 +303,12 @@ export function checkBossDanger(scene) {
 export function bossDie(scene, boss) {
     if (scene.stageCleared) return;
 
+    // Destroy boss shadow
+    if (scene.bossShadow && scene.bossShadow.active) {
+        scene.bossShadow.destroy();
+        scene.bossShadow = null;
+    }
+
     scene.bossTimerStartFlg = false;
     scene.bossTimerLabel.setVisible(false);
     scene.bossTimerNum.container.setVisible(false);
@@ -309,7 +322,7 @@ export function bossDie(scene, boss) {
     scene.scoreCount += scene.bossScore * ratio;
 
     scene.showExplosion(boss.x, boss.y);
-    scene.showScorePopup(boss.x, boss.y, scene.bossScore * ratio);
+    scene.showScorePopup(boss.x, boss.y, scene.bossScore, ratio);
 
     var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
     var stageId = gameState.stageId || 0;
