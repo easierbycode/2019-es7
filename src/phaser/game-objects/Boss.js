@@ -6,6 +6,7 @@ import { GAME_DIMENSIONS } from "../../constants.js";
 import { gameState } from "../../gameState.js";
 import { triggerHaptic } from "../../haptics.js";
 import { createShadow, updateShadowPosition } from "./Shadow.js";
+import { showBossExplosion } from "../effects/Explosions.js";
 import {
     bossPatternBison,
     bossPatternBarlog,
@@ -375,8 +376,62 @@ export function bossDie(scene, boss) {
     var ratio = Math.max(1, Math.ceil(scene.comboCount / 10));
     scene.scoreCount += scene.bossScore * ratio;
 
-    scene.showExplosion(boss.x, boss.y);
     scene.showScorePopup(boss.x, boss.y, scene.bossScore, ratio);
+
+    // PIXI bossRemove: destroy all player bullets and clear list
+    for (var pb = scene.playerBullets.length - 1; pb >= 0; pb--) {
+        if (scene.playerBullets[pb] && scene.playerBullets[pb].active) {
+            scene.playerBullets[pb].destroy();
+        }
+    }
+    scene.playerBullets = [];
+
+    // PIXI boss.dead(): 5 staggered explosions at random positions within boss hitArea
+    // Uses slower 18fps animation matching PIXI animationSpeed=0.15
+    var startX = boss.x;
+    var startY = boss.y;
+    var bw = boss.width || 80;
+    var bh = boss.height || 80;
+    for (var ei = 0; ei < 5; ei++) {
+        (function (i) {
+            scene.time.delayedCall(250 * i, function () {
+                var ex = startX + Math.random() * bw - bw / 2;
+                var ey = startY + Math.random() * bh - bh / 2;
+                showBossExplosion(scene, ex, ey);
+                scene.playSound("se_explosion", 0.35);
+            });
+        })(ei);
+    }
+
+    // PIXI boss.dead(): shake animation (two cycles of position jitter)
+    var shakeOffsets = [
+        { x: 4, y: -2 }, { x: -3, y: 1 }, { x: 2, y: -1 },
+        { x: -2, y: 1 }, { x: 1, y: 1 }, { x: 0, y: 0 },
+        { x: 4, y: -2 }, { x: -3, y: 1 }, { x: 2, y: -1 },
+        { x: -2, y: 1 }, { x: 1, y: 1 }, { x: 0, y: 0 },
+    ];
+    var shakeDelays = [0, 80, 70, 50, 50, 40, 0, 80, 70, 50, 50, 40];
+    var cumDelay = 0;
+    for (var si = 0; si < shakeOffsets.length; si++) {
+        cumDelay += shakeDelays[si];
+        (function (off, delay) {
+            scene.time.delayedCall(delay, function () {
+                if (!boss || !boss.active) return;
+                boss.x = startX + off.x;
+                boss.y = startY + off.y;
+            });
+        })(shakeOffsets[si], cumDelay);
+    }
+    // PIXI boss.dead(): fade out unit after shake (1s fade with 0.5s delay)
+    scene.tweens.add({
+        targets: boss,
+        alpha: 0,
+        duration: 1000,
+        delay: cumDelay + 500,
+        onComplete: function () {
+            if (boss && boss.active) boss.destroy();
+        },
+    });
 
     var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
     var stageId = gameState.stageId || 0;
@@ -395,44 +450,6 @@ export function bossDie(scene, boss) {
 
     var idx = scene.enemies.indexOf(boss);
     if (idx >= 0) scene.enemies.splice(idx, 1);
-
-    if (scene.spFired) {
-        var startX = boss.x;
-        var startY = boss.y;
-        var bw = boss.width || 80;
-        var bh = boss.height || 80;
-        for (var ei = 0; ei < 5; ei++) {
-            (function (i) {
-                scene.time.delayedCall(250 * i, function () {
-                    if (!boss || !boss.active) return;
-                    var ex = startX + Math.random() * bw - bw / 2;
-                    var ey = startY + Math.random() * bh - bh / 2;
-                    scene.showExplosion(ex, ey);
-                    scene.playSound("se_explosion", 0.35);
-                });
-            })(ei);
-        }
-        var shakeOffsets = [
-            { x: 4, y: -2 }, { x: -3, y: 1 }, { x: 2, y: -1 },
-            { x: -2, y: 1 }, { x: 1, y: 1 }, { x: 0, y: 0 },
-            { x: 4, y: -2 }, { x: -3, y: 1 }, { x: 2, y: -1 },
-            { x: -2, y: 1 }, { x: 1, y: 1 }, { x: 0, y: 0 },
-        ];
-        var shakeDelays = [0, 80, 70, 50, 50, 40, 0, 80, 70, 50, 50, 40];
-        var cumDelay = 0;
-        for (var si = 0; si < shakeOffsets.length; si++) {
-            cumDelay += shakeDelays[si];
-            (function (off, delay) {
-                scene.time.delayedCall(delay, function () {
-                    if (!boss || !boss.active) return;
-                    boss.x = startX + off.x;
-                    boss.y = startY + off.y;
-                });
-            })(shakeOffsets[si], cumDelay);
-        }
-    } else {
-        boss.destroy();
-    }
 
     scene.bossSprite = null;
     scene.bossActive = false;

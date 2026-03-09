@@ -200,6 +200,7 @@ export function playerDie(scene) {
 
     scene.showExplosion(scene.playerSprite.x, scene.playerSprite.y);
     scene.playerSprite.setVisible(false);
+    if (scene.playerShadow) scene.playerShadow.setVisible(false);
 
     gameState.maxCombo = Math.max(gameState.maxCombo || 0, scene.maxCombo);
 

@@ -102,12 +102,38 @@ export function flashEnemyTint(scene, enemy) {
     if (!enemy || !enemy.active) return;
     var existing = enemy.getData("_tintTimer");
     if (existing) existing.remove(false);
-    enemy.setTint(0xFF0000);
-    var timer = scene.time.delayedCall(100, function () {
+    // PIXI: TweenMax.to tint:16711680, 0.1s, then delay 0.1 back to white
+    enemy.setTint(16711680);
+    var timer = scene.time.delayedCall(200, function () {
         if (enemy && enemy.active) {
             enemy.clearTint();
             enemy.setData("_tintTimer", null);
         }
     });
     enemy.setData("_tintTimer", timer);
+}
+
+// Boss death explosion (PIXI: animationSpeed=0.15 at 120fps ≈ 18fps, scale 1.0)
+export function showBossExplosion(scene, x, y) {
+    if (!scene.anims.exists("boss_explosion_anim")) {
+        scene.anims.create({
+            key: "boss_explosion_anim",
+            frames: scene.anims.generateFrameNames("game_asset", {
+                prefix: "explosion",
+                start: 0,
+                end: 6,
+                zeroPad: 2,
+                suffix: ".gif",
+            }),
+            frameRate: 18,
+            repeat: 0,
+        });
+    }
+    var ex = scene.add.sprite(x, y, "game_asset", "explosion00.gif");
+    ex.setOrigin(0.5);
+    ex.setDepth(60);
+    ex.play("boss_explosion_anim");
+    ex.once("animationcomplete", function () {
+        ex.destroy();
+    });
 }
