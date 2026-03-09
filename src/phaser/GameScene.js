@@ -258,7 +258,16 @@ export class PhaserGameScene extends Phaser.Scene {
             ),
             Phaser.Geom.Circle.Contains
         );
-        this.spBtnBarBg.input.cursor = "pointer";
+        this.spBtnBarBg.on("pointerover", function () {
+            if (this.game && this.game.canvas) {
+                this.game.canvas.style.cursor = "pointer";
+            }
+        }, this);
+        this.spBtnBarBg.on("pointerout", function () {
+            if (this.game && this.game.canvas) {
+                this.game.canvas.style.cursor = "default";
+            }
+        }, this);
         this.spBtnBarBg.on("pointerup", this.onSpFire, this);
         this.spBtn = this.spBtnWrap;
 
