@@ -1512,10 +1512,17 @@ export class PhaserGameScene extends Phaser.Scene {
                     }
                 }
 
+                // soliderB: don't shoot until horizontal movement starts (y >= GH/3),
+                // matching PIXI where off-screen straight-down bullets are harmless
+                var canShoot = true;
+                if (enemyName === "soliderB" && enemy.y < GH / 3) {
+                    canShoot = false;
+                }
+
                 var shootCnt = enemy.getData("shootCnt") + 1;
                 enemy.setData("shootCnt", shootCnt);
                 var shootInterval = enemy.getData("interval") || 300;
-                if (shootInterval > 0 && shootCnt >= shootInterval) {
+                if (canShoot && shootInterval > 0 && shootCnt >= shootInterval) {
                     enemy.setData("shootCnt", shootCnt - shootInterval);
                     // Only shoot when enemy is above the player (not from the side or past)
                     if (enemy.y < this.playerSprite.y - 20) {
@@ -1829,13 +1836,15 @@ export class PhaserGameScene extends Phaser.Scene {
         bullet.setData("spgage", projData.spgage || 0);
 
         // PIXI projectileAdd default: rotX=0, rotY=1 (straight down).
-        // soliderB aims at player; special projectile types (beam, smoke, etc.) also aim.
-        // All other regular enemies (soliderA, launchpad, etc.) shoot straight down.
+        // Special projectile types (beam, smoke, etc.) aim at player.
+        // soliderB: straight down on first loop; aims at player when secondLoop is active.
+        // All other regular enemies shoot straight down.
         var enemyName = String(enemy.getData("name") || "").toLowerCase();
         var projName = String((projData && projData.name) || "").toLowerCase();
+        var soldierBAiming = (enemyName === "soliderb" || enemyName === "soldierb") &&
+            gameState.secondLoop;
 
-        if (enemyName === "soliderb" || enemyName === "soldierb" ||
-            projName === "beam" || projName === "smoke" || projName === "meka" || projName === "psychofield") {
+        if (soldierBAiming || projName === "beam" || projName === "smoke" || projName === "meka" || projName === "psychofield") {
             // Aimed at player
             var dx = this.playerSprite.x - enemy.x;
             var dy = this.playerSprite.y - enemy.y;

@@ -87,6 +87,7 @@ export function syncRuntimeFlagsFromLocation(state = gameState) {
     }
 
     state.vibrateFlg = readBooleanSearchParam("vibrate", typeof state.vibrateFlg === "boolean" ? state.vibrateFlg : true);
+    state.secondLoop = readBooleanSearchParam("secondLoop", typeof state.secondLoop === "boolean" ? state.secondLoop : false);
 }
 
 syncRuntimeFlagsFromLocation(gameState);
