@@ -122,6 +122,7 @@ modular ES7 architecture under `src/`.
 - [ ] **Cordova config** (`config.xml`) — Mobile app packaging support.
 - [ ] **Bosses directory** (`src/bosses/`) — Boss classes given their own directory separate from `game-objects/`, with re-export shims in `game-objects/Boss*.js` for backwards compatibility.
 - [ ] **Barrel re-exports** (`src/app-formatted.js`, `src/game-objects/index.js`, `src/scenes/index.js`, `src/ui/index.js`, `src/bosses/index.js`) — Central import points for each module group.
+- [ ] **Phaser 4 port** (`src/phaser/`, ~163KB) — Parallel rendering target with its own `GameScene.js` (103KB). Separate from the PIXI extraction effort.
 
 ---
 
@@ -132,8 +133,10 @@ modular ES7 architecture under `src/`.
 | Game Objects | 13/14 | 1 (AnimatedEnemy) | — |
 | Scenes | 10/10 | 0 | — |
 | UI Components | 22/22 | 0 | — |
-| Infrastructure | 8/11 | 3 (SceneManager, Logger, instantiateGame) | 6 (Firebase, haptics, highScoreUi, Vite, PWA, Cordova) |
-| **Total extracted lines** | **~6,600** | **~9,124 in monolith** | **~800+ new** |
+| Infrastructure | 8/11 | 3 (SceneManager, Logger, instantiateGame) | 7 (Firebase, haptics, highScoreUi, Vite, PWA, Cordova, Phaser 4 port) |
+| **Total extracted lines** | **~6,600** | **~9,124 in monolith** | **~960+ new** |
 
-The monolith (`src/app-original.js`) is still loaded at runtime for bootstrapping.
-Once the 3 remaining infrastructure pieces are extracted, it can be fully removed.
+The monolith (`src/app-original.js`) is still loaded at runtime **only for bootstrapping**
+(~70 lines: the `Manager` class and `instantiateGame()`). All game logic classes inside
+it are dead code — every exported class has a fully standalone extracted replacement.
+Once the Manager/bootstrap is extracted, the entire 9,124-line file can be deleted.
