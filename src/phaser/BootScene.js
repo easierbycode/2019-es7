@@ -2,6 +2,76 @@ import { RESOURCE_PATHS, GAME_DIMENSIONS } from "../constants.js";
 import { gameState } from "../gameState.js";
 import { globals } from "../globals.js";
 
+var EDITOR_PLAY_RECIPE_KEY = "__editorPhaserRecipe__";
+var EDITOR_PLAY_STAGE_KEY = "__editorPhaserStageId__";
+
+function parseStageId(value) {
+    var stageId = Number(value);
+    if (!Number.isFinite(stageId)) {
+        return 0;
+    }
+
+    return Math.max(0, Math.min(4, Math.floor(stageId)));
+}
+
+function readEditorPlayRequest() {
+    if (typeof window === "undefined") {
+        return null;
+    }
+
+    var params;
+    try {
+        params = new URLSearchParams(window.location.search);
+    } catch (error) {
+        return null;
+    }
+
+    if (params.get("editorPlay") !== "1") {
+        return null;
+    }
+
+    var recipeText = null;
+    try {
+        recipeText = localStorage.getItem(EDITOR_PLAY_RECIPE_KEY);
+    } catch (error) {}
+
+    if (!recipeText) {
+        return null;
+    }
+
+    try {
+        return {
+            recipe: JSON.parse(recipeText),
+            stageId: parseStageId(
+                params.get("stage")
+                || localStorage.getItem(EDITOR_PLAY_STAGE_KEY)
+                || 0
+            ),
+        };
+    } catch (error) {
+        return null;
+    }
+}
+
+function primeGameStateForStage(recipe, stageId) {
+    if (recipe && recipe.playerData) {
+        gameState.spDamage = recipe.playerData.spDamage;
+        gameState.playerMaxHp = recipe.playerData.maxHp;
+        gameState.playerHp = recipe.playerData.maxHp;
+        gameState.shootMode = recipe.playerData.defaultShootName;
+        gameState.shootSpeed = recipe.playerData.defaultShootSpeed;
+    }
+
+    gameState.combo = 0;
+    gameState.maxCombo = 0;
+    gameState.score = 0;
+    gameState.spgage = 0;
+    gameState.stageId = parseStageId(stageId);
+    gameState.continueCnt = 0;
+    gameState.akebonoCnt = 0;
+    gameState.shortFlg = false;
+}
+
 export class BootScene extends Phaser.Scene {
     constructor() {
         super({ key: "BootScene" });
@@ -89,9 +159,16 @@ export class BootScene extends Phaser.Scene {
     }
 
     create() {
-        var recipe = this.cache.json.get("recipe");
+        var editorPlay = readEditorPlayRequest();
+        var recipe = editorPlay && editorPlay.recipe ? editorPlay.recipe : this.cache.json.get("recipe");
         if (recipe) {
             gameState._phaserRecipe = recipe;
+        }
+
+        var nextSceneKey = "PhaserTitleScene";
+        if (editorPlay && recipe) {
+            primeGameStateForStage(recipe, editorPlay.stageId);
+            nextSceneKey = "PhaserGameScene";
         }
 
         // Phaser 4 RC6: the scene-level plugin (this.scene.start) and
@@ -100,7 +177,7 @@ export class BootScene extends Phaser.Scene {
         var game = this.game;
         setTimeout(function () {
             game.scene.stop("BootScene");
-            game.scene.start("PhaserTitleScene");
+            game.scene.start(nextSceneKey);
         }, 50);
     }
 }

@@ -61,6 +61,8 @@
                         class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-sm">+ Add Wave</button>
                 <button onclick="deleteLastWave()" 
                         class="px-4 py-2 bg-zinc-800 hover:bg-red-900 rounded text-sm">− Delete Last Wave</button>
+                <button onclick="playCurrentStage()"
+                        class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-black rounded text-sm font-medium">▶ Play In Phaser</button>
                 <button onclick="exportCurrentLevelJSON()" 
                         class="ml-auto px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black rounded text-sm">Export Level JSON</button>
             </div>
@@ -136,6 +138,8 @@
         const GAME_JSON_NAME = "game.json";           // root or assets/
         const ATLAS_PNG = "game_asset.png";
         const ATLAS_JSON = "game_asset.json";
+        const EDITOR_PLAY_RECIPE_KEY = "__editorPhaserRecipe__";
+        const EDITOR_PLAY_STAGE_KEY = "__editorPhaserStageId__";
         
         // Frame name mapping for codes like "A0" → "soliderA0.gif"
         function getFrameNameForCode(code) {
@@ -156,6 +160,45 @@
         let frameThumbs = {};           // key → canvas (64x64 thumb)
         let extraSprites = [];          // {key, canvas, w, h} for new uploads
         let currentEnemyKey = null;
+
+        function createEmptyWave() {
+            return Array(8).fill("00");
+        }
+
+        function normalizeWave(wave) {
+            const normalized = createEmptyWave();
+            if (!Array.isArray(wave)) {
+                return normalized;
+            }
+
+            for (let i = 0; i < 8; i++) {
+                normalized[i] = typeof wave[i] === 'string' && wave[i] ? wave[i] : "00";
+            }
+
+            return normalized;
+        }
+
+        function normalizeGrid(grid) {
+            if (!Array.isArray(grid) || grid.length === 0) {
+                return Array(8).fill(null).map(() => createEmptyWave());
+            }
+
+            return grid.map(normalizeWave);
+        }
+
+        function getCurrentStageId() {
+            const match = String(currentStageKey).match(/^stage(\d+)$/);
+            if (!match) {
+                return 0;
+            }
+
+            const stageId = Number(match[1]);
+            if (!Number.isFinite(stageId)) {
+                return 0;
+            }
+
+            return Math.max(0, Math.min(4, Math.floor(stageId)));
+        }
 
         const tailwindScript = document.createElement('script');
         tailwindScript.src = 'https://cdn.tailwindcss.com';
@@ -277,39 +320,39 @@
         function loadCurrentStage() {
             currentStageKey = document.getElementById('stage-select').value;
             const stageObj = gameData[currentStageKey] || {};
-            currentGrid = stageObj.enemylist || [];
-            if (!Array.isArray(currentGrid) || currentGrid.length === 0) {
-                currentGrid = Array(8).fill().map(() => Array(8).fill("00")); // default 8 waves
-            }
+            currentGrid = normalizeGrid(stageObj.enemylist);
             renderGrid();
             renderPreview();
         }
 
         function renderGrid() {
             const thead = document.getElementById('grid-header');
-            thead.innerHTML = '<th class="px-2 py-1 bg-zinc-800 text-xs">#</th>';
-            for (let c = 0; c < 8; c++) {
+            currentGrid = normalizeGrid(currentGrid);
+
+            thead.innerHTML = '<th class="px-3 py-2 bg-zinc-800 text-xs text-left">Slot</th>';
+            currentGrid.forEach((wave, waveIdx) => {
                 const th = document.createElement('th');
                 th.className = 'px-2 py-1 bg-zinc-800 text-xs text-center';
-                th.textContent = c;
+                th.textContent = `W${waveIdx}`;
                 thead.appendChild(th);
-            }
+            });
 
             const tbody = document.getElementById('grid-body');
             tbody.innerHTML = '';
-            currentGrid.forEach((wave, r) => {
+            for (let slotIdx = 0; slotIdx < 8; slotIdx++) {
                 const tr = document.createElement('tr');
                 const rowNum = document.createElement('td');
                 rowNum.className = 'px-3 py-2 bg-zinc-800 text-xs text-right';
-                rowNum.textContent = r;
+                rowNum.textContent = slotIdx;
                 tr.appendChild(rowNum);
 
-                wave.forEach((code, c) => {
+                currentGrid.forEach((wave, waveIdx) => {
+                    const code = wave[slotIdx] || "00";
                     const td = document.createElement('td');
                     td.className = 'grid-cell';
-                    td.dataset.row = r;
-                    td.dataset.col = c;
-                    td.onclick = () => openPalette(r, c);
+                    td.dataset.wave = waveIdx;
+                    td.dataset.slot = slotIdx;
+                    td.onclick = () => openPalette(waveIdx, slotIdx);
 
                     const codeDiv = document.createElement('div');
                     codeDiv.className = 'text-[10px] font-mono';
@@ -327,7 +370,7 @@
                     tr.appendChild(td);
                 });
                 tbody.appendChild(tr);
-            });
+            }
         }
 
         function openPalette(row, col) {
@@ -387,8 +430,8 @@
         }
 
         function addWave() {
-            if (!currentGrid.length) currentGrid = [Array(8).fill("00")];
-            currentGrid.push(Array(8).fill("00"));
+            currentGrid = normalizeGrid(currentGrid);
+            currentGrid.push(createEmptyWave());
             renderGrid();
             renderPreview();
         }
@@ -402,6 +445,7 @@
         }
 
         function renderPreview() {
+            currentGrid = normalizeGrid(currentGrid);
             const canvas = document.getElementById('preview-canvas');
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = '#0a0a0a';
@@ -440,21 +484,51 @@
             document.getElementById('enemy-json').value = JSON.stringify(enemyData[key], null, 2);
         }
 
-        function saveCurrentEnemy() {
-            if (!currentEnemyKey) return;
-            try {
-                const newData = JSON.parse(document.getElementById('enemy-json').value);
-                const newKey = document.getElementById('enemy-key').value.trim();
-                if (newKey !== currentEnemyKey) {
-                    delete enemyData[currentEnemyKey];
-                }
-                enemyData[newKey] = newData;
-                gameData.enemyData = enemyData; // sync back
-                renderEnemyList();
-                alert('Enemy saved');
-            } catch (e) {
-                alert('Invalid JSON');
+        function syncEnemyEditorForm(showErrors = false) {
+            const keyInput = document.getElementById('enemy-key');
+            const jsonInput = document.getElementById('enemy-json');
+            const draftKey = keyInput.value.trim();
+            const draftJson = jsonInput.value.trim();
+
+            if (!draftKey && !draftJson && !currentEnemyKey) {
+                return true;
             }
+
+            if (!draftKey) {
+                if (showErrors) {
+                    switchTab(1);
+                    alert('Enemy key is required before saving or playing.');
+                }
+                return false;
+            }
+
+            let newData;
+            try {
+                newData = JSON.parse(draftJson || '{}');
+            } catch (e) {
+                if (showErrors) {
+                    switchTab(1);
+                    alert('Invalid enemy JSON');
+                }
+                return false;
+            }
+
+            if (currentEnemyKey && currentEnemyKey !== draftKey) {
+                delete enemyData[currentEnemyKey];
+            }
+
+            enemyData[draftKey] = newData;
+            gameData.enemyData = enemyData;
+            currentEnemyKey = draftKey;
+            renderEnemyList();
+            return true;
+        }
+
+        function saveCurrentEnemy() {
+            if (!syncEnemyEditorForm(true)) {
+                return;
+            }
+            alert('Enemy saved');
         }
 
         function renderAtlas() {
@@ -631,7 +705,7 @@
 
             // Update current stage
             gameData[currentStageKey] = gameData[currentStageKey] || {};
-            gameData[currentStageKey].enemylist = currentGrid;
+            gameData[currentStageKey].enemylist = normalizeGrid(currentGrid);
 
             // Write game.json
             try {
@@ -652,10 +726,45 @@
             }
         }
 
+        function buildRuntimeRecipe() {
+            const recipe = JSON.parse(JSON.stringify(gameData || {}));
+            recipe.enemyData = JSON.parse(JSON.stringify(enemyData || {}));
+            recipe[currentStageKey] = recipe[currentStageKey] || {};
+            recipe[currentStageKey].enemylist = normalizeGrid(currentGrid);
+            return recipe;
+        }
+
+        function playCurrentStage() {
+            if (!gameData) {
+                alert('Load directory first');
+                return;
+            }
+
+            if (!syncEnemyEditorForm(true)) {
+                return;
+            }
+
+            const stageId = getCurrentStageId();
+            const recipe = buildRuntimeRecipe();
+
+            try {
+                localStorage.setItem(EDITOR_PLAY_RECIPE_KEY, JSON.stringify(recipe));
+                localStorage.setItem(EDITOR_PLAY_STAGE_KEY, String(stageId));
+            } catch (e) {
+                alert('Unable to prepare editor play data: ' + e.message);
+                return;
+            }
+
+            const popup = window.open(`phaser-game.html?editorPlay=1&stage=${stageId}`, '_blank');
+            if (!popup) {
+                alert('Popup blocked. Allow popups for this page to launch Phaser.');
+            }
+        }
+
         function exportCurrentLevelJSON() {
             const levelData = {
                 name: currentStageKey,
-                enemylist: currentGrid,
+                enemylist: normalizeGrid(currentGrid),
                 width: 8,
                 exportedAt: new Date().toISOString()
             };

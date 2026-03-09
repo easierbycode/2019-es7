@@ -21,6 +21,19 @@ function clamp(v, lo, hi) {
     return v < lo ? lo : v > hi ? hi : v;
 }
 
+function pointerId(pointer) {
+    if (!pointer) {
+        return null;
+    }
+    if (pointer.id !== undefined && pointer.id !== null) {
+        return pointer.id;
+    }
+    if (pointer.pointerId !== undefined && pointer.pointerId !== null) {
+        return pointer.pointerId;
+    }
+    return null;
+}
+
 function rectOverlap(a, b) {
     return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
@@ -87,8 +100,11 @@ export class PhaserGameScene extends Phaser.Scene {
         this.enemyBullets = [];
         this.items = [];
         this.bulletIdCnt = 0;
+        this.isDragging = false;
+        this.dragPointerId = null;
 
         this.createPlayer();
+        this.createDragArea();
         this.createHUD();
         this.createCover();
 
@@ -107,11 +123,8 @@ export class PhaserGameScene extends Phaser.Scene {
 
         this.showTitle();
 
-        this.input.on("pointermove", this.onPointerMove, this);
-        this.input.on("pointerdown", this.onPointerDown, this);
-        this.input.on("pointerup", this.onPointerUp, this);
-
-        this.isDragging = false;
+        this.input.setTopOnly(true);
+        this.input.on("pointerup", this.onScreenDragEnd, this);
         this.shootTimer = 0;
         this.shootInterval = this.recipe.playerData.shootNormal.interval || 23;
         this.shootMode = gameState.shootMode || "normal";
@@ -160,6 +173,13 @@ export class PhaserGameScene extends Phaser.Scene {
         this.playerSprite = this.add.sprite(GCX, GH - 80, "game_asset", frameKey);
         this.playerSprite.setOrigin(0.5);
 
+        this.playerHitAreaHalfWidth = (this.playerSprite.width - 14) / 2;
+        if (!isFinite(this.playerHitAreaHalfWidth) || this.playerHitAreaHalfWidth <= 0) {
+            this.playerHitAreaHalfWidth = 16;
+        }
+        this.playerUnitX = this.playerSprite.x;
+        this.playerUnitY = this.playerSprite.y;
+
         this.playerHp = gameState.playerHp || pd.maxHp;
         this.playerMaxHp = gameState.playerMaxHp || pd.maxHp;
 
@@ -187,6 +207,15 @@ export class PhaserGameScene extends Phaser.Scene {
         this.barrierActive = false;
         this.barrierTimer = 0;
         this.barrierSprite = null;
+    }
+
+    createDragArea() {
+        this.dragArea = this.add.zone(0, 0, GW, GH);
+        this.dragArea.setOrigin(0, 0);
+        this.dragArea.setInteractive(new Phaser.Geom.Rectangle(0, 0, GW, GH), Phaser.Geom.Rectangle.Contains);
+        this.dragArea.on("pointerdown", this.onScreenDragStart, this);
+        this.dragArea.on("pointermove", this.onScreenDragMove, this);
+        this.dragArea.on("pointerup", this.onScreenDragEnd, this);
     }
 
     createHUD() {
@@ -383,21 +412,40 @@ export class PhaserGameScene extends Phaser.Scene {
         this.enemyWaveFlg = true;
         this.frameCnt = 0;
         this.waveCount = 0;
+        this.playerUnitX = this.playerSprite.x;
+        this.playerUnitY = this.playerSprite.y;
     }
 
-    onPointerDown(pointer) {
-        this.isDragging = true;
+    clampPlayerX(x) {
+        return clamp(x, this.playerHitAreaHalfWidth, GW - this.playerHitAreaHalfWidth);
     }
 
-    onPointerUp(pointer) {
-        this.isDragging = false;
-    }
-
-    onPointerMove(pointer) {
+    onScreenDragStart(pointer) {
         if (!this.gameStarted || this.playerDead || this.theWorldFlg) {
             return;
         }
-        this.playerSprite.x = clamp(pointer.x, 16, GW - 16);
+        this.playerUnitX = pointer.x;
+        this.isDragging = true;
+        this.dragPointerId = pointerId(pointer);
+    }
+
+    onScreenDragEnd(pointer) {
+        var activePointerId = pointerId(pointer);
+        if (this.dragPointerId !== null && activePointerId !== null && activePointerId !== this.dragPointerId) {
+            return;
+        }
+        this.isDragging = false;
+        this.dragPointerId = null;
+    }
+
+    onScreenDragMove(pointer) {
+        if (!this.isDragging || !this.gameStarted || this.playerDead || this.theWorldFlg) {
+            return;
+        }
+        if (this.dragPointerId !== null && pointerId(pointer) !== this.dragPointerId) {
+            return;
+        }
+        this.playerUnitX = this.clampPlayerX(pointer.x);
     }
 
     handleKeyboardInput() {
@@ -421,8 +469,9 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         if (moveX !== 0 || moveY !== 0) {
-            this.playerSprite.x = clamp(this.playerSprite.x + moveX, 16, GW - 16);
+            this.playerUnitX = this.clampPlayerX(this.playerUnitX + moveX);
             this.playerSprite.y = clamp(this.playerSprite.y + moveY, 50, GH - 20);
+            this.playerUnitY = this.playerSprite.y;
         }
 
         // Space bar triggers SP
@@ -1393,6 +1442,8 @@ export class PhaserGameScene extends Phaser.Scene {
 
         // Handle keyboard input every logical frame
         this.handleKeyboardInput();
+
+        this.playerSprite.x += 0.09 * (this.playerUnitX - this.playerSprite.x);
 
         if (this.theWorldFlg) {
             this.updateHUD();
