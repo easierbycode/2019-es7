@@ -262,6 +262,19 @@ export class BootScene extends Phaser.Scene {
             nextSceneKey = "PhaserGameScene";
         }
 
+        // DEBUG: skip to ending scene for testing
+        var debugScene = null;
+        try { debugScene = new URLSearchParams(window.location.search).get("scene"); } catch(e) {}
+        if (debugScene) {
+            if (recipe) {
+                gameState.score = 12345;
+                gameState.highScore = 10000;
+                gameState.maxCombo = 42;
+                gameState.continueCnt = 1;
+            }
+            nextSceneKey = debugScene;
+        }
+
         // Phaser 4 RC6: the scene-level plugin (this.scene.start) and
         // this.time.delayedCall do not work reliably from create().
         // Use the game-level scene manager via setTimeout instead.
