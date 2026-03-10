@@ -421,9 +421,12 @@ export class PhaserGameScene extends Phaser.Scene {
         this.gameStarted = false;
 
         gameState.score = this.scoreCount;
-        gameState.playerHp = this.playerHp;
+        gameState.playerHp = this.playerMaxHp;
+        gameState.playerMaxHp = this.playerMaxHp;
         gameState.spgage = this.spGauge;
         gameState.maxCombo = Math.max(gameState.maxCombo || 0, this.maxCombo);
+        gameState.shootMode = this.shootMode;
+        gameState.shootSpeed = this.shootSpeed;
 
         if (this.spFiredDuringBoss) {
             gameState.akebonoCnt = (gameState.akebonoCnt || 0) + 1;
