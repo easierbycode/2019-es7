@@ -124,34 +124,27 @@ export class PhaserEndingScene extends Phaser.Scene {
             color: "#ffffff",
         }).setOrigin(0.5);
 
-        // Staff roll button
-        var staffBtn = this.add.text(GCX - 50, GH - 50, "STAFF", {
-            fontFamily: "sans-serif",
-            fontSize: "14px",
-            fontStyle: "bold",
-            color: "#ffffff",
-            backgroundColor: "#444444",
-            padding: { x: 12, y: 6 },
-        });
-        staffBtn.setOrigin(0.5);
-        staffBtn.setInteractive({ useHandCursor: true });
-
         var self = this;
-        staffBtn.on("pointerup", function () {
-            self.showStaffRoll();
+
+        // Tweet button (sprite-based, matching PIXI TwitterButton)
+        this.twitterBtn = this.createFrameButton(GCX, GCY + 28, "twitterBtn");
+        this.twitterBtn.setOrigin(0.5);
+        this.twitterBtn.setScale(0);
+        this.twitterBtn.on("pointerup", function () {
+            self.tweet();
+        });
+        this.tweens.add({
+            targets: this.twitterBtn,
+            scaleX: 1,
+            scaleY: 1,
+            duration: 500,
+            delay: 800,
+            ease: "Back.easeOut",
         });
 
-        // Title button
-        var titleBtn = this.add.text(GCX + 50, GH - 50, "TITLE", {
-            fontFamily: "sans-serif",
-            fontSize: "14px",
-            fontStyle: "bold",
-            color: "#ffffff",
-            backgroundColor: "#333333",
-            padding: { x: 12, y: 6 },
-        });
+        // Title button (sprite-based, matching PIXI GotoTitleButton)
+        var titleBtn = this.createFrameButton(GCX, GH - 30, "gotoTitleBtn");
         titleBtn.setOrigin(0.5);
-        titleBtn.setInteractive({ useHandCursor: true });
 
         var game = this.game;
         titleBtn.on("pointerup", function () {
@@ -162,75 +155,50 @@ export class PhaserEndingScene extends Phaser.Scene {
             }, 50);
         });
 
-        this.staffRollContainer = null;
     }
 
-    showStaffRoll() {
-        if (this.staffRollContainer) return;
+    createFrameButton(x, y, framePrefix) {
+        var button = this.add.sprite(x, y, "game_ui", framePrefix + "0.gif");
+        button.setInteractive({ useHandCursor: true });
 
-        var self = this;
+        button.on("pointerover", function () {
+            button.setFrame(framePrefix + "1.gif");
+        });
+        button.on("pointerout", function () {
+            button.setFrame(framePrefix + "0.gif");
+        });
+        button.on("pointerdown", function () {
+            button.setFrame(framePrefix + "2.gif");
+        });
+        button.on("pointerup", function () {
+            button.setFrame(framePrefix + "1.gif");
+        });
 
-        this.staffRollContainer = this.add.container(0, 0);
-        this.staffRollContainer.setDepth(500);
+        return button;
+    }
 
-        var bg = this.add.rectangle(GCX, GCY, GW, GH, 0x000000, 0.92);
-        this.staffRollContainer.add(bg);
+    tweet() {
+        var score = Number(gameState.score || 0);
+        var highScore = Number(gameState.highScore || 0);
 
-        var staffG = this.add.sprite(GCX, 55, "game_ui", "staffrollG0.gif");
-        staffG.setOrigin(0.5);
-        this.staffRollContainer.add(staffG);
+        var url = "";
+        var hashtags = "";
+        var text = "";
 
+        if (LANG === "ja") {
+            url = encodeURIComponent("https://game.capcom.com/cfn/sfv/aprilfool/2019/?lang=ja");
+            hashtags = encodeURIComponent("シャド研,SFVAE,aprilfool,エイプリルフール");
+            text = encodeURIComponent("エイプリルフール 2019 世界大統領がSTGやってみた\n今回のSCORE:" + score + "\nHISCORE:" + highScore + "\n");
+        } else {
+            url = encodeURIComponent("https://game.capcom.com/cfn/sfv/aprilfool/2019/?lang=en");
+            hashtags = encodeURIComponent("ShadalooCRI, SFVAE, aprilfool");
+            text = encodeURIComponent("APRIL FOOL 2019 WORLD PRESIDENT CHALLENGES A STG\nSCORE:" + score + "\nBEST:" + highScore + "\n");
+        }
+
+        var tweetUrl = "https://twitter.com/intent/tweet?url=" + url + "&hashtags=" + hashtags + "&text=" + text;
         try {
-            if (!this.anims.exists("staffroll_waking")) {
-                this.anims.create({
-                    key: "staffroll_waking",
-                    frames: this.anims.generateFrameNames("game_ui", {
-                        prefix: "staffrollG",
-                        start: 0,
-                        end: 7,
-                        suffix: ".gif",
-                    }),
-                    frameRate: 8,
-                    repeat: -1,
-                });
-            }
-            staffG.play("staffroll_waking");
+            window.open(tweetUrl, "_blank");
         } catch (e) {}
-
-        try {
-            var namePanel = this.add.sprite(15, 90, "game_ui", "staffrollName.gif");
-            namePanel.setOrigin(0, 0);
-            this.staffRollContainer.add(namePanel);
-        } catch (e) {}
-
-        var closeText = this.add.text(GCX, GH - 30, "TAP TO CLOSE", {
-            fontFamily: "sans-serif",
-            fontSize: "12px",
-            fontStyle: "bold",
-            color: "#888888",
-        });
-        closeText.setOrigin(0.5);
-        this.staffRollContainer.add(closeText);
-
-        this.staffRollContainer.setAlpha(0);
-        this.tweens.add({
-            targets: this.staffRollContainer,
-            alpha: 1,
-            duration: 400,
-        });
-
-        bg.setInteractive();
-        bg.on("pointerup", function () {
-            self.tweens.add({
-                targets: self.staffRollContainer,
-                alpha: 0,
-                duration: 300,
-                onComplete: function () {
-                    self.staffRollContainer.destroy();
-                    self.staffRollContainer = null;
-                },
-            });
-        });
     }
 
     playSound(key, volume) {

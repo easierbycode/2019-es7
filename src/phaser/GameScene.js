@@ -583,6 +583,39 @@ export class PhaserGameScene extends Phaser.Scene {
             });
         });
 
+        // Impact flurry during cutin blackout (matches PIXI shungokusatsu)
+        if (this.bossActive && this.bossSprite && this.bossSprite.active) {
+            var bossX = this.bossSprite.x;
+            var bossY = this.bossSprite.y;
+            var bossW = this.bossSprite.width || 80;
+            var bossH = this.bossSprite.height || 80;
+            var spFlash = this.add.graphics();
+            spFlash.setDepth(163);
+            spFlash.fillStyle(0xffffff, 1);
+            spFlash.fillRect(0, 0, GW, GH);
+            spFlash.setAlpha(0);
+
+            for (var fi = 0; fi < 10; fi++) {
+                (function (idx) {
+                    self.time.delayedCall(400 + 50 * idx, function () {
+                        var ix = bossX + Math.random() * bossW - bossW / 2;
+                        var iy = bossY + Math.random() * (bossH / 2) - bossH / 4;
+                        _showHitImpact(self, ix, iy, false);
+                        self.playSound("se_damage", 0.3);
+                    });
+                    self.time.delayedCall(400 + 50 * idx + 10, function () {
+                        spFlash.setAlpha(0.2);
+                    });
+                    self.time.delayedCall(400 + 50 * idx + 70, function () {
+                        spFlash.setAlpha(0);
+                    });
+                })(fi);
+            }
+            this.time.delayedCall(1700, function () {
+                spFlash.destroy();
+            });
+        }
+
         // SP line
         var spLine = this.add.graphics();
         spLine.setDepth(150);
