@@ -169,19 +169,10 @@ export class PhaserEndingScene extends Phaser.Scene {
             }
         );
 
-        // --- Tweet button (starts at scale 0) ---
-        // PIXI: TwitterButton at (GCX, GCY+28)
-        this.tweetBtn = this.add.text(GCX, GCY + 28, "TWEET", {
-            fontFamily: "sans-serif",
-            fontSize: "12px",
-            fontStyle: "bold",
-            color: "#ffffff",
-            backgroundColor: "#1da1f2",
-            padding: { x: 14, y: 6 },
-        });
+        // --- Tweet button (sprite-based, matching PIXI TwitterButton) ---
+        this.tweetBtn = this.createFrameButton(GCX, GCY + 28, "twitterBtn");
         this.tweetBtn.setOrigin(0.5);
         this.tweetBtn.setScale(0);
-        this.tweetBtn.setInteractive({ useHandCursor: true });
         this.tweetBtn.on("pointerup", function () {
             openUrl(buildTweetUrl());
         });
@@ -215,21 +206,6 @@ export class PhaserEndingScene extends Phaser.Scene {
                 }, 50);
             });
         });
-
-        // --- Staff roll button (small, unobtrusive) ---
-        this.staffBtn = this.add.text(GW - 8, GH - 8, "STAFF", {
-            fontFamily: "sans-serif",
-            fontSize: "10px",
-            fontStyle: "bold",
-            color: "#666666",
-        });
-        this.staffBtn.setOrigin(1, 1);
-        this.staffBtn.setInteractive({ useHandCursor: true });
-        this.staffBtn.on("pointerup", function () {
-            self.showStaffRoll();
-        });
-
-        this.staffRollContainer = null;
 
         // ============================================================
         // Animation timeline (matches PIXI TimelineMax sequence)
@@ -344,6 +320,26 @@ export class PhaserEndingScene extends Phaser.Scene {
                 ease: "Elastic.easeOut",
             });
         });
+    }
+
+    createFrameButton(x, y, framePrefix) {
+        var button = this.add.sprite(x, y, "game_ui", framePrefix + "0.gif");
+        button.setInteractive({ useHandCursor: true });
+
+        button.on("pointerover", function () {
+            button.setFrame(framePrefix + "1.gif");
+        });
+        button.on("pointerout", function () {
+            button.setFrame(framePrefix + "0.gif");
+        });
+        button.on("pointerdown", function () {
+            button.setFrame(framePrefix + "2.gif");
+        });
+        button.on("pointerup", function () {
+            button.setFrame(framePrefix + "1.gif");
+        });
+
+        return button;
     }
 
     showStaffRoll() {
