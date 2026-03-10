@@ -30,7 +30,7 @@ export function bossPatternSagat(scene, seed) {
                 targets: boss, x: px, duration: 250,
                 onComplete: function () {
                     if (!scene._bossAlive()) return;
-                    scene.bossShootAimed(projA);
+                    scene.bossShootStraight(projA);
                     scene.time.delayedCall(250, sweepStep);
                 },
             });
@@ -47,7 +47,7 @@ export function bossPatternSagat(scene, seed) {
                     delay: 200, repeat: 6,
                     callback: function () {
                         if (!scene._bossAlive()) return;
-                        scene.bossShootAimed(projA);
+                        scene.bossShootStraight(projA);
                         shotCount++;
                         if (shotCount >= 7) {
                             scene.time.delayedCall(500, function () { scene.bossShootStart(); });
@@ -64,7 +64,7 @@ export function bossPatternSagat(scene, seed) {
                 if (!scene._bossAlive()) return;
                 scene.time.delayedCall(500, function () {
                     if (!scene._bossAlive()) return;
-                    scene.bossShootSpread(projB, 5, 20);
+                    scene.bossShootStraight(projB);
                     scene.time.delayedCall(800, function () { scene.bossShootStart(); });
                 });
             },
@@ -75,7 +75,7 @@ export function bossPatternSagat(scene, seed) {
             targets: boss, x: px5, y: baseY - 20, duration: 400,
             onComplete: function () {
                 if (!scene._bossAlive()) return;
-                scene.bossShootAimed(projA);
+                scene.bossShootStraight(projA);
                 scene.time.delayedCall(500, function () {
                     if (!scene._bossAlive()) return;
                     scene.tweens.add({

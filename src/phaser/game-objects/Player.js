@@ -35,6 +35,7 @@ export function createPlayer(scene) {
 
     scene.playerSprite = scene.add.sprite(GCX, GH - 80, "game_asset", frameKey);
     scene.playerSprite.setOrigin(0.5);
+    scene.playerSprite.setDepth(50);
 
     scene.playerHitAreaHalfWidth = (scene.playerSprite.width - 14) / 2;
     if (!isFinite(scene.playerHitAreaHalfWidth) || scene.playerHitAreaHalfWidth <= 0) {
