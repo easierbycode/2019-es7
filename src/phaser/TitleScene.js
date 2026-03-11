@@ -129,9 +129,9 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.howtoBtn.setOrigin(0, 0);
         this.howtoBtn.setScale(1, 0);
         this.howtoBtn.on("pointerup", function () {
-            try {
-                window.location.href = "level-editor.html";
-            } catch (e) {}
+            if (window.howtoModalOpen) {
+                window.howtoModalOpen();
+            }
         });
 
         this.staffrollBtn = this.createFrameButton(
