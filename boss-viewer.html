@@ -312,9 +312,12 @@
 
                 // Run pixel implosion intro
                 this.assemblePixels(firstFrame, function() {
+                    if (self.activeBoss !== bossId) return;
                     // Hold assembled pixels briefly, then explode and reveal sprite
                     setTimeout(function() {
+                        if (self.activeBoss !== bossId) return;
                         self.explodePixels(function() {
+                            if (self.activeBoss !== bossId) return;
                             // Show the actual sprite
                             var W = self.scale.width;
                             var H = self.scale.height;
