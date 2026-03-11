@@ -143,33 +143,42 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.staffrollBtn.setScale(1, 0);
         this.staffrollBtn.on("pointerup", this.showStaffroll, this);
 
-        // Secret two-touch gesture: top-right + bottom-left to launch level editor
-        this._secretTouches = {};
+        // Secret touch: top-right + bottom-left corners, or right-click
         this._secretActivated = false;
+        var _bottomLeftTouched = false;
+        var _topRightTouched = false;
         var W = GAME_DIMENSIONS.WIDTH;
         var H = GAME_DIMENSIONS.HEIGHT;
-        var ZONE_SIZE = 80;
 
-        this.secretZoneTR = this.add.zone(W - ZONE_SIZE / 2, ZONE_SIZE / 2, ZONE_SIZE, ZONE_SIZE);
-        this.secretZoneTR.setInteractive();
-        this.secretZoneTR.setDepth(999);
-        this.secretZoneTR.on("pointerdown", function (pointer) {
-            self._secretTouches.tr = pointer.id;
-            self.checkSecretGesture();
-        });
-        this.secretZoneTR.on("pointerup", function (pointer) {
-            if (self._secretTouches.tr === pointer.id) delete self._secretTouches.tr;
+        this.input.on("pointerdown", function (pointer) {
+            if (self._secretActivated || self.transitioning) return;
+
+            // Right-click anywhere triggers
+            if (pointer.rightButtonDown()) {
+                self._secretActivated = true;
+                self.launchLevelEditor();
+                return;
+            }
+
+            var touchX = pointer.x;
+            var touchY = pointer.y;
+
+            if (touchX < 50 && touchY > H - 50) {
+                _bottomLeftTouched = true;
+            }
+            if (touchX > W - 50 && touchY < 50) {
+                _topRightTouched = true;
+            }
+
+            if (_bottomLeftTouched && _topRightTouched) {
+                self._secretActivated = true;
+                self.launchLevelEditor();
+            }
         });
 
-        this.secretZoneBL = this.add.zone(ZONE_SIZE / 2, H - ZONE_SIZE / 2, ZONE_SIZE, ZONE_SIZE);
-        this.secretZoneBL.setInteractive();
-        this.secretZoneBL.setDepth(999);
-        this.secretZoneBL.on("pointerdown", function (pointer) {
-            self._secretTouches.bl = pointer.id;
-            self.checkSecretGesture();
-        });
-        this.secretZoneBL.on("pointerup", function (pointer) {
-            if (self._secretTouches.bl === pointer.id) delete self._secretTouches.bl;
+        this.input.on("pointerup", function () {
+            _bottomLeftTouched = false;
+            _topRightTouched = false;
         });
 
         this.playTitleVoice = false;
@@ -406,14 +415,6 @@ export class PhaserTitleScene extends Phaser.Scene {
         }, 50);
     }
 
-    checkSecretGesture() {
-        if (this._secretActivated || this.transitioning) return;
-        if (this._secretTouches.tr !== undefined && this._secretTouches.bl !== undefined) {
-            this._secretActivated = true;
-            this.launchLevelEditor();
-        }
-    }
-
     launchLevelEditor() {
         this.transitioning = true;
         var self = this;
@@ -424,8 +425,6 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.howtoBtn.disableInteractive();
         this.staffrollBtn.disableInteractive();
         this.tapZone.disableInteractive();
-        this.secretZoneTR.disableInteractive();
-        this.secretZoneBL.disableInteractive();
         this.tweens.killTweensOf(this.startText);
 
         // Cinematic red flash and screen shake sequence
