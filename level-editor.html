@@ -33,7 +33,7 @@
             width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
             font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0; transition: all 0.15s;
         }
-        .tb-pill.on { background: #f39c12; color: #000; }
+        .tb-pill.on { background: #d39438; color: #000; }
         .tb-pill.off { background: #333; color: #888; }
         .tb-pill.off:active { background: #555; }
         .tb-pill.add { background: #27ae60; color: #fff; font-size: 15px; }
@@ -154,17 +154,17 @@
         <!-- TOOLBAR -->
         <div id="toolbar">
             <!-- Enemy picker button -->
-            <button id="enemy-picker-btn" class="tb-btn" style="background:#2d1b4e" onclick="openPicker('enemy')">
+            <button id="enemy-picker-btn" class="tb-btn" style="background:#4d8bc4" onclick="openPicker('enemy')">
                 <span id="enemy-btn-img"></span>
                 <span id="enemy-btn-label" class="hidden-mobile">Enemy</span>
             </button>
             <!-- Item picker button -->
-            <button id="powerup-picker-btn" class="tb-btn" style="background:#4a2c17" onclick="openPicker('powerup')">
+            <button id="powerup-picker-btn" class="tb-btn" style="background:#5db872" onclick="openPicker('powerup')">
                 <span id="powerup-btn-img"></span>
                 <span id="powerup-btn-label" class="hidden-mobile">Item</span>
             </button>
             <!-- Delete -->
-            <button id="delete-mode-btn" class="tb-btn" style="background:#4a1717" onclick="setDeleteMode()">
+            <button id="delete-mode-btn" class="tb-btn" style="background:#821c35" onclick="setDeleteMode()">
                 <span style="font-size:16px">🗑</span>
             </button>
 
@@ -176,7 +176,7 @@
             <div class="tb-spacer"></div>
 
             <!-- Save -->
-            <button class="tb-btn" style="background:#1a4a1a" onclick="quickSave()">
+            <button class="tb-btn" style="background:#4f9e61" onclick="quickSave()">
                 <span style="font-size:14px">💾</span>
             </button>
             <!-- Menu -->
@@ -1082,6 +1082,47 @@
             window.open(`phaser-game.html?level=${encodeURIComponent(sanitizeLevelName(name))}&stage=${getCurrentStageId()}`, '_blank');
         }
 
+        // ================== AUTO-LOAD FROM SERVER ==================
+        async function autoLoadFromServer() {
+            try {
+                // Load game.json for enemy data + stage data
+                const gameResp = await fetch('assets/game.json');
+                if (gameResp.ok) {
+                    gameData = await gameResp.json();
+                    enemyData = gameData.enemyData || {};
+                    if (!enemyData || Object.keys(enemyData).length === 0) {
+                        for (let k in gameData) {
+                            if (k.includes('enemy') && typeof gameData[k] === 'object') enemyData[k] = gameData[k];
+                        }
+                    }
+                    populateStagePills();
+                    loadCurrentStage();
+                }
+            } catch (e) { console.warn('Auto-load game.json failed:', e); }
+
+            try {
+                // Load atlas JSON + PNG for sprite thumbnails
+                const [atlasResp, imgResp] = await Promise.all([
+                    fetch('assets/game_asset.json'),
+                    fetch('assets/img/game_asset.png')
+                ]);
+                if (atlasResp.ok && imgResp.ok) {
+                    atlasData = await atlasResp.json();
+                    const blob = await imgResp.blob();
+                    atlasImage = new Image();
+                    atlasImage.src = URL.createObjectURL(blob);
+                    await new Promise((resolve, reject) => {
+                        atlasImage.onload = resolve;
+                        atlasImage.onerror = reject;
+                    });
+                    buildFrameThumbs();
+                    renderGrid();
+                    renderPreview();
+                    updateToolUI();
+                }
+            } catch (e) { console.warn('Auto-load atlas failed:', e); }
+        }
+
         // ================== INIT ==================
         window.onload = () => {
             updateToolUI();
@@ -1092,6 +1133,8 @@
                 const tryLoad = () => { initFirebase(); loadFromFirebase(urlLevel); };
                 firebaseDb ? tryLoad() : setTimeout(tryLoad, 1000);
             }
+            // Auto-load atlas and game data from server
+            autoLoadFromServer();
         };
     </script>
 </body>
