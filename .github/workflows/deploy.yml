@@ -173,6 +173,7 @@ jobs:
           cp -r icons dist/ || true
           cp index.html dist/
           cp phaser-game.html dist/
+          cp level-editor.html dist/
           cp manifest.json dist/ || true
           cp favicon.ico dist/ || true
           cp app-original.js dist/ || true
