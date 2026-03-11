@@ -129,9 +129,9 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.howtoBtn.setOrigin(0, 0);
         this.howtoBtn.setScale(1, 0);
         this.howtoBtn.on("pointerup", function () {
-            if (typeof window !== "undefined" && typeof window.howtoModalOpen === "function") {
-                window.howtoModalOpen();
-            }
+            try {
+                window.location.href = "level-editor.html";
+            } catch (e) {}
         });
 
         this.staffrollBtn = this.createFrameButton(
@@ -142,44 +142,6 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.staffrollBtn.setOrigin(1, 0);
         this.staffrollBtn.setScale(1, 0);
         this.staffrollBtn.on("pointerup", this.showStaffroll, this);
-
-        // Secret touch: top-right + bottom-left corners, or right-click
-        this._secretActivated = false;
-        var _bottomLeftTouched = false;
-        var _topRightTouched = false;
-        var W = GAME_DIMENSIONS.WIDTH;
-        var H = GAME_DIMENSIONS.HEIGHT;
-
-        this.input.on("pointerdown", function (pointer) {
-            if (self._secretActivated || self.transitioning) return;
-
-            // Right-click anywhere triggers
-            if (pointer.rightButtonDown()) {
-                self._secretActivated = true;
-                self.launchLevelEditor();
-                return;
-            }
-
-            var touchX = pointer.x;
-            var touchY = pointer.y;
-
-            if (touchX < 50 && touchY > H - 50) {
-                _bottomLeftTouched = true;
-            }
-            if (touchX > W - 50 && touchY < 50) {
-                _topRightTouched = true;
-            }
-
-            if (_bottomLeftTouched && _topRightTouched) {
-                self._secretActivated = true;
-                self.launchLevelEditor();
-            }
-        });
-
-        this.input.on("pointerup", function () {
-            _bottomLeftTouched = false;
-            _topRightTouched = false;
-        });
 
         this.playTitleVoice = false;
         this.startIntroAnimation();
@@ -413,74 +375,6 @@ export class PhaserTitleScene extends Phaser.Scene {
             game.scene.stop("PhaserTitleScene");
             game.scene.start("PhaserAdvScene");
         }, 50);
-    }
-
-    launchLevelEditor() {
-        this.transitioning = true;
-        var self = this;
-
-        // Disable all interactive elements
-        this.startText.disableInteractive();
-        this.twitterBtn.disableInteractive();
-        this.howtoBtn.disableInteractive();
-        this.staffrollBtn.disableInteractive();
-        this.tapZone.disableInteractive();
-        this.tweens.killTweensOf(this.startText);
-
-        // Cinematic red flash and screen shake sequence
-        var flash = this.add.graphics();
-        flash.setDepth(1000);
-        flash.fillStyle(0xff0000, 1);
-        flash.fillRect(0, 0, GAME_DIMENSIONS.WIDTH, GAME_DIMENSIONS.HEIGHT);
-        flash.setAlpha(0);
-
-        // Triple red flash burst
-        this.tweens.add({
-            targets: flash,
-            alpha: 0.9,
-            duration: 60,
-            yoyo: true,
-            hold: 40,
-            onComplete: function () {
-                self.cameras.main.shake(200, 0.03);
-                self.tweens.add({
-                    targets: flash,
-                    alpha: 0.7,
-                    duration: 50,
-                    yoyo: true,
-                    hold: 30,
-                    onComplete: function () {
-                        self.cameras.main.shake(150, 0.02);
-                        self.tweens.add({
-                            targets: flash,
-                            alpha: 1,
-                            duration: 80,
-                            hold: 100,
-                            onComplete: function () {
-                                self.cameras.main.shake(300, 0.04);
-                                self.tweens.add({
-                                    targets: flash,
-                                    alpha: 0,
-                                    duration: 400,
-                                    ease: "Power2",
-                                    onComplete: function () {
-                                        flash.destroy();
-                                        // Navigate to level editor
-                                        try {
-                                            window.location.href = "level-editor.html";
-                                        } catch (e) {}
-                                    },
-                                });
-                            },
-                        });
-                    },
-                });
-            },
-        });
-
-        try {
-            this.playSound("se_decision", 0.75);
-        } catch (e) {}
     }
 
     update(time, delta) {
