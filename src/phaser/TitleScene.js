@@ -143,6 +143,35 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.staffrollBtn.setScale(1, 0);
         this.staffrollBtn.on("pointerup", this.showStaffroll, this);
 
+        // Secret two-touch gesture: top-right + bottom-left to launch level editor
+        this._secretTouches = {};
+        this._secretActivated = false;
+        var W = GAME_DIMENSIONS.WIDTH;
+        var H = GAME_DIMENSIONS.HEIGHT;
+        var ZONE_SIZE = 80;
+
+        this.secretZoneTR = this.add.zone(W - ZONE_SIZE / 2, ZONE_SIZE / 2, ZONE_SIZE, ZONE_SIZE);
+        this.secretZoneTR.setInteractive();
+        this.secretZoneTR.setDepth(999);
+        this.secretZoneTR.on("pointerdown", function (pointer) {
+            self._secretTouches.tr = pointer.id;
+            self.checkSecretGesture();
+        });
+        this.secretZoneTR.on("pointerup", function (pointer) {
+            if (self._secretTouches.tr === pointer.id) delete self._secretTouches.tr;
+        });
+
+        this.secretZoneBL = this.add.zone(ZONE_SIZE / 2, H - ZONE_SIZE / 2, ZONE_SIZE, ZONE_SIZE);
+        this.secretZoneBL.setInteractive();
+        this.secretZoneBL.setDepth(999);
+        this.secretZoneBL.on("pointerdown", function (pointer) {
+            self._secretTouches.bl = pointer.id;
+            self.checkSecretGesture();
+        });
+        this.secretZoneBL.on("pointerup", function (pointer) {
+            if (self._secretTouches.bl === pointer.id) delete self._secretTouches.bl;
+        });
+
         this.playTitleVoice = false;
         this.startIntroAnimation();
 
@@ -375,6 +404,84 @@ export class PhaserTitleScene extends Phaser.Scene {
             game.scene.stop("PhaserTitleScene");
             game.scene.start("PhaserAdvScene");
         }, 50);
+    }
+
+    checkSecretGesture() {
+        if (this._secretActivated || this.transitioning) return;
+        if (this._secretTouches.tr !== undefined && this._secretTouches.bl !== undefined) {
+            this._secretActivated = true;
+            this.launchLevelEditor();
+        }
+    }
+
+    launchLevelEditor() {
+        this.transitioning = true;
+        var self = this;
+
+        // Disable all interactive elements
+        this.startText.disableInteractive();
+        this.twitterBtn.disableInteractive();
+        this.howtoBtn.disableInteractive();
+        this.staffrollBtn.disableInteractive();
+        this.tapZone.disableInteractive();
+        this.secretZoneTR.disableInteractive();
+        this.secretZoneBL.disableInteractive();
+        this.tweens.killTweensOf(this.startText);
+
+        // Cinematic red flash and screen shake sequence
+        var flash = this.add.graphics();
+        flash.setDepth(1000);
+        flash.fillStyle(0xff0000, 1);
+        flash.fillRect(0, 0, GAME_DIMENSIONS.WIDTH, GAME_DIMENSIONS.HEIGHT);
+        flash.setAlpha(0);
+
+        // Triple red flash burst
+        this.tweens.add({
+            targets: flash,
+            alpha: 0.9,
+            duration: 60,
+            yoyo: true,
+            hold: 40,
+            onComplete: function () {
+                self.cameras.main.shake(200, 0.03);
+                self.tweens.add({
+                    targets: flash,
+                    alpha: 0.7,
+                    duration: 50,
+                    yoyo: true,
+                    hold: 30,
+                    onComplete: function () {
+                        self.cameras.main.shake(150, 0.02);
+                        self.tweens.add({
+                            targets: flash,
+                            alpha: 1,
+                            duration: 80,
+                            hold: 100,
+                            onComplete: function () {
+                                self.cameras.main.shake(300, 0.04);
+                                self.tweens.add({
+                                    targets: flash,
+                                    alpha: 0,
+                                    duration: 400,
+                                    ease: "Power2",
+                                    onComplete: function () {
+                                        flash.destroy();
+                                        // Navigate to level editor
+                                        try {
+                                            window.location.href = "level-editor.html";
+                                        } catch (e) {}
+                                    },
+                                });
+                            },
+                        });
+                    },
+                });
+            },
+        });
+
+        try {
+            this.playSound("se_decision", 0.75);
+        } catch (e) {}
     }
 
     update(time, delta) {
