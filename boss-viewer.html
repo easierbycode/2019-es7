@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Boss Viewer</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0a0a0a; color: #fff; font-family: system-ui, -apple-system, sans-serif; overflow: hidden; }
+        #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+
+        /* NAV */
+        #nav {
+            flex-shrink: 0; height: 44px; background: #111; border-bottom: 1px solid #2a2a2a;
+            display: flex; align-items: center; padding: 0 12px; gap: 12px;
+        }
+        #nav .nav-title { font-size: 14px; font-weight: 700; color: #e74c3c; letter-spacing: 1px; }
+        #nav .nav-link {
+            font-size: 12px; color: #888; text-decoration: none; padding: 4px 10px;
+            border-radius: 6px; transition: all 0.15s;
+        }
+        #nav .nav-link:hover { color: #fff; background: #222; }
+        .nav-spacer { flex: 1; }
+
+        /* BOSS BUTTONS */
+        #boss-bar {
+            flex-shrink: 0; height: 48px; background: #0f0f0f; border-bottom: 1px solid #1a1a1a;
+            display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px;
+            overflow-x: auto;
+        }
+        .boss-btn {
+            height: 34px; padding: 0 14px; border-radius: 6px; border: 2px solid transparent;
+            background: #1a1a1a; color: #aaa; font-size: 12px; font-weight: 700;
+            cursor: pointer; transition: all 0.15s; white-space: nowrap; text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .boss-btn:hover { background: #222; color: #fff; }
+        .boss-btn.active { border-color: #e74c3c; color: #fff; background: #2a1a1a; }
+
+        /* CANVAS AREA */
+        #viewer { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+
+        /* ANIM BUTTONS */
+        #anim-bar {
+            flex-shrink: 0; min-height: 48px; background: #0f0f0f; border-top: 1px solid #1a1a1a;
+            display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px;
+            flex-wrap: wrap;
+        }
+        .anim-btn {
+            height: 30px; padding: 0 12px; border-radius: 5px; border: 2px solid transparent;
+            background: #1a2a1a; color: #6c6; font-size: 11px; font-weight: 700;
+            cursor: pointer; transition: all 0.15s; text-transform: uppercase;
+        }
+        .anim-btn:hover { background: #2a3a2a; color: #8f8; }
+        .anim-btn.active { border-color: #4c4; color: #fff; background: #1a3a1a; }
+
+        /* INFO OVERLAY */
+        #boss-name {
+            position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+            font-size: 18px; font-weight: 700; color: #fff; text-shadow: 0 0 12px rgba(231,76,60,0.6);
+            pointer-events: none; opacity: 0; transition: opacity 0.3s;
+        }
+        #boss-name.visible { opacity: 1; }
+
+        #frame-info {
+            position: absolute; bottom: 8px; right: 12px;
+            font-size: 10px; color: #555; font-family: monospace; pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div id="nav">
+            <span class="nav-title">BOSS VIEWER</span>
+            <div class="nav-spacer"></div>
+            <a class="nav-link" href="boss-attack-viewer.html">Attack Viewer</a>
+            <a class="nav-link" href="level-editor.html">Level Editor</a>
+            <a class="nav-link" href="phaser-game.html">Play Game</a>
+        </div>
+        <div id="boss-bar"></div>
+        <div id="viewer">
+            <div id="boss-name"></div>
+            <div id="frame-info"></div>
+        </div>
+        <div id="anim-bar"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@4.0.0-rc.6/dist/phaser.min.js"></script>
+    <script>
+    (function() {
+        var BOSS_ORDER = ["boss0","boss1","boss2","boss3","boss4","bossExtra"];
+        var bossData = null;
+        var game = null;
+
+        // ===================== SCENE =====================
+        class BossViewerScene extends Phaser.Scene {
+            constructor() {
+                super({ key: "BossViewerScene" });
+                this.activeBoss = null;
+                this.activeSprite = null;
+                this.pixelImages = [];
+                this.particleContainer = null;
+                this.currentAnim = null;
+            }
+
+            preload() {
+                this.load.atlas("game_asset", "assets/img/game_asset.png", "assets/game_asset.json");
+                this.load.json("recipe", "assets/game.json");
+                this.load.image("pixel",
+                    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAC0lEQVQI12NgAAIABQABNjN9GQAAAABJRElEQkSuQmCC"
+                );
+            }
+
+            create() {
+                var recipe = this.cache.json.get("recipe");
+                bossData = recipe.bossData;
+
+                this.cameras.main.setBackgroundColor(0x0a0a0a);
+
+                // Build boss buttons
+                buildBossButtons();
+
+                // Select first boss
+                if (BOSS_ORDER.length > 0) {
+                    selectBoss(BOSS_ORDER[0]);
+                }
+            }
+
+            // ---- Pixel implosion effect ----
+            assemblePixels(frameKey, onDone) {
+                var self = this;
+                var W = this.scale.width;
+                var H = this.scale.height;
+
+                // Get frame data
+                var frame = this.textures.getFrame("game_asset", frameKey);
+                if (!frame) { if (onDone) onDone(); return; }
+
+                // Draw frame to temp canvas
+                var canvas = document.createElement("canvas");
+                canvas.width = frame.width;
+                canvas.height = frame.height;
+                var ctx = canvas.getContext("2d");
+                ctx.drawImage(
+                    frame.source.image,
+                    frame.cutX, frame.cutY, frame.width, frame.height,
+                    0, 0, frame.width, frame.height
+                );
+                var imageData = ctx.getImageData(0, 0, frame.width, frame.height);
+
+                // Clean previous particles
+                this.clearPixels();
+                this.particleContainer = this.add.container(W / 2, H / 2).setDepth(5);
+
+                var SAMPLE = 3;
+                var MAX = 1500;
+                var count = 0;
+                var done = 0;
+                var scale = 3;
+                var resolved = false;
+                var color = new Phaser.Display.Color();
+                var particles = [];
+
+                for (var y = 0; y < frame.height; y += SAMPLE) {
+                    for (var x = 0; x < frame.width; x += SAMPLE) {
+                        if (count >= MAX) break;
+                        var i = (y * frame.width + x) * 4;
+                        var a = imageData.data[i + 3];
+                        if (a > 127) {
+                            var offX = (x - frame.width / 2) * scale;
+                            var offY = (y - frame.height / 2) * scale;
+                            // Start from random positions
+                            var startX = Phaser.Math.Between(-W / 2, W / 2);
+                            var startY = Phaser.Math.Between(-H / 2, H / 2);
+                            var img = this.add.rectangle(startX, startY, SAMPLE, SAMPLE,
+                                Phaser.Display.Color.GetColor(imageData.data[i], imageData.data[i+1], imageData.data[i+2])
+                            ).setAlpha(0);
+                            this.particleContainer.add(img);
+                            particles.push({ img: img, fx: offX, fy: offY });
+                            count++;
+                        }
+                    }
+                    if (count >= MAX) break;
+                }
+
+                if (count === 0) { if (onDone) onDone(); return; }
+
+                this.pixelImages = particles;
+
+                // Animate: implode from random positions to form the character
+                var finish = function() {
+                    if (resolved) return;
+                    resolved = true;
+                    if (onDone) onDone();
+                };
+
+                for (var p = 0; p < particles.length; p++) {
+                    (function(part, idx) {
+                        var delay = Math.random() * 300;
+                        self.tweens.add({
+                            targets: part.img,
+                            x: part.fx,
+                            y: part.fy,
+                            alpha: 1,
+                            duration: 600 + Math.random() * 300,
+                            delay: delay,
+                            ease: "Cubic.easeOut",
+                            onComplete: function() {
+                                done++;
+                                if (done >= count) finish();
+                            }
+                        });
+                    })(particles[p], p);
+                }
+
+                // Time-based fallback (setTimeout avoids Phaser clock throttling)
+                setTimeout(finish, 2000);
+            }
+
+            // ---- Pixel explosion effect ----
+            explodePixels(onDone) {
+                var self = this;
+                var W = this.scale.width;
+                var H = this.scale.height;
+                if (!this.pixelImages || this.pixelImages.length === 0) {
+                    if (onDone) onDone();
+                    return;
+                }
+
+                var resolved = false;
+                function finish() {
+                    if (resolved) return;
+                    resolved = true;
+                    self.clearPixels();
+                    if (onDone) onDone();
+                }
+
+                var total = this.pixelImages.length;
+                var done = 0;
+
+                for (var p = 0; p < this.pixelImages.length; p++) {
+                    (function(part) {
+                        var angle = Math.random() * Math.PI * 2;
+                        var dist = W / 2 + Math.random() * 200;
+                        self.tweens.add({
+                            targets: part.img,
+                            x: Math.cos(angle) * dist,
+                            y: Math.sin(angle) * dist,
+                            alpha: 0,
+                            duration: 600 + Math.random() * 400,
+                            delay: Math.random() * 150,
+                            ease: "Cubic.easeIn",
+                            onComplete: function() {
+                                part.img.destroy();
+                                done++;
+                                if (done >= total) finish();
+                            }
+                        });
+                    })(this.pixelImages[p]);
+                }
+                this.pixelImages = [];
+
+                // Time-based fallback (setTimeout avoids Phaser clock throttling)
+                setTimeout(finish, 2000);
+            }
+
+            clearPixels() {
+                if (this.pixelImages) {
+                    for (var i = 0; i < this.pixelImages.length; i++) {
+                        if (this.pixelImages[i].img) {
+                            this.tweens.killTweensOf(this.pixelImages[i].img);
+                            this.pixelImages[i].img.destroy();
+                        }
+                    }
+                    this.pixelImages = [];
+                }
+                if (this.particleContainer) {
+                    this.particleContainer.destroy();
+                    this.particleContainer = null;
+                }
+            }
+
+            // ---- Boss selection ----
+            showBoss(bossId) {
+                var self = this;
+                var boss = bossData[bossId];
+                if (!boss) return;
+
+                var firstFrame = null;
+                if (boss.anim) {
+                    for (var k in boss.anim) {
+                        if (boss.anim[k] && boss.anim[k].length > 0) {
+                            firstFrame = boss.anim[k][0];
+                            break;
+                        }
+                    }
+                }
+                if (!firstFrame) return;
+
+                // Clean up previous
+                if (this.activeSprite) {
+                    this.activeSprite.destroy();
+                    this.activeSprite = null;
+                }
+                this.clearPixels();
+
+                this.activeBoss = bossId;
+                this.currentAnim = null;
+
+                // Create animations for this boss
+                this.ensureAnims(bossId);
+
+                // Run pixel implosion intro
+                this.assemblePixels(firstFrame, function() {
+                    // Hold assembled pixels briefly, then explode and reveal sprite
+                    setTimeout(function() {
+                        self.explodePixels(function() {
+                            // Show the actual sprite
+                            var W = self.scale.width;
+                            var H = self.scale.height;
+                            self.activeSprite = self.add.sprite(W / 2, H / 2, "game_asset", firstFrame);
+                            self.activeSprite.setScale(3);
+                            self.activeSprite.setDepth(10);
+
+                            // Play idle by default
+                            var animKey = bossId + "_idle";
+                            if (self.anims.exists(animKey)) {
+                                self.activeSprite.play(animKey);
+                                self.currentAnim = "idle";
+                                highlightAnimBtn("idle");
+                            }
+
+                            updateFrameInfo(self);
+                        });
+                    }, 800);
+                });
+            }
+
+            ensureAnims(bossId) {
+                var boss = bossData[bossId];
+                if (!boss || !boss.anim) return;
+
+                for (var animName in boss.anim) {
+                    var animKey = bossId + "_" + animName;
+                    if (this.anims.exists(animKey)) continue;
+
+                    var frames = boss.anim[animName];
+                    if (!frames || frames.length === 0) continue;
+
+                    // Validate frames exist in atlas
+                    var validFrames = [];
+                    for (var f = 0; f < frames.length; f++) {
+                        if (this.textures.get("game_asset").has(frames[f])) {
+                            validFrames.push({ key: "game_asset", frame: frames[f] });
+                        }
+                    }
+                    if (validFrames.length === 0) continue;
+
+                    try {
+                        this.anims.create({
+                            key: animKey,
+                            frames: validFrames,
+                            frameRate: 6,
+                            repeat: validFrames.length > 1 ? -1 : 0
+                        });
+                    } catch (e) {}
+                }
+            }
+
+            playAnim(animName) {
+                if (!this.activeSprite || !this.activeBoss) return;
+                var animKey = this.activeBoss + "_" + animName;
+                if (this.anims.exists(animKey)) {
+                    this.activeSprite.play(animKey);
+                    this.currentAnim = animName;
+                    updateFrameInfo(this);
+                }
+            }
+
+            update() {
+                updateFrameInfo(this);
+            }
+        }
+
+        // ===================== UI =====================
+        function buildBossButtons() {
+            var bar = document.getElementById("boss-bar");
+            bar.innerHTML = "";
+            for (var i = 0; i < BOSS_ORDER.length; i++) {
+                (function(id) {
+                    var boss = bossData[id];
+                    if (!boss) return;
+                    var btn = document.createElement("button");
+                    btn.className = "boss-btn";
+                    btn.textContent = boss.name;
+                    btn.dataset.id = id;
+                    btn.onclick = function() { selectBoss(id); };
+                    bar.appendChild(btn);
+                })(BOSS_ORDER[i]);
+            }
+        }
+
+        function buildAnimButtons(bossId) {
+            var bar = document.getElementById("anim-bar");
+            bar.innerHTML = "";
+            var boss = bossData[bossId];
+            if (!boss || !boss.anim) return;
+
+            for (var animName in boss.anim) {
+                (function(name) {
+                    var btn = document.createElement("button");
+                    btn.className = "anim-btn";
+                    btn.textContent = name;
+                    btn.dataset.anim = name;
+                    btn.onclick = function() {
+                        var scene = game.scene.getScene("BossViewerScene");
+                        if (scene) {
+                            scene.playAnim(name);
+                            highlightAnimBtn(name);
+                        }
+                    };
+                    bar.appendChild(btn);
+                })(animName);
+            }
+        }
+
+        function selectBoss(bossId) {
+            // Highlight boss button
+            var btns = document.querySelectorAll(".boss-btn");
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].classList.toggle("active", btns[i].dataset.id === bossId);
+            }
+
+            // Update boss name
+            var nameEl = document.getElementById("boss-name");
+            var boss = bossData[bossId];
+            if (boss) {
+                nameEl.textContent = boss.name.toUpperCase();
+                nameEl.classList.add("visible");
+            }
+
+            // Build anim buttons
+            buildAnimButtons(bossId);
+
+            // Tell scene to show boss
+            var scene = game.scene.getScene("BossViewerScene");
+            if (scene) {
+                scene.showBoss(bossId);
+            }
+        }
+
+        function highlightAnimBtn(animName) {
+            var btns = document.querySelectorAll(".anim-btn");
+            for (var i = 0; i < btns.length; i++) {
+                btns[i].classList.toggle("active", btns[i].dataset.anim === animName);
+            }
+        }
+
+        function updateFrameInfo(scene) {
+            var el = document.getElementById("frame-info");
+            if (!el || !scene.activeSprite || !scene.activeSprite.anims || !scene.activeSprite.anims.currentFrame) {
+                if (el) el.textContent = "";
+                return;
+            }
+            var cf = scene.activeSprite.anims.currentFrame;
+            var total = scene.activeSprite.anims.currentAnim ? scene.activeSprite.anims.currentAnim.frames.length : 0;
+            el.textContent = (cf.textureFrame || "") + " [" + (cf.index + 1) + "/" + total + "]";
+        }
+
+        // ===================== INIT =====================
+        var viewerEl = document.getElementById("viewer");
+
+        var config = {
+            type: Phaser.AUTO,
+            width: viewerEl.clientWidth,
+            height: viewerEl.clientHeight,
+            parent: "viewer",
+            backgroundColor: "#0a0a0a",
+            scale: {
+                mode: Phaser.Scale.RESIZE,
+                autoCenter: Phaser.Scale.CENTER_BOTH
+            },
+            scene: [BossViewerScene]
+        };
+
+        game = new Phaser.Game(config);
+
+        // Handle resize
+        window.addEventListener("resize", function() {
+            var scene = game.scene.getScene("BossViewerScene");
+            if (scene && scene.activeSprite) {
+                scene.activeSprite.setPosition(scene.scale.width / 2, scene.scale.height / 2);
+            }
+        });
+    })();
+    </script>
+</body>
+</html>

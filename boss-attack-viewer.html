@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boss Attack Viewer</title>
+<script src="https://cdn.jsdelivr.net/npm/phaser@v4.0.0-rc.6/dist/phaser.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+html, body { width:100%; height:100%; overflow:hidden; background:#111; font-family:'Courier New',monospace; color:#ccc; }
+#app { display:flex; flex-direction:column; height:100vh; }
+#nav { display:flex; align-items:center; padding:0 16px; height:44px; background:#1a1a1a; border-bottom:1px solid #333; flex-shrink:0; }
+#nav .title { color:#e44; font-weight:bold; font-size:15px; margin-right:auto; letter-spacing:1px; }
+#nav a { color:#999; text-decoration:none; font-size:13px; margin-left:20px; }
+#nav a:hover { color:#fff; }
+#boss-bar { display:flex; justify-content:center; gap:8px; padding:8px; background:#1a1a1a; border-bottom:1px solid #333; flex-shrink:0; flex-wrap:wrap; }
+#boss-bar button { background:#222; color:#aaa; border:1px solid #444; padding:6px 16px; font-family:inherit; font-size:13px; cursor:pointer; letter-spacing:1px; }
+#boss-bar button:hover { background:#333; color:#fff; }
+#boss-bar button.active { border-color:#e44; color:#fff; }
+#viewer { flex:1; position:relative; overflow:hidden; }
+#boss-name { position:absolute; top:8px; left:50%; transform:translateX(-50%); font-size:20px; font-weight:bold; color:#fff; letter-spacing:2px; z-index:10; pointer-events:none; text-shadow:0 0 10px rgba(0,0,0,0.8); }
+#pattern-info { position:absolute; top:8px; right:12px; font-size:11px; color:#888; z-index:10; pointer-events:none; text-align:right; }
+#bullet-count { position:absolute; bottom:4px; right:12px; font-size:11px; color:#666; z-index:10; pointer-events:none; }
+#pattern-bar { display:flex; justify-content:center; gap:6px; padding:8px; background:#1a1a1a; border-top:1px solid #333; flex-shrink:0; flex-wrap:wrap; }
+#pattern-bar button { background:#1a2a3a; color:#8ac; border:1px solid #345; padding:5px 12px; font-family:inherit; font-size:12px; cursor:pointer; }
+#pattern-bar button:hover { background:#2a3a4a; color:#fff; }
+#pattern-bar button.active { background:#2a4a6a; border-color:#6af; color:#fff; }
+#control-bar { display:flex; justify-content:center; gap:8px; padding:6px; background:#151515; border-top:1px solid #282828; flex-shrink:0; }
+#control-bar button { background:#252525; color:#999; border:1px solid #383838; padding:4px 14px; font-family:inherit; font-size:11px; cursor:pointer; letter-spacing:0.5px; }
+#control-bar button:hover { background:#353535; color:#fff; }
+#control-bar button.on { background:#2a3a2a; border-color:#4a4; color:#6c6; }
+</style>
+</head>
+<body>
+<div id="app">
+    <div id="nav">
+        <span class="title">BOSS ATTACK VIEWER</span>
+        <a href="boss-viewer.html">Boss Viewer</a>
+        <a href="level-editor.html">Level Editor</a>
+        <a href="phaser-game.html">Play Game</a>
+    </div>
+    <div id="boss-bar"></div>
+    <div id="viewer">
+        <div id="boss-name"></div>
+        <div id="pattern-info"></div>
+        <div id="bullet-count"></div>
+    </div>
+    <div id="pattern-bar"></div>
+    <div id="control-bar">
+        <button id="btnLoop">LOOP</button>
+        <button id="btnSpeed">SPEED 1x</button>
+        <button id="btnTrails" class="on">TRAILS</button>
+        <button id="btnReset">RESET</button>
+    </div>
+</div>
+<script>
+(function() {
+    "use strict";
+
+    // Game world constants (matching src/constants.js)
+    var GW = 256, GH = 480, GCX = 128;
+
+    var BOSS_ORDER = ["boss0","boss1","boss2","boss3","boss4","bossExtra"];
+    var BOSS_NAMES = { boss0:"BISON", boss1:"BARLOG", boss2:"SAGAT", boss3:"VEGA", boss4:"FANG", bossExtra:"GOKI" };
+
+    var bossData = null;
+    var scene = null;
+    var looping = false;
+    var speedIdx = 1;
+    var speeds = [0.5, 1, 2];
+    var showTrails = true;
+    var currentPattern = null;
+
+    function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+
+    // ---- Pattern definitions (ported from src/phaser/bosses/) ----
+
+    function patternBison(sc, seed) {
+        var boss = sc.bossSprite;
+        var baseY = 80, downY = GH - 60;
+        if (seed < 0.6) {
+            var targetX = clamp(Math.random() * GW, 30, GW - 30);
+            sc.tweens.add({ targets: boss, x: targetX, duration: 300, onComplete: function() {
+                if (!sc._bossAlive()) return;
+                sc.tweens.add({ targets: boss, y: baseY - 10, duration: 500, onComplete: function() {
+                    if (!sc._bossAlive()) return;
+                    sc.tweens.add({ targets: boss, y: downY, duration: 350, onComplete: function() {
+                        if (!sc._bossAlive()) return;
+                        sc.tweens.add({ targets: boss, y: baseY, duration: 200, onComplete: function() {
+                            sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                        }});
+                    }});
+                }});
+            }});
+        } else if (seed < 0.8) {
+            var steps = [{x:30,y:baseY-20,d:400},{x:GW-60,y:baseY,d:400},{x:30,y:baseY+30,d:400},{x:GW-60,y:baseY+60,d:400}];
+            var idx = 0;
+            var runStep = function() {
+                if (!sc._bossAlive() || idx >= steps.length) {
+                    if (!sc._bossAlive()) return;
+                    sc.tweens.add({ targets: boss, y: downY, duration: 300, onComplete: function() {
+                        if (!sc._bossAlive()) return;
+                        sc.tweens.add({ targets: boss, y: baseY, duration: 200, onComplete: function() {
+                            sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                        }});
+                    }});
+                    return;
+                }
+                var s = steps[idx++];
+                sc.tweens.add({ targets: boss, x: s.x, y: s.y, duration: s.d, onComplete: function() {
+                    sc.time.delayedCall(100, runStep);
+                }});
+            };
+            runStep();
+        } else {
+            var steps2 = [{x:GW-30,y:baseY-20,d:400},{x:60,y:baseY,d:400},{x:GW-30,y:baseY+30,d:400},{x:60,y:baseY+60,d:400}];
+            var idx2 = 0;
+            var runStep2 = function() {
+                if (!sc._bossAlive() || idx2 >= steps2.length) {
+                    if (!sc._bossAlive()) return;
+                    sc.tweens.add({ targets: boss, y: downY, duration: 300, onComplete: function() {
+                        if (!sc._bossAlive()) return;
+                        sc.tweens.add({ targets: boss, y: baseY, duration: 200, onComplete: function() {
+                            sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                        }});
+                    }});
+                    return;
+                }
+                var s = steps2[idx2++];
+                sc.tweens.add({ targets: boss, x: s.x, y: s.y, duration: s.d, onComplete: function() {
+                    sc.time.delayedCall(100, runStep2);
+                }});
+            };
+            runStep2();
+        }
+    }
+
+    function patternBarlog(sc, seed) {
+        var boss = sc.bossSprite;
+        var baseY = 80, diveY = GH - 40;
+        if (seed < 0.3) {
+            var rx = clamp(Math.random() * GW, 30, GW - 30);
+            var ry = clamp(60 + Math.random() * 120, 60, 200);
+            sc.tweens.add({ targets: boss, x: rx, y: ry, duration: 600, onComplete: function() {
+                if (!sc._bossAlive()) return;
+                sc.bossShootStraight(sc.bossProjData);
+                sc.time.delayedCall(600, function() { sc.bossShootStart(); });
+            }});
+        } else if (seed < 0.8) {
+            var px = clamp(sc.playerSprite.x, 30, GW - 30);
+            sc.tweens.add({ targets: boss, x: px, duration: 300, onComplete: function() {
+                if (!sc._bossAlive()) return;
+                sc.time.delayedCall(400, function() {
+                    if (!sc._bossAlive()) return;
+                    sc.bossShootStraight(sc.bossProjData);
+                    sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                });
+            }});
+        } else {
+            var px2 = clamp(sc.playerSprite.x, 30, GW - 30);
+            sc.tweens.add({ targets: boss, x: px2, duration: 500, onComplete: function() {
+                if (!sc._bossAlive()) return;
+                sc.bossShootStraight(sc.bossProjData);
+                sc.tweens.add({ targets: boss, y: baseY - 70, duration: 300, onComplete: function() {
+                    if (!sc._bossAlive()) return;
+                    sc.tweens.add({ targets: boss, y: diveY, duration: 600, onComplete: function() {
+                        if (!sc._bossAlive()) return;
+                        sc.tweens.add({ targets: boss, y: baseY, duration: 200, onComplete: function() {
+                            sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                        }});
+                    }});
+                }});
+            }});
+        }
+    }
+
+    function patternSagat(sc, seed) {
+        var boss = sc.bossSprite;
+        var baseY = 80, diveY = GH - 40;
+        var projA = sc.bossProjDataA || sc.bossProjData;
+        var projB = sc.bossProjDataB || sc.bossProjData;
+        if (seed < 0.3) {
+            var positions = [-20, 10, 50, 100, 150, 200];
+            var pi = 0;
+            var sweepStep = function() {
+                if (!sc._bossAlive() || pi >= positions.length) {
+                    if (sc._bossAlive()) sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                    return;
+                }
+                var px = clamp(positions[pi], 20, GW - 20); pi++;
+                sc.tweens.add({ targets: boss, x: px, duration: 250, onComplete: function() {
+                    if (!sc._bossAlive()) return;
+                    sc.bossShootStraight(projA);
+                    sc.time.delayedCall(250, sweepStep);
+                }});
+            };
+            sweepStep();
+        } else if (seed < 0.6) {
+            var px3 = clamp(Math.random() * GW, 30, GW - 30);
+            sc.tweens.add({ targets: boss, x: px3, duration: 250, onComplete: function() {
+                if (!sc._bossAlive()) return;
+                var shotCount = 0;
+                sc.time.addEvent({ delay: 200, repeat: 6, callback: function() {
+                    if (!sc._bossAlive()) return;
+                    sc.bossShootStraight(projA);
+                    shotCount++;
+                    if (shotCount >= 7) sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                }});
+            }});
+        } else if (seed < 0.8) {
+            var px4 = clamp(Math.random() * GW, 30, GW - 30);
+            sc.tweens.add({ targets: boss, x: px4, duration: 250, onComplete: function() {
+                if (!sc._bossAlive()) return;
+                sc.time.delayedCall(500, function() {
+                    if (!sc._bossAlive()) return;
+                    sc.bossShootStraight(projB);
+                    sc.time.delayedCall(800, function() { sc.bossShootStart(); });
+                });
+            }});
+        } else {
+            var px5 = clamp(sc.playerSprite.x, 30, GW - 30);
+            sc.tweens.add({ targets: boss, x: px5, y: baseY - 20, duration: 400, onComplete: function() {
+                if (!sc._bossAlive()) return;
+                sc.bossShootStraight(projA);
+                sc.time.delayedCall(500, function() {
+                    if (!sc._bossAlive()) return;
+                    sc.tweens.add({ targets: boss, y: diveY, duration: 300, onComplete: function() {
+                        if (!sc._bossAlive()) return;
+                        sc.tweens.add({ targets: boss, y: baseY, duration: 200, onComplete: function() {
+                            sc.time.delayedCall(400, function() { sc.bossShootStart(); });
+                        }});
+                    }});
+                });
+            }});
+        }
+    }
+
+    function patternVega(sc, seed) {
+        var boss = sc.bossSprite;
+        var baseY = 80, diveY = GH - 20;
+        var projA = sc.bossProjDataA || sc.bossProjData;
+        var projB = sc.bossProjDataB || sc.bossProjData;
+        if (seed < 0.1) {
+            var warpPositions = [30, GW - 30, clamp(Math.random() * GW, 30, GW - 30)];
+            var wi = 0;
+            var warpStep = function() {
+                if (!sc._bossAlive() || wi >= warpPositions.length) {
+                    if (sc._bossAlive()) sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                    return;
+                }
+                sc.tweens.add({ targets: boss, alpha: 0, duration: 100, onComplete: function() {
+                    if (!sc._bossAlive()) return;
+                    boss.x = warpPositions[wi++];
+                    sc.tweens.add({ targets: boss, alpha: 1, duration: 100, onComplete: function() {
+                        sc.time.delayedCall(200, warpStep);
+                    }});
+                }});
+            };
+            warpStep();
+        } else if (seed < 0.4) {
+            var shotPositions = [30, GW - 60, 50, GCX, GW - 40, 60, GCX];
+            var si = 0;
+            var psychoStep = function() {
+                if (!sc._bossAlive() || si >= shotPositions.length) {
+                    if (sc._bossAlive()) sc.time.delayedCall(800, function() { sc.bossShootStart(); });
+                    return;
+                }
+                sc.tweens.add({ targets: boss, alpha: 0, duration: 100, onComplete: function() {
+                    if (!sc._bossAlive()) return;
+                    boss.x = shotPositions[si++];
+                    sc.tweens.add({ targets: boss, alpha: 1, duration: 100, onComplete: function() {
+                        if (!sc._bossAlive()) return;
+                        sc.bossShootAimed(projA);
+                        sc.time.delayedCall(300, psychoStep);
+                    }});
+                }});
+            };
+            psychoStep();
+        } else if (seed < 0.7) {
+            sc.tweens.add({ targets: boss, x: GCX, y: baseY + 10, duration: 300, onComplete: function() {
+                if (!sc._bossAlive()) return;
+                var fieldCount = 0;
+                sc.time.addEvent({ delay: 300, repeat: 4, callback: function() {
+                    if (!sc._bossAlive()) return;
+                    sc.bossShootRadial(projB, 12);
+                    fieldCount++;
+                    if (fieldCount >= 5) sc.time.delayedCall(800, function() { sc.bossShootStart(); });
+                }});
+            }});
+        } else {
+            var px6 = clamp(sc.playerSprite.x, 30, GW - 30);
+            sc.tweens.add({ targets: boss, alpha: 0, duration: 100, onComplete: function() {
+                if (!sc._bossAlive()) return;
+                boss.x = px6;
+                sc.tweens.add({ targets: boss, alpha: 1, y: baseY - 20, duration: 200, onComplete: function() {
+                    if (!sc._bossAlive()) return;
+                    sc.bossShootSpread(projA, 3, 30);
+                    sc.tweens.add({ targets: boss, y: diveY, duration: 900, onComplete: function() {
+                        if (!sc._bossAlive()) return;
+                        boss.x = GCX; boss.y = -50;
+                        sc.tweens.add({ targets: boss, y: baseY, duration: 1000, onComplete: function() {
+                            sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                        }});
+                    }});
+                }});
+            }});
+        }
+    }
+
+    function patternFang(sc, seed) {
+        var boss = sc.bossSprite;
+        var projA = sc.bossProjDataA || sc.bossProjData;
+        var projB = sc.bossProjDataB || sc.bossProjData;
+        var projC = sc.bossProjDataC || sc.bossProjData;
+        if (seed < 0.3) {
+            var volleys = 0;
+            var beamStep = function() {
+                if (!sc._bossAlive() || volleys >= 3) {
+                    if (sc._bossAlive()) sc.time.delayedCall(1000, function() { sc.bossShootStart(); });
+                    return;
+                }
+                volleys++;
+                sc.bossShootSpread(projA, 3, 25);
+                sc.time.delayedCall(500, beamStep);
+            };
+            sc.time.delayedCall(300, beamStep);
+        } else if (seed < 0.7) {
+            sc.bossShootRadial(projC || projA, 8);
+            sc.time.delayedCall(1500, function() { sc.bossShootStart(); });
+        } else {
+            var smokeCount = 0, smokeTotal = 12;
+            sc.time.addEvent({ delay: 300, repeat: smokeTotal - 1, callback: function() {
+                if (!sc._bossAlive()) return;
+                boss.x = clamp(boss.x + (Math.random() - 0.5) * 20, 30, GW - 30);
+                sc.bossShootAimed(projB || projA);
+                smokeCount++;
+                if (smokeCount >= smokeTotal) sc.time.delayedCall(1000, function() { sc.bossShootStart(); });
+            }});
+        }
+    }
+
+    function patternGoki(sc, seed) {
+        var boss = sc.bossSprite;
+        var projA = sc.bossProjDataA || sc.bossProjData;
+        var projB = sc.bossProjDataB || sc.bossProjData;
+        if (seed < 0.35) {
+            var px = clamp(sc.playerSprite.x, 30, GW - 30);
+            sc.tweens.add({ targets: boss, x: px, duration: 400, onComplete: function() {
+                if (!sc._bossAlive()) return;
+                var volleys = 0;
+                var shootStep = function() {
+                    if (!sc._bossAlive() || volleys >= 6) {
+                        if (sc._bossAlive()) sc.time.delayedCall(300, function() { sc.bossShootStart(); });
+                        return;
+                    }
+                    sc.bossShootStraight(projA);
+                    volleys++;
+                    sc.time.delayedCall(320, shootStep);
+                };
+                shootStep();
+            }});
+        } else if (seed < 0.65) {
+            var px2 = clamp(sc.playerSprite.x, 30, GW - 30);
+            sc.tweens.add({ targets: boss, x: px2, duration: 400, onComplete: function() {
+                if (!sc._bossAlive()) return;
+                sc.time.delayedCall(400, function() {
+                    if (!sc._bossAlive()) return;
+                    sc.bossShootStraight(projB);
+                    sc.time.delayedCall(800, function() { sc.bossShootStart(); });
+                });
+            }});
+        } else if (seed < 0.9) {
+            sc.tweens.add({ targets: boss, y: GH - 20, duration: 1200, onComplete: function() {
+                if (!sc._bossAlive()) return;
+                var nx = Math.random() * (GW - 60) + 30;
+                boss.x = nx; boss.y = -50;
+                sc.tweens.add({ targets: boss, y: GH / 4, duration: 700, onComplete: function() {
+                    sc.time.delayedCall(300, function() { sc.bossShootStart(); });
+                }});
+            }});
+        } else {
+            var nx2 = Math.random() * (GW - 60) + 30;
+            var ny = Math.random() > 0.5 ? 60 : GH / 4;
+            sc.tweens.add({ targets: boss, x: nx2, y: ny, duration: 700, onComplete: function() {
+                sc.time.delayedCall(300, function() { sc.bossShootStart(); });
+            }});
+        }
+    }
+
+    // Pattern catalog per boss
+    var PATTERNS = {
+        boss0: [
+            { name: "Dive", seed: 0.3, fn: patternBison },
+            { name: "Step Sweep L", seed: 0.7, fn: patternBison },
+            { name: "Step Sweep R", seed: 0.9, fn: patternBison }
+        ],
+        boss1: [
+            { name: "Random Shot", seed: 0.15, fn: patternBarlog },
+            { name: "Track & Shoot", seed: 0.55, fn: patternBarlog },
+            { name: "Shoot + Dive", seed: 0.9, fn: patternBarlog }
+        ],
+        boss2: [
+            { name: "Sweep Fire", seed: 0.15, fn: patternSagat },
+            { name: "Rapid Fire", seed: 0.45, fn: patternSagat },
+            { name: "Power Shot", seed: 0.7, fn: patternSagat },
+            { name: "Aimed Dive", seed: 0.9, fn: patternSagat }
+        ],
+        boss3: [
+            { name: "Teleport", seed: 0.05, fn: patternVega },
+            { name: "Psycho Crusher", seed: 0.25, fn: patternVega },
+            { name: "Radial Field", seed: 0.55, fn: patternVega },
+            { name: "Spread + Dive", seed: 0.85, fn: patternVega }
+        ],
+        boss4: [
+            { name: "Beam Spread", seed: 0.15, fn: patternFang },
+            { name: "Radial Burst", seed: 0.5, fn: patternFang },
+            { name: "Aimed Smoke", seed: 0.85, fn: patternFang }
+        ],
+        bossExtra: [
+            { name: "Rapid Aimed", seed: 0.17, fn: patternGoki },
+            { name: "Big Shot", seed: 0.5, fn: patternGoki },
+            { name: "Ashura Dive", seed: 0.77, fn: patternGoki },
+            { name: "Ashura Warp", seed: 0.95, fn: patternGoki }
+        ]
+    };
+
+    // ---- Scene ----
+
+    class BossAttackViewerScene extends Phaser.Scene {
+        constructor() {
+            super("BossAttackViewerScene");
+            this.activeBoss = null;
+            this.bossSprite = null;
+            this.playerSprite = null;
+            this.enemyBullets = [];
+            this.trailGfx = null;
+            this.worldContainer = null;
+            this.boundaryGfx = null;
+            this.bossProjData = null;
+            this.bossProjDataA = null;
+            this.bossProjDataB = null;
+            this.bossProjDataC = null;
+            this._timeEvents = [];
+        }
+
+        preload() {
+            this.load.atlas("game_asset", "assets/img/game_asset.png", "assets/game_asset.json");
+            this.load.json("recipe", "assets/game.json");
+        }
+
+        create() {
+            var recipe = this.cache.json.get("recipe");
+            bossData = recipe.bossData;
+            scene = this;
+
+            // Build world container
+            this.worldContainer = this.add.container(0, 0);
+
+            // Game area background
+            this.boundaryGfx = this.add.graphics();
+            this.worldContainer.add(this.boundaryGfx);
+
+            // Trail layer
+            this.trailGfx = this.add.graphics();
+            this.worldContainer.add(this.trailGfx);
+
+            // Player marker (crosshair)
+            this.playerMarkerGfx = this.add.graphics();
+            this.playerMarkerGfx.lineStyle(1, 0x44ff44, 0.8);
+            this.playerMarkerGfx.strokeCircle(0, 0, 8);
+            this.playerMarkerGfx.moveTo(-12, 0); this.playerMarkerGfx.lineTo(12, 0);
+            this.playerMarkerGfx.moveTo(0, -12); this.playerMarkerGfx.lineTo(0, 12);
+            this.playerMarkerGfx.stroke();
+            this.playerMarkerGfx.setPosition(GCX, 400);
+            this.worldContainer.add(this.playerMarkerGfx);
+
+            // Dummy playerSprite for pattern functions
+            this.playerSprite = { x: GCX, y: 400 };
+
+            // Make player draggable via pointer on the scene
+            this._draggingPlayer = false;
+            this.input.on("pointerdown", function(pointer) {
+                var wp = scene.screenToWorld(pointer.x, pointer.y);
+                var dx = wp.x - scene.playerSprite.x;
+                var dy = wp.y - scene.playerSprite.y;
+                if (Math.sqrt(dx*dx + dy*dy) < 20) {
+                    scene._draggingPlayer = true;
+                }
+            });
+            this.input.on("pointermove", function(pointer) {
+                if (!scene._draggingPlayer) return;
+                var wp = scene.screenToWorld(pointer.x, pointer.y);
+                scene.playerSprite.x = clamp(wp.x, 10, GW - 10);
+                scene.playerSprite.y = clamp(wp.y, 10, GH - 10);
+                scene.playerMarkerGfx.setPosition(scene.playerSprite.x, scene.playerSprite.y);
+            });
+            this.input.on("pointerup", function() { scene._draggingPlayer = false; });
+
+            this.rescaleWorld();
+            this.scale.on("resize", function() { scene.rescaleWorld(); });
+
+            // Build boss buttons
+            buildBossButtons();
+            selectBoss(BOSS_ORDER[0]);
+
+            // Control buttons
+            document.getElementById("btnLoop").addEventListener("click", function() {
+                looping = !looping;
+                this.classList.toggle("on", looping);
+            });
+            document.getElementById("btnSpeed").addEventListener("click", function() {
+                speedIdx = (speedIdx + 1) % speeds.length;
+                var spd = speeds[speedIdx];
+                this.textContent = "SPEED " + spd + "x";
+                if (scene) {
+                    scene.tweens.timeScale = spd;
+                    scene.time.timeScale = spd;
+                }
+            });
+            document.getElementById("btnTrails").addEventListener("click", function() {
+                showTrails = !showTrails;
+                this.classList.toggle("on", showTrails);
+                if (!showTrails && scene && scene.trailGfx) scene.trailGfx.clear();
+            });
+            document.getElementById("btnReset").addEventListener("click", function() {
+                if (scene) scene.resetPattern();
+            });
+        }
+
+        screenToWorld(sx, sy) {
+            var c = this.worldContainer;
+            return { x: (sx - c.x) / c.scaleX + GW/2, y: (sy - c.y) / c.scaleY + GH/2 };
+        }
+
+        rescaleWorld() {
+            var W = this.scale.width;
+            var H = this.scale.height;
+            var sx = W / GW;
+            var sy = H / GH;
+            var s = Math.min(sx, sy) * 0.92;
+            this.worldContainer.setScale(s);
+            this.worldContainer.setPosition(W/2 - (GW/2)*s, H/2 - (GH/2)*s);
+
+            // Redraw boundary
+            this.boundaryGfx.clear();
+            this.boundaryGfx.fillStyle(0x0d0d0d, 1);
+            this.boundaryGfx.fillRect(0, 0, GW, GH);
+            this.boundaryGfx.lineStyle(1, 0x333333, 0.6);
+            this.boundaryGfx.strokeRect(0, 0, GW, GH);
+        }
+
+        showBoss(bossId) {
+            var self = this;
+            this.resetPattern();
+
+            var boss = bossData[bossId];
+            if (!boss) return;
+
+            this.activeBoss = bossId;
+
+            // Set projectile data
+            this.bossProjData = boss.bulletData || boss.bulletDataA || null;
+            this.bossProjDataA = boss.bulletDataA || null;
+            this.bossProjDataB = boss.bulletDataB || null;
+            this.bossProjDataC = boss.bulletDataC || null;
+
+            // Get first frame
+            var firstFrame = null;
+            if (boss.anim) {
+                for (var k in boss.anim) {
+                    if (boss.anim[k] && boss.anim[k].length > 0) { firstFrame = boss.anim[k][0]; break; }
+                }
+            }
+            if (!firstFrame) return;
+
+            // Create boss sprite
+            this.ensureAnims(bossId);
+            this.bossSprite = this.add.sprite(GCX, 80, "game_asset", firstFrame);
+            this.bossSprite.setOrigin(0.5);
+            this.bossSprite.setDepth(10);
+            this.worldContainer.add(this.bossSprite);
+
+            // Play idle
+            var idleKey = bossId + "_idle";
+            if (this.anims.exists(idleKey)) this.bossSprite.play(idleKey);
+        }
+
+        ensureAnims(bossId) {
+            var boss = bossData[bossId];
+            if (!boss || !boss.anim) return;
+            for (var animName in boss.anim) {
+                var key = bossId + "_" + animName;
+                if (this.anims.exists(key)) continue;
+                var frameNames = boss.anim[animName];
+                if (!frameNames || frameNames.length === 0) continue;
+                var validFrames = [];
+                for (var f = 0; f < frameNames.length; f++) {
+                    if (this.textures.getFrame("game_asset", frameNames[f])) {
+                        validFrames.push({ key: "game_asset", frame: frameNames[f] });
+                    }
+                }
+                if (validFrames.length === 0) continue;
+                var isIdle = animName === "idle";
+                this.anims.create({ key: key, frames: validFrames, frameRate: 6, repeat: isIdle ? -1 : 0 });
+            }
+        }
+
+        // Scene interface for pattern functions
+        _bossAlive() { return !!this.bossSprite; }
+
+        bossShootStart() {
+            if (looping && currentPattern) {
+                var self = this;
+                this.time.delayedCall(200, function() {
+                    if (self._bossAlive() && currentPattern) {
+                        self.bossSprite.x = clamp(self.bossSprite.x, 10, GW - 10);
+                        self.bossSprite.y = 80;
+                        currentPattern.fn(self, currentPattern.seed);
+                    }
+                });
+            }
+        }
+
+        playSound() { /* no-op in viewer */ }
+
+        bossShootStraight(projData) {
+            if (!projData || !this.bossSprite) return;
+            var frames = projData.texture || [];
+            var frameKey = frames[0] || "normalProjectile0.gif";
+            var speed = projData.speed || 1;
+            var bullet = this.add.sprite(this.bossSprite.x, this.bossSprite.y + 20, "game_asset", frameKey);
+            bullet.setOrigin(0.5); bullet.setDepth(5);
+            bullet.setData("speed", speed); bullet.setData("rotX", 0); bullet.setData("rotY", 1);
+            if (frames.length > 1) { bullet.setData("frames", frames); bullet.setData("animIdx", 0); bullet.setData("animTimer", 0); }
+            this.worldContainer.add(bullet);
+            this.enemyBullets.push(bullet);
+        }
+
+        bossShootAimed(projData) {
+            if (!projData || !this.bossSprite) return;
+            var frames = projData.texture || [];
+            var frameKey = frames[0] || "normalProjectile0.gif";
+            var speed = projData.speed || 1;
+            var bullet = this.add.sprite(this.bossSprite.x, this.bossSprite.y + 20, "game_asset", frameKey);
+            bullet.setOrigin(0.5); bullet.setDepth(5);
+            bullet.setData("speed", speed);
+            var dx = this.playerSprite.x - this.bossSprite.x;
+            var dy = this.playerSprite.y - this.bossSprite.y;
+            var dist = Math.sqrt(dx*dx + dy*dy) || 1;
+            bullet.setData("rotX", dx / dist); bullet.setData("rotY", dy / dist);
+            if (frames.length > 1) { bullet.setData("frames", frames); bullet.setData("animIdx", 0); bullet.setData("animTimer", 0); }
+            this.worldContainer.add(bullet);
+            this.enemyBullets.push(bullet);
+        }
+
+        bossShootSpread(projData, count, angleDeg) {
+            if (!projData || !this.bossSprite) return;
+            var frames = projData.texture || [];
+            var frameKey = frames[0] || "normalProjectile0.gif";
+            var speed = projData.speed || 1;
+            var dx = this.playerSprite.x - this.bossSprite.x;
+            var dy = this.playerSprite.y - this.bossSprite.y;
+            var baseAngle = Math.atan2(dy, dx);
+            var spreadRad = angleDeg * Math.PI / 180;
+            var half = Math.floor(count / 2);
+            for (var i = 0; i < count; i++) {
+                var offset = (i - half) * (spreadRad / Math.max(count - 1, 1));
+                var angle = baseAngle + offset;
+                var bullet = this.add.sprite(this.bossSprite.x, this.bossSprite.y + 20, "game_asset", frameKey);
+                bullet.setOrigin(0.5); bullet.setDepth(5);
+                bullet.setData("speed", speed);
+                bullet.setData("rotX", Math.cos(angle)); bullet.setData("rotY", Math.sin(angle));
+                if (frames.length > 1) { bullet.setData("frames", frames); bullet.setData("animIdx", 0); bullet.setData("animTimer", 0); }
+                this.worldContainer.add(bullet);
+                this.enemyBullets.push(bullet);
+            }
+        }
+
+        bossShootRadial(projData, count) {
+            if (!projData || !this.bossSprite) return;
+            var frames = projData.texture || [];
+            var frameKey = frames[0] || "normalProjectile0.gif";
+            var speed = (projData.speed || 1) * 0.8;
+            for (var i = 0; i < count; i++) {
+                var angle = (i / count) * Math.PI * 2;
+                var bullet = this.add.sprite(this.bossSprite.x, this.bossSprite.y, "game_asset", frameKey);
+                bullet.setOrigin(0.5); bullet.setDepth(5);
+                bullet.setData("speed", speed);
+                bullet.setData("rotX", Math.cos(angle)); bullet.setData("rotY", Math.sin(angle));
+                if (frames.length > 1) { bullet.setData("frames", frames); bullet.setData("animIdx", 0); bullet.setData("animTimer", 0); }
+                this.worldContainer.add(bullet);
+                this.enemyBullets.push(bullet);
+            }
+        }
+
+        resetPattern() {
+            // Kill all tweens on boss
+            if (this.bossSprite) {
+                this.tweens.killTweensOf(this.bossSprite);
+                this.bossSprite.destroy();
+                this.bossSprite = null;
+            }
+            // Clear bullets
+            for (var i = 0; i < this.enemyBullets.length; i++) {
+                if (this.enemyBullets[i]) this.enemyBullets[i].destroy();
+            }
+            this.enemyBullets = [];
+            // Clear trails
+            if (this.trailGfx) this.trailGfx.clear();
+            // Clear time events
+            this.time.removeAllEvents();
+            currentPattern = null;
+            // Recreate boss if we have one selected
+            if (this.activeBoss) {
+                var bossId = this.activeBoss;
+                this.activeBoss = null;
+                this.showBoss(bossId);
+            }
+        }
+
+        runPattern(pattern) {
+            // Clear existing bullets and tweens but keep boss
+            for (var i = 0; i < this.enemyBullets.length; i++) {
+                if (this.enemyBullets[i]) this.enemyBullets[i].destroy();
+            }
+            this.enemyBullets = [];
+            if (this.trailGfx) this.trailGfx.clear();
+            this.time.removeAllEvents();
+
+            if (this.bossSprite) {
+                this.tweens.killTweensOf(this.bossSprite);
+                this.bossSprite.x = GCX;
+                this.bossSprite.y = 80;
+                this.bossSprite.alpha = 1;
+            }
+
+            currentPattern = pattern;
+            document.getElementById("pattern-info").textContent = pattern.name;
+            highlightPatternBtn(pattern.name);
+
+            if (this.bossSprite) {
+                pattern.fn(this, pattern.seed);
+            }
+        }
+
+        update(time, delta) {
+            // Move bullets
+            for (var i = this.enemyBullets.length - 1; i >= 0; i--) {
+                var b = this.enemyBullets[i];
+                if (!b || !b.active) { this.enemyBullets.splice(i, 1); continue; }
+                var rx = b.getData("rotX") || 0;
+                var ry = b.getData("rotY") || 0;
+                var spd = b.getData("speed") || 1;
+                b.x += rx * spd;
+                b.y += ry * spd;
+
+                // Trail dots
+                if (showTrails && this.trailGfx) {
+                    this.trailGfx.fillStyle(0x66aaff, 0.25);
+                    this.trailGfx.fillCircle(b.x, b.y, 1.2);
+                }
+
+                // Multi-frame animation
+                var frames = b.getData("frames");
+                if (frames && frames.length > 1) {
+                    var timer = (b.getData("animTimer") || 0) + delta;
+                    if (timer >= 150) {
+                        timer = 0;
+                        var idx = ((b.getData("animIdx") || 0) + 1) % frames.length;
+                        b.setData("animIdx", idx);
+                        b.setFrame(frames[idx]);
+                    }
+                    b.setData("animTimer", timer);
+                }
+
+                // Out of bounds
+                if (b.x < -30 || b.x > GW + 30 || b.y < -30 || b.y > GH + 30) {
+                    b.destroy();
+                    this.enemyBullets.splice(i, 1);
+                }
+            }
+
+            // Update bullet count
+            document.getElementById("bullet-count").textContent = this.enemyBullets.length > 0 ? this.enemyBullets.length + " bullets" : "";
+        }
+    }
+
+    // ---- UI Functions ----
+
+    function buildBossButtons() {
+        var bar = document.getElementById("boss-bar");
+        bar.innerHTML = "";
+        for (var i = 0; i < BOSS_ORDER.length; i++) {
+            (function(id) {
+                var btn = document.createElement("button");
+                btn.textContent = BOSS_NAMES[id] || id;
+                btn.addEventListener("click", function() { selectBoss(id); });
+                bar.appendChild(btn);
+            })(BOSS_ORDER[i]);
+        }
+    }
+
+    function buildPatternButtons(bossId) {
+        var bar = document.getElementById("pattern-bar");
+        bar.innerHTML = "";
+        var patterns = PATTERNS[bossId] || [];
+        for (var i = 0; i < patterns.length; i++) {
+            (function(pat) {
+                var btn = document.createElement("button");
+                btn.textContent = pat.name;
+                btn.setAttribute("data-name", pat.name);
+                btn.addEventListener("click", function() {
+                    if (scene) scene.runPattern(pat);
+                });
+                bar.appendChild(btn);
+            })(patterns[i]);
+        }
+    }
+
+    function selectBoss(bossId) {
+        // Highlight boss button
+        var btns = document.querySelectorAll("#boss-bar button");
+        var idx = BOSS_ORDER.indexOf(bossId);
+        for (var i = 0; i < btns.length; i++) {
+            btns[i].classList.toggle("active", i === idx);
+        }
+        document.getElementById("boss-name").textContent = BOSS_NAMES[bossId] || bossId;
+        document.getElementById("pattern-info").textContent = "";
+
+        buildPatternButtons(bossId);
+
+        if (scene) scene.showBoss(bossId);
+    }
+
+    function highlightPatternBtn(name) {
+        var btns = document.querySelectorAll("#pattern-bar button");
+        for (var i = 0; i < btns.length; i++) {
+            btns[i].classList.toggle("active", btns[i].getAttribute("data-name") === name);
+        }
+    }
+
+    // ---- Init ----
+
+    var viewerEl = document.getElementById("viewer");
+    var game = new Phaser.Game({
+        type: Phaser.AUTO,
+        width: viewerEl.clientWidth,
+        height: viewerEl.clientHeight,
+        parent: "viewer",
+        backgroundColor: "#0a0a0a",
+        scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
+        scene: [BossAttackViewerScene]
+    });
+
+    window.addEventListener("resize", function() {
+        if (scene && scene.bossSprite) {
+            scene.rescaleWorld();
+        }
+    });
+})();
+</script>
+</body>
+</html>
