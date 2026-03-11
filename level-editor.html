@@ -2,515 +2,848 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Evil Invaders Level Editor (Standalone)</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Evil Invaders Level Editor</title>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
     <style>
-        body { font-family: system-ui, sans-serif; }
-        .grid-cell {
-            display: flex; align-items: center; justify-content: center;
-            font-size: 10px; border: 1px solid #333; cursor: pointer; position: relative;
-            background: #111; transition: background 0.1s;
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+        body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; color: #fff; overflow: hidden; touch-action: manipulation; }
+
+        /* ===== APP LAYOUT ===== */
+        #app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+
+        /* ===== TOOLBAR ===== */
+        #toolbar {
+            flex-shrink: 0; height: 52px; background: #111; border-bottom: 1px solid #2a2a2a;
+            display: flex; align-items: center; padding: 0 6px; gap: 4px; z-index: 10;
         }
-        .grid-cell:hover { background-color: #1a3a1a; border-color: #84cc16; }
-        .grid-cell.occupied { background: #1a1a2e; border-color: #555; }
-        .grid-cell .sprite-icon { image-rendering: pixelated; width: 80%; height: 80%; object-fit: contain; }
-        .grid-cell .code-label { position: absolute; bottom: 1px; right: 2px; font-size: 8px; color: #888; font-family: monospace; }
-        .thumb { image-rendering: pixelated; }
-        .modal { animation: pop 0.2s; }
-        @keyframes pop { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .tb-btn {
+            height: 40px; min-width: 40px; border-radius: 8px; border: 2px solid transparent;
+            display: flex; align-items: center; justify-content: center; gap: 4px;
+            cursor: pointer; font-size: 12px; font-weight: 600; padding: 0 8px;
+            transition: all 0.15s; flex-shrink: 0; color: #fff;
+        }
+        .tb-btn:active { transform: scale(0.95); }
+        .tb-btn.active { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.15); }
+        .tb-btn img { width: 28px; height: 28px; image-rendering: pixelated; object-fit: contain; }
+        .tb-sep { width: 1px; height: 28px; background: #333; flex-shrink: 0; }
+        .tb-pills { display: flex; gap: 2px; align-items: center; overflow-x: auto; flex-shrink: 1; min-width: 0; }
+        .tb-pill {
+            width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+            font-size: 12px; font-weight: 700; cursor: pointer; flex-shrink: 0; transition: all 0.15s;
+        }
+        .tb-pill.on { background: #f39c12; color: #000; }
+        .tb-pill.off { background: #333; color: #888; }
+        .tb-pill.off:active { background: #555; }
+        .tb-pill.add { background: #27ae60; color: #fff; font-size: 15px; }
+        .tb-spacer { flex: 1; min-width: 4px; }
+        .tb-label { font-size: 10px; color: #888; font-weight: 700; white-space: nowrap; }
+
+        /* ===== GRID ===== */
+        #grid-area { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; background: #0a0a0a; }
+        #grid-icon-view { padding: 2px; }
+        .editor-grid { display: grid; gap: 1px; }
+        .col-hdr { display: flex; align-items: center; justify-content: center; font-size: 10px; color: #84cc16; font-family: monospace; font-weight: 700; padding: 2px 0; }
+        .row-lbl { display: flex; align-items: center; justify-content: center; font-size: 9px; color: #555; font-family: monospace; }
+        .grid-cell {
+            position: relative; background: #111; border: 1px solid #1a1a1a; cursor: pointer;
+            aspect-ratio: 1; overflow: hidden; transition: background 0.1s, border-color 0.1s;
+        }
+        .grid-cell:active { background: #222; }
+        .grid-cell.occupied { background: #12122a; border-color: #333; }
+        .grid-cell .enemy-img {
+            position: absolute; inset: 8%; width: 84%; height: 84%;
+            object-fit: contain; image-rendering: pixelated; pointer-events: none;
+        }
+        .grid-cell .powerup-bubble {
+            position: absolute; bottom: 1px; right: 1px; width: 44%; height: 44%;
+            background: rgba(255,255,255,0.25); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: none; box-shadow: 0 0 4px rgba(0,0,0,0.5);
+        }
+        .grid-cell .powerup-bubble img {
+            width: 72%; height: 72%; object-fit: contain; image-rendering: pixelated;
+        }
+        .grid-cell .code-label {
+            position: absolute; top: 1px; left: 2px; font-size: 7px; color: #555;
+            font-family: monospace; pointer-events: none; line-height: 1;
+        }
+        /* Grid hover modes (desktop) */
+        @media (hover: hover) {
+            .editor-grid.mode-place .grid-cell:hover { background: #1a3a1a; border-color: #84cc16; }
+            .editor-grid.mode-delete .grid-cell:hover { background: #3a1a1a; border-color: #ef4444; }
+        }
+        .grid-cell.drag-over { background: #1a3a1a !important; border-color: #84cc16 !important; }
+
+        /* ===== PICKER OVERLAY ===== */
+        .picker-overlay {
+            position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,0.7);
+            display: flex; align-items: flex-end; justify-content: center;
+            animation: fadeIn 0.15s;
+        }
+        @keyframes fadeIn { from { opacity: 0; } }
+        @keyframes slideUp { from { transform: translateY(40px); } }
+        .picker-panel {
+            background: #1a1a1a; border-radius: 16px 16px 0 0; width: 100%; max-width: 480px;
+            max-height: 65vh; overflow-y: auto; padding: 12px 12px 24px; animation: slideUp 0.2s;
+        }
+        .picker-title { font-size: 13px; font-weight: 700; color: #888; padding: 4px 8px 10px; }
+        .picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+        .picker-opt {
+            display: flex; flex-direction: column; align-items: center; padding: 8px 4px;
+            border-radius: 10px; border: 2px solid transparent; cursor: pointer;
+            transition: all 0.15s; -webkit-user-select: none; user-select: none;
+        }
+        .picker-opt:active { transform: scale(0.95); }
+        .picker-opt.sel { border-color: #84cc16; background: rgba(132,204,22,0.12); }
+        .picker-opt .opt-img {
+            width: 44px; height: 44px; image-rendering: pixelated; object-fit: contain;
+        }
+        .picker-opt .opt-placeholder {
+            width: 44px; height: 44px; border-radius: 8px; display: flex; align-items: center;
+            justify-content: center; font-size: 22px;
+        }
+        .picker-opt .opt-name { font-size: 10px; margin-top: 4px; text-align: center; color: #ccc; line-height: 1.2; }
+        .picker-opt .opt-code { font-size: 8px; color: #666; font-family: monospace; }
+
+        /* ===== MENU DRAWER ===== */
+        .menu-backdrop { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.5); animation: fadeIn 0.15s; }
+        .menu-panel {
+            position: fixed; top: 0; right: 0; bottom: 0; width: 300px; max-width: 85vw;
+            background: #1a1a1a; z-index: 301; padding: 16px; overflow-y: auto;
+            animation: slideIn 0.2s; border-left: 1px solid #333;
+        }
+        @keyframes slideIn { from { transform: translateX(100%); } }
+        .menu-section { margin-bottom: 16px; }
+        .menu-section-title { font-size: 10px; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+        .menu-btn {
+            display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 12px;
+            border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 500;
+            transition: background 0.1s; border: none; color: #fff; background: #222; margin-bottom: 4px;
+        }
+        .menu-btn:active { background: #333; }
+        .menu-input {
+            width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #444;
+            background: #111; color: #fff; font-size: 13px; margin-bottom: 8px;
+        }
+
+        /* ===== PREVIEW (desktop only) ===== */
+        #preview-section { display: none; padding: 16px; }
+        @media (min-width: 900px) { #preview-section { display: block; } }
         canvas { image-rendering: pixelated; }
+
+        /* ===== DESKTOP TWEAKS ===== */
+        @media (min-width: 768px) {
+            #toolbar { height: 56px; padding: 0 12px; gap: 8px; }
+            .tb-btn { height: 44px; min-width: 44px; padding: 0 12px; font-size: 13px; }
+            .tb-btn img { width: 32px; height: 32px; }
+            .tb-pill { width: 32px; height: 32px; font-size: 13px; }
+            .editor-grid { gap: 2px; }
+            .grid-cell .code-label { font-size: 8px; }
+            .picker-panel { max-width: 560px; border-radius: 16px; margin-bottom: 10vh; }
+            .picker-grid { grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
+            .picker-opt .opt-img { width: 56px; height: 56px; }
+        }
+
+        .hidden { display: none !important; }
     </style>
 </head>
-<body class="bg-zinc-950 text-white">
-    <div class="max-w-screen-xl mx-auto p-6">
-        <!-- Header -->
-        <div class="flex items-center justify-between mb-8 border-b border-zinc-800 pb-6">
-            <div>
-                <h1 class="text-3xl font-bold text-lime-400">EVIL INVADERS LEVEL EDITOR</h1>
-                <p class="text-zinc-400 text-sm">Standalone • Live patches game.json + atlas • Creates level JSONs</p>
-            </div>
-            <div class="flex gap-3 items-center">
-                <button onclick="loadDirectory()"
-                        class="px-6 py-3 bg-lime-500 hover:bg-lime-600 text-black font-medium rounded-lg flex items-center gap-2">
-                    <span>📁</span> Load Game Directory
-                </button>
-                <button onclick="saveAll()"
-                        class="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 font-medium rounded-lg flex items-center gap-2">
-                    💾 Save All (Live Patch)
-                </button>
-                <div class="border-l border-zinc-700 pl-3 flex gap-2 items-center">
-                    <input id="firebase-level-name" type="text" placeholder="Level name"
-                           class="bg-zinc-900 border border-zinc-600 rounded px-3 py-2 text-sm w-36">
-                    <button onclick="saveToFirebase()"
-                            class="px-4 py-3 bg-orange-500 hover:bg-orange-600 text-black font-medium rounded-lg text-sm">
-                        🔥 Save to Firebase
-                    </button>
-                    <button onclick="loadFromFirebasePrompt()"
-                            class="px-4 py-3 bg-sky-500 hover:bg-sky-600 text-black font-medium rounded-lg text-sm">
-                        📥 Load from Firebase
-                    </button>
-                    <button onclick="playFirebaseLevel()"
-                            class="px-4 py-3 bg-green-500 hover:bg-green-600 text-black font-medium rounded-lg text-sm">
-                        ▶ Play Level
-                    </button>
-                </div>
-            </div>
+<body>
+    <div id="app">
+        <!-- TOOLBAR -->
+        <div id="toolbar">
+            <!-- Enemy picker button -->
+            <button id="enemy-picker-btn" class="tb-btn" style="background:#2d1b4e" onclick="openPicker('enemy')">
+                <span id="enemy-btn-img"></span>
+                <span id="enemy-btn-label" class="hidden-mobile">Enemy</span>
+            </button>
+            <!-- Item picker button -->
+            <button id="powerup-picker-btn" class="tb-btn" style="background:#4a2c17" onclick="openPicker('powerup')">
+                <span id="powerup-btn-img"></span>
+                <span id="powerup-btn-label" class="hidden-mobile">Item</span>
+            </button>
+            <!-- Delete -->
+            <button id="delete-mode-btn" class="tb-btn" style="background:#4a1717" onclick="setDeleteMode()">
+                <span style="font-size:16px">🗑</span>
+            </button>
+
+            <div class="tb-sep"></div>
+
+            <!-- Stage pills -->
+            <div class="tb-pills" id="stage-pills"></div>
+
+            <div class="tb-spacer"></div>
+
+            <!-- Save -->
+            <button class="tb-btn" style="background:#1a4a1a" onclick="quickSave()">
+                <span style="font-size:14px">💾</span>
+            </button>
+            <!-- Menu -->
+            <button class="tb-btn" style="background:#333" onclick="openMenu()">
+                <span style="font-size:16px">☰</span>
+            </button>
         </div>
 
-        <!-- Status -->
-        <div id="status" class="mb-6 text-sm text-zinc-400 flex items-center gap-2">
-            <div class="w-2 h-2 bg-red-500 rounded-full"></div>
-            No directory loaded
+        <!-- GRID AREA -->
+        <div id="grid-area">
+            <div id="grid-icon-view"></div>
         </div>
 
-        <!-- Tabs -->
-        <div class="flex border-b border-zinc-800 mb-6">
-            <button onclick="switchTab(0)" id="tab-0"
-                    class="tab-button px-8 py-3 font-medium border-b-2 border-transparent hover:text-lime-400 active">STAGES</button>
-            <button onclick="switchTab(1)" id="tab-1"
-                    class="tab-button px-8 py-3 font-medium border-b-2 border-transparent hover:text-lime-400">ENEMIES</button>
-            <button onclick="switchTab(2)" id="tab-2"
-                    class="tab-button px-8 py-3 font-medium border-b-2 border-transparent hover:text-lime-400">ATLAS</button>
-        </div>
-
-        <!-- STAGES TAB -->
-        <div id="tab-content-0" class="tab-content">
-            <div class="flex gap-4 mb-4">
-                <select id="stage-select" onchange="loadCurrentStage()" 
-                        class="bg-zinc-900 border border-zinc-700 rounded px-4 py-2 text-sm">
-                </select>
-                <button onclick="addWave()" 
-                        class="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 rounded text-sm">+ Add Wave</button>
-                <button onclick="deleteLastWave()" 
-                        class="px-4 py-2 bg-zinc-800 hover:bg-red-900 rounded text-sm">− Delete Last Wave</button>
-                <button onclick="playCurrentStage()"
-                        class="px-4 py-2 bg-sky-500 hover:bg-sky-600 text-black rounded text-sm font-medium">▶ Play In Phaser</button>
-                <button onclick="exportCurrentLevelJSON()" 
-                        class="ml-auto px-4 py-2 bg-amber-500 hover:bg-amber-600 text-black rounded text-sm">Export Level JSON</button>
-            </div>
-
-            <!-- Grid -->
-            <div class="overflow-auto max-h-[600px] border border-zinc-700 rounded-lg bg-zinc-900 p-2" id="grid-container">
-                <div id="grid-icon-view" class="inline-block"></div>
-            </div>
-
-            <!-- Preview Canvas -->
-            <div class="mt-8">
-                <h3 class="text-lg mb-2">Live Preview (Vertical Shooter Style)</h3>
-                <canvas id="preview-canvas" width="640" height="480" class="border border-zinc-700 bg-black"></canvas>
-            </div>
-        </div>
-
-        <!-- ENEMIES TAB -->
-        <div id="tab-content-1" class="tab-content hidden">
-            <div class="flex gap-4">
-                <div class="w-1/3">
-                    <h3 class="text-lg mb-3">Enemy Types</h3>
-                    <div id="enemy-list" class="space-y-1 max-h-96 overflow-auto"></div>
-                </div>
-                <div class="flex-1">
-                    <h3 class="text-lg mb-3">Edit Selected Enemy</h3>
-                    <div class="bg-zinc-900 border border-zinc-700 rounded p-6">
-                        <input id="enemy-key" type="text" placeholder="Key (e.g. enemyA)" 
-                               class="w-full bg-zinc-950 border border-zinc-600 rounded px-4 py-3 mb-4 text-lg">
-                        <textarea id="enemy-json" rows="20" 
-                                  class="w-full bg-zinc-950 border border-zinc-600 rounded p-4 font-mono text-xs"></textarea>
-                        <button onclick="saveCurrentEnemy()" 
-                                class="mt-4 w-full py-3 bg-lime-500 text-black font-medium rounded">Save Enemy</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ATLAS TAB -->
-        <div id="tab-content-2" class="tab-content hidden">
-            <div class="flex justify-between mb-6">
-                <h3 class="text-lg">Atlas Manager (<span id="frame-count">0</span> frames)</h3>
-                <div>
-                    <label class="px-6 py-3 bg-zinc-800 hover:bg-zinc-700 rounded-lg cursor-pointer inline-block">
-                        <input type="file" id="upload-sprites" multiple accept="image/*" class="hidden" onchange="handleSpriteUpload(event)">
-                        📤 Upload New Sprites
-                    </label>
-                    <button onclick="repackAtlas()" 
-                            class="ml-3 px-6 py-3 bg-violet-500 hover:bg-violet-600 rounded-lg">Repack &amp; Update Atlas Files</button>
-                </div>
-            </div>
-            <div id="atlas-grid" class="grid grid-cols-8 gap-4 max-h-[600px] overflow-auto"></div>
+        <!-- PREVIEW (desktop only) -->
+        <div id="preview-section">
+            <canvas id="preview-canvas" width="640" height="480" style="border:1px solid #333;background:#000;max-width:100%;"></canvas>
         </div>
     </div>
 
-    <!-- Palette Modal -->
-    <div id="palette-modal" class="hidden fixed inset-0 bg-black/80 flex items-center justify-center z-50">
-        <div class="modal bg-zinc-900 border border-lime-400 rounded-2xl w-[640px] p-8">
-            <h3 class="text-xl mb-6 text-lime-400">Choose Enemy / Drop (click to place)</h3>
-            <div id="palette-grid" class="grid grid-cols-6 gap-4"></div>
-            <button onclick="closePalette()" 
-                    class="mt-8 w-full py-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl">Cancel</button>
+    <!-- ENEMY PICKER OVERLAY -->
+    <div id="enemy-picker-overlay" class="picker-overlay hidden" onclick="if(event.target===this)closePicker()">
+        <div class="picker-panel">
+            <div class="picker-title">SELECT ENEMY</div>
+            <div id="enemy-picker-grid" class="picker-grid"></div>
+        </div>
+    </div>
+
+    <!-- POWERUP PICKER OVERLAY -->
+    <div id="powerup-picker-overlay" class="picker-overlay hidden" onclick="if(event.target===this)closePicker()">
+        <div class="picker-panel">
+            <div class="picker-title">SELECT ITEM DROP</div>
+            <div id="powerup-picker-grid" class="picker-grid"></div>
+        </div>
+    </div>
+
+    <!-- MENU DRAWER -->
+    <div id="menu-backdrop" class="menu-backdrop hidden" onclick="closeMenu()"></div>
+    <div id="menu-panel" class="menu-panel hidden">
+        <div class="menu-section">
+            <div class="menu-section-title">Waves</div>
+            <button class="menu-btn" onclick="addWave();closeMenu()">+ Add Wave</button>
+            <button class="menu-btn" style="color:#f87171" onclick="deleteLastWave();closeMenu()">- Delete Last Wave</button>
+        </div>
+        <div class="menu-section">
+            <div class="menu-section-title">File System</div>
+            <button class="menu-btn" onclick="loadDirectory();closeMenu()">📁 Load Game Directory</button>
+            <button class="menu-btn" onclick="saveAll();closeMenu()">💾 Save All (Live Patch)</button>
+            <button class="menu-btn" onclick="playCurrentStage();closeMenu()">▶ Play In Phaser</button>
+            <button class="menu-btn" onclick="exportCurrentLevelJSON();closeMenu()">📤 Export Level JSON</button>
+        </div>
+        <div class="menu-section">
+            <div class="menu-section-title">Firebase</div>
+            <input id="firebase-level-name" type="text" placeholder="Level name" class="menu-input">
+            <button class="menu-btn" onclick="saveToFirebase()">🔥 Save to Firebase</button>
+            <button class="menu-btn" onclick="loadFromFirebasePrompt()">📥 Load from Firebase</button>
+            <button class="menu-btn" onclick="playFirebaseLevel()">▶ Play Firebase Level</button>
+        </div>
+        <div class="menu-section">
+            <div class="menu-section-title">Advanced</div>
+            <button class="menu-btn" onclick="showEnemyEditor()">👾 Enemy Editor</button>
+            <button class="menu-btn" onclick="showAtlasManager()">🎨 Atlas Manager</button>
+        </div>
+        <div id="status" style="font-size:11px;color:#666;margin-top:16px;">No directory loaded</div>
+    </div>
+
+    <!-- ENEMY EDITOR MODAL -->
+    <div id="enemy-editor-modal" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+        <div class="picker-panel" style="max-height:80vh">
+            <div class="picker-title">ENEMY EDITOR</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="enemy-list"></div>
+            <input id="enemy-key" type="text" placeholder="Key (e.g. enemyA)" class="menu-input">
+            <textarea id="enemy-json" rows="12" class="menu-input" style="font-family:monospace;font-size:11px;resize:vertical;"></textarea>
+            <button onclick="saveCurrentEnemy()" class="menu-btn" style="background:#84cc16;color:#000;font-weight:700;">Save Enemy</button>
+        </div>
+    </div>
+
+    <!-- ATLAS MANAGER MODAL -->
+    <div id="atlas-modal" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+        <div class="picker-panel" style="max-height:80vh">
+            <div class="picker-title">ATLAS MANAGER (<span id="frame-count">0</span> frames)</div>
+            <div style="display:flex;gap:8px;margin-bottom:12px;">
+                <label class="menu-btn" style="flex:1;justify-content:center;">
+                    <input type="file" id="upload-sprites" multiple accept="image/*" style="display:none" onchange="handleSpriteUpload(event)">
+                    📤 Upload Sprites
+                </label>
+                <button onclick="repackAtlas()" class="menu-btn" style="flex:1;justify-content:center;">Repack Atlas</button>
+            </div>
+            <div id="atlas-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;"></div>
         </div>
     </div>
 
     <script>
-        // ================== CONFIG (TWEAK IF YOUR ATLAS/JSON DIFFERS) ==================
+        // ================== CONFIG ==================
         const ATLAS_DIR = "assets";
-        const GAME_JSON_NAME = "game.json";           // root or assets/
+        const GAME_JSON_NAME = "game.json";
         const ATLAS_PNG = "game_asset.png";
         const ATLAS_JSON = "game_asset.json";
         const EDITOR_PLAY_RECIPE_KEY = "__editorPhaserRecipe__";
         const EDITOR_PLAY_STAGE_KEY = "__editorPhaserStageId__";
-        
-        // Frame name mapping for codes like "A0" → "soliderA0.gif"
+
         function getFrameNameForCode(code) {
             if (code === "00") return null;
-            return `solider${code}.gif`;   // Change "solider" to exact prefix in your atlas if different
+            return `solider${code}.gif`;
         }
 
-        // =============================================================================
+        // ================== POWERUP DEFINITIONS ==================
+        const POWERUP_TYPES = [
+            { id: '0', name: 'None', frame: null, color: '#666' },
+            { id: '1', name: 'Big Shot', frame: 'powerupBig0.gif', color: '#f59e0b' },
+            { id: '2', name: '3-Way', frame: 'powerup3way0.gif', color: '#3b82f6' },
+            { id: '3', name: 'Speed Up', frame: 'speedupItem0.gif', color: '#10b981' },
+            { id: '9', name: 'Barrier', frame: 'barrierItem0.gif', color: '#8b5cf6' }
+        ];
 
+        // ================== STATE ==================
         let dirHandle = null;
         let gameData = null;
         let atlasData = null;
         let atlasImage = null;
         let currentStageKey = "stage0";
-        let currentGrid = [];           // 2D array [wave][col]
-        let selectedCell = null;        // {row, col}
+        let currentGrid = [];
         let enemyData = {};
-        let frameThumbs = {};           // key → canvas (64x64 thumb)
-        let extraSprites = [];          // {key, canvas, w, h} for new uploads
+        let frameThumbs = {};       // key -> canvas
+        let thumbDataURLs = {};     // key -> dataURL (cached)
+        let extraSprites = [];
         let currentEnemyKey = null;
 
-        function createEmptyWave() {
-            return Array(8).fill("00");
-        }
+        // Tool state
+        let selectedEnemyLetter = null;
+        let selectedEnemyFullKey = null;
+        let selectedPowerup = '0';
+        let currentTool = 'none';
+
+        // ================== HELPERS ==================
+        function createEmptyWave() { return Array(8).fill("00"); }
 
         function normalizeWave(wave) {
-            const normalized = createEmptyWave();
-            if (!Array.isArray(wave)) {
-                return normalized;
-            }
-
-            for (let i = 0; i < 8; i++) {
-                normalized[i] = typeof wave[i] === 'string' && wave[i] ? wave[i] : "00";
-            }
-
-            return normalized;
+            const n = createEmptyWave();
+            if (!Array.isArray(wave)) return n;
+            for (let i = 0; i < 8; i++) n[i] = typeof wave[i] === 'string' && wave[i] ? wave[i] : "00";
+            return n;
         }
 
         function normalizeGrid(grid) {
-            if (!Array.isArray(grid) || grid.length === 0) {
-                return Array(8).fill(null).map(() => createEmptyWave());
-            }
-
+            if (!Array.isArray(grid) || grid.length === 0) return Array(8).fill(null).map(() => createEmptyWave());
             return grid.map(normalizeWave);
         }
 
         function getCurrentStageId() {
-            const match = String(currentStageKey).match(/^stage(\d+)$/);
-            if (!match) {
-                return 0;
-            }
-
-            const stageId = Number(match[1]);
-            if (!Number.isFinite(stageId)) {
-                return 0;
-            }
-
-            return Math.max(0, Math.min(4, Math.floor(stageId)));
+            const m = String(currentStageKey).match(/^stage(\d+)$/);
+            if (!m) return 0;
+            const id = Number(m[1]);
+            return Number.isFinite(id) ? Math.max(0, Math.min(4, Math.floor(id))) : 0;
         }
 
-        const tailwindScript = document.createElement('script');
-        tailwindScript.src = 'https://cdn.tailwindcss.com';
-        document.head.appendChild(tailwindScript);
+        function getEnemyLetter(k) { return k.replace(/enemy/i, '').toUpperCase().slice(0, 1); }
 
-        function switchTab(n) {
-            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-            document.getElementById(`tab-content-${n}`).classList.remove('hidden');
-            document.querySelectorAll('.tab-button').forEach(el => el.classList.remove('active', 'border-lime-400'));
-            document.getElementById(`tab-${n}`).classList.add('active', 'border-lime-400');
+        function getEnemyDisplayName(k) {
+            const d = enemyData[k];
+            if (d && d.name) return d.name;
+            return k;
         }
 
+        // Cached dataURL lookups
+        function getThumbURL(frameKey) {
+            if (!frameKey) return null;
+            if (thumbDataURLs[frameKey]) return thumbDataURLs[frameKey];
+            if (frameThumbs[frameKey]) {
+                thumbDataURLs[frameKey] = frameThumbs[frameKey].toDataURL();
+                return thumbDataURLs[frameKey];
+            }
+            return null;
+        }
+
+        function getEnemyThumbURL(enemyKey) {
+            const letter = getEnemyLetter(enemyKey);
+            // Try standard frame name
+            let url = getThumbURL(getFrameNameForCode(letter + '0'));
+            if (url) return url;
+            // Try enemy texture array
+            const d = enemyData[enemyKey];
+            if (d && d.texture && d.texture[0]) {
+                url = getThumbURL(d.texture[0]);
+                if (url) return url;
+            }
+            return null;
+        }
+
+        function getEnemyBaseURL(code) {
+            if (code === '00') return null;
+            const letter = code[0];
+            // Base enemy frame (no powerup variant)
+            let url = getThumbURL(getFrameNameForCode(letter + '0'));
+            if (url) return url;
+            // Try full code frame
+            url = getThumbURL(getFrameNameForCode(code));
+            if (url) return url;
+            // Try finding enemy key and its texture
+            for (const k of Object.keys(enemyData)) {
+                if (getEnemyLetter(k) === letter) {
+                    const d = enemyData[k];
+                    if (d && d.texture && d.texture[0]) {
+                        url = getThumbURL(d.texture[0]);
+                        if (url) return url;
+                    }
+                    break;
+                }
+            }
+            return null;
+        }
+
+        function getPowerupURL(dropId) {
+            const pt = POWERUP_TYPES.find(p => p.id === dropId);
+            if (!pt || !pt.frame) return null;
+            return getThumbURL(pt.frame);
+        }
+
+        // ================== MENU ==================
+        function openMenu() {
+            document.getElementById('menu-backdrop').classList.remove('hidden');
+            document.getElementById('menu-panel').classList.remove('hidden');
+        }
+        function closeMenu() {
+            document.getElementById('menu-backdrop').classList.add('hidden');
+            document.getElementById('menu-panel').classList.add('hidden');
+        }
+        function showEnemyEditor() {
+            closeMenu();
+            renderEnemyList();
+            document.getElementById('enemy-editor-modal').classList.remove('hidden');
+        }
+        function showAtlasManager() {
+            closeMenu();
+            renderAtlas();
+            document.getElementById('atlas-modal').classList.remove('hidden');
+        }
+
+        // ================== FILE SYSTEM ==================
         async function loadDirectory() {
             try {
                 dirHandle = await window.showDirectoryPicker();
-                document.getElementById('status').innerHTML = `
-                    <div class="w-2 h-2 bg-lime-400 rounded-full"></div>
-                    Loaded: ${dirHandle.name}
-                `;
+                document.getElementById('status').innerHTML = `<span style="color:#84cc16">Loaded: ${dirHandle.name}</span>`;
                 await loadGameFiles();
-            } catch (e) {
-                alert("Directory picker cancelled or not supported (Chrome/Edge recommended)");
-            }
+            } catch (e) { alert("Directory picker cancelled or not supported"); }
         }
 
         async function getFileHandle(pathParts) {
-            let handle = dirHandle;
-            for (let i = 0; i < pathParts.length - 1; i++) {
-                handle = await handle.getDirectoryHandle(pathParts[i]);
-            }
-            return await handle.getFileHandle(pathParts[pathParts.length-1]);
+            let h = dirHandle;
+            for (let i = 0; i < pathParts.length - 1; i++) h = await h.getDirectoryHandle(pathParts[i]);
+            return await h.getFileHandle(pathParts[pathParts.length - 1]);
         }
 
         async function loadGameFiles() {
-            // Try root then assets/ for game.json
             let jsonText;
             try {
-                const rootHandle = await getFileHandle([GAME_JSON_NAME]);
-                jsonText = await (await rootHandle.getFile()).text();
-            } catch (e) {
-                try {
-                    const assetsHandle = await getFileHandle([ATLAS_DIR, GAME_JSON_NAME]);
-                    jsonText = await (await assetsHandle.getFile()).text();
-                } catch (e2) {
-                    alert("game.json not found in root or assets/");
-                    return;
-                }
+                jsonText = await (await (await getFileHandle([GAME_JSON_NAME])).getFile()).text();
+            } catch {
+                try { jsonText = await (await (await getFileHandle([ATLAS_DIR, GAME_JSON_NAME])).getFile()).text(); }
+                catch { alert("game.json not found"); return; }
             }
             gameData = JSON.parse(jsonText);
 
-            // Load atlas
             try {
-                const assetsHandle = await dirHandle.getDirectoryHandle(ATLAS_DIR);
-                const jsonHandle = await assetsHandle.getFileHandle(ATLAS_JSON);
-                const pngHandle = await assetsHandle.getFileHandle(ATLAS_PNG);
-
-                const jsonFile = await jsonHandle.getFile();
-                atlasData = JSON.parse(await jsonFile.text());
-
-                const pngBlob = await pngHandle.getFile();
+                const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                atlasData = JSON.parse(await (await (await ad.getFileHandle(ATLAS_JSON)).getFile()).text());
+                const pngBlob = await (await ad.getFileHandle(ATLAS_PNG)).getFile();
                 atlasImage = new Image();
                 atlasImage.src = URL.createObjectURL(pngBlob);
-                atlasImage.onload = () => {
-                    buildFrameThumbs();
-                    renderAll();
-                };
-            } catch (e) {
-                console.warn("Atlas load failed", e);
-            }
+                atlasImage.onload = () => { buildFrameThumbs(); renderAll(); };
+            } catch (e) { console.warn("Atlas load failed", e); }
 
-            // Extract enemyData (assume top-level)
             enemyData = gameData.enemyData || {};
             if (!enemyData || Object.keys(enemyData).length === 0) {
-                // Fallback scan for any *enemy* keys
                 for (let k in gameData) {
                     if (k.includes('enemy') && typeof gameData[k] === 'object') enemyData[k] = gameData[k];
                 }
             }
-
-            // Populate stage select
-            const select = document.getElementById('stage-select');
-            select.innerHTML = '';
-            Object.keys(gameData).filter(k => k.startsWith('stage')).forEach(key => {
-                const opt = document.createElement('option');
-                opt.value = key;
-                opt.textContent = key.toUpperCase();
-                select.appendChild(opt);
-            });
-            if (select.options.length) {
-                currentStageKey = select.value;
-                loadCurrentStage();
-            }
-            renderEnemyList();
+            populateStagePills();
+            loadCurrentStage();
         }
 
         function buildFrameThumbs() {
             frameThumbs = {};
+            thumbDataURLs = {};
             const frames = atlasData.frames || {};
-            const tempCanvas = document.createElement('canvas');
-            const ctx = tempCanvas.getContext('2d');
-
+            const tc = document.createElement('canvas');
+            const ctx = tc.getContext('2d');
             for (let key in frames) {
                 const f = frames[key].frame;
                 if (!f) continue;
-                tempCanvas.width = f.w;
-                tempCanvas.height = f.h;
+                tc.width = f.w; tc.height = f.h;
+                ctx.clearRect(0, 0, f.w, f.h);
                 ctx.drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
-
                 const thumb = document.createElement('canvas');
-                thumb.width = 64;
-                thumb.height = 64;
-                const tctx = thumb.getContext('2d');
-                tctx.drawImage(tempCanvas, 0, 0, f.w, f.h, 0, 0, 64, 64);
+                thumb.width = 64; thumb.height = 64;
+                thumb.getContext('2d').drawImage(tc, 0, 0, f.w, f.h, 0, 0, 64, 64);
                 frameThumbs[key] = thumb;
             }
             document.getElementById('frame-count').textContent = Object.keys(frameThumbs).length;
         }
 
-        function renderAll() {
-            loadCurrentStage();
-            renderEnemyList();
-            renderAtlas();
+        // ================== STAGE PILLS ==================
+        function populateStagePills() {
+            const c = document.getElementById('stage-pills');
+            c.innerHTML = '';
+            const keys = Object.keys(gameData).filter(k => k.startsWith('stage')).sort((a, b) =>
+                parseInt(a.replace('stage', '')) - parseInt(b.replace('stage', '')));
+
+            keys.forEach(key => {
+                const p = document.createElement('div');
+                p.className = `tb-pill ${key === currentStageKey ? 'on' : 'off'}`;
+                p.textContent = key.replace('stage', '');
+                p.onclick = () => { currentStageKey = key; populateStagePills(); loadCurrentStage(); };
+                c.appendChild(p);
+            });
+
+            const ap = document.createElement('div');
+            ap.className = 'tb-pill add';
+            ap.textContent = '+';
+            ap.onclick = () => {
+                const nums = keys.map(k => parseInt(k.replace('stage', '')));
+                const next = nums.length ? Math.max(...nums) + 1 : 0;
+                currentStageKey = `stage${next}`;
+                gameData[currentStageKey] = { enemylist: normalizeGrid([]) };
+                populateStagePills();
+                loadCurrentStage();
+            };
+            c.appendChild(ap);
         }
 
-        function loadCurrentStage() {
-            currentStageKey = document.getElementById('stage-select').value;
-            const stageObj = gameData[currentStageKey] || {};
-            currentGrid = normalizeGrid(stageObj.enemylist);
-            renderGrid();
-            renderPreview();
+        // ================== PICKER SYSTEM ==================
+        function openPicker(type) {
+            closePicker();
+            if (type === 'enemy') {
+                populateEnemyPicker();
+                document.getElementById('enemy-picker-overlay').classList.remove('hidden');
+            } else {
+                populatePowerupPicker();
+                document.getElementById('powerup-picker-overlay').classList.remove('hidden');
+            }
         }
 
+        function closePicker() {
+            document.getElementById('enemy-picker-overlay').classList.add('hidden');
+            document.getElementById('powerup-picker-overlay').classList.add('hidden');
+        }
+
+        function populateEnemyPicker() {
+            const c = document.getElementById('enemy-picker-grid');
+            c.innerHTML = '';
+            const keys = Object.keys(enemyData);
+            if (!keys.length) {
+                c.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#666;padding:24px;font-size:13px">No enemies loaded. Load a game directory or Firebase level.</div>';
+                return;
+            }
+            keys.forEach(ek => {
+                const letter = getEnemyLetter(ek);
+                if (!letter) return;
+                const opt = document.createElement('div');
+                opt.className = `picker-opt${selectedEnemyFullKey === ek ? ' sel' : ''}`;
+                opt.draggable = true;
+
+                const url = getEnemyThumbURL(ek);
+                if (url) {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.className = 'opt-img';
+                    opt.appendChild(img);
+                } else {
+                    const ph = document.createElement('div');
+                    ph.className = 'opt-placeholder';
+                    ph.style.background = '#2d1b4e';
+                    ph.textContent = letter;
+                    opt.appendChild(ph);
+                }
+                const nm = document.createElement('div');
+                nm.className = 'opt-name';
+                nm.textContent = getEnemyDisplayName(ek);
+                opt.appendChild(nm);
+
+                opt.onclick = () => selectEnemy(ek);
+                opt.addEventListener('dragstart', e => {
+                    e.dataTransfer.setData('application/json', JSON.stringify({ type: 'enemy', key: ek, letter }));
+                    e.dataTransfer.effectAllowed = 'copy';
+                });
+                c.appendChild(opt);
+            });
+        }
+
+        function populatePowerupPicker() {
+            const c = document.getElementById('powerup-picker-grid');
+            c.innerHTML = '';
+            POWERUP_TYPES.forEach(pt => {
+                const opt = document.createElement('div');
+                opt.className = `picker-opt${selectedPowerup === pt.id ? ' sel' : ''}`;
+
+                const url = pt.frame ? getThumbURL(pt.frame) : null;
+                if (url) {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.className = 'opt-img';
+                    opt.appendChild(img);
+                } else {
+                    const ph = document.createElement('div');
+                    ph.className = 'opt-placeholder';
+                    ph.style.background = pt.id === '0' ? '#333' : pt.color + '33';
+                    ph.style.border = `2px solid ${pt.color}`;
+                    ph.textContent = pt.id === '0' ? '—' : pt.name[0];
+                    opt.appendChild(ph);
+                }
+                const nm = document.createElement('div');
+                nm.className = 'opt-name';
+                nm.textContent = pt.name;
+                opt.appendChild(nm);
+
+                opt.onclick = () => selectPowerup(pt.id);
+                if (pt.id !== '0') {
+                    opt.draggable = true;
+                    opt.addEventListener('dragstart', e => {
+                        e.dataTransfer.setData('application/json', JSON.stringify({ type: 'powerup', id: pt.id }));
+                        e.dataTransfer.effectAllowed = 'copy';
+                    });
+                }
+                c.appendChild(opt);
+            });
+        }
+
+        function selectEnemy(ek) {
+            selectedEnemyLetter = getEnemyLetter(ek);
+            selectedEnemyFullKey = ek;
+            currentTool = 'place';
+            closePicker();
+            updateToolUI();
+        }
+
+        function selectPowerup(id) {
+            selectedPowerup = id;
+            closePicker();
+            updateToolUI();
+        }
+
+        function setDeleteMode() {
+            currentTool = currentTool === 'delete' ? (selectedEnemyLetter ? 'place' : 'none') : 'delete';
+            closePicker();
+            updateToolUI();
+        }
+
+        function updateToolUI() {
+            // Enemy button
+            const eBtn = document.getElementById('enemy-picker-btn');
+            const eBtnImg = document.getElementById('enemy-btn-img');
+            eBtnImg.innerHTML = '';
+            if (selectedEnemyFullKey) {
+                const url = getEnemyThumbURL(selectedEnemyFullKey);
+                if (url) {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.style.cssText = 'width:28px;height:28px;image-rendering:pixelated;object-fit:contain;';
+                    eBtnImg.appendChild(img);
+                } else {
+                    eBtnImg.textContent = selectedEnemyLetter;
+                }
+            } else {
+                eBtnImg.innerHTML = '<span style="font-size:16px">👾</span>';
+            }
+            eBtn.classList.toggle('active', currentTool === 'place' && !!selectedEnemyLetter);
+
+            // Powerup button
+            const pBtn = document.getElementById('powerup-picker-btn');
+            const pBtnImg = document.getElementById('powerup-btn-img');
+            pBtnImg.innerHTML = '';
+            const pt = POWERUP_TYPES.find(p => p.id === selectedPowerup);
+            if (pt && pt.frame) {
+                const url = getThumbURL(pt.frame);
+                if (url) {
+                    const img = document.createElement('img');
+                    img.src = url;
+                    img.style.cssText = 'width:28px;height:28px;image-rendering:pixelated;object-fit:contain;';
+                    pBtnImg.appendChild(img);
+                } else {
+                    pBtnImg.innerHTML = `<span style="font-size:16px">🍄</span>`;
+                }
+            } else {
+                pBtnImg.innerHTML = '<span style="font-size:16px">🍄</span>';
+            }
+            pBtn.classList.toggle('active', selectedPowerup !== '0');
+
+            // Delete button
+            document.getElementById('delete-mode-btn').classList.toggle('active', currentTool === 'delete');
+
+            // Grid mode class
+            const gv = document.getElementById('grid-icon-view');
+            gv.classList.remove('mode-place', 'mode-delete', 'mode-none');
+            gv.classList.add(currentTool === 'delete' ? 'mode-delete' :
+                (currentTool === 'place' && selectedEnemyLetter) ? 'mode-place' : 'mode-none');
+        }
+
+        // ================== GRID RENDERING ==================
         function renderGrid() {
             currentGrid = normalizeGrid(currentGrid);
             const container = document.getElementById('grid-icon-view');
             container.innerHTML = '';
 
-            const CELL_SIZE = 52;
+            const COLS = 8;
+            const grid = document.createElement('div');
+            grid.className = `editor-grid ${
+                currentTool === 'delete' ? 'mode-delete' :
+                (currentTool === 'place' && selectedEnemyLetter) ? 'mode-place' : 'mode-none'}`;
+            grid.style.gridTemplateColumns = `28px repeat(${COLS}, 1fr)`;
 
-            // Column headers (wave numbers)
-            const headerRow = document.createElement('div');
-            headerRow.style.cssText = `display: flex; gap: 2px; margin-bottom: 2px; padding-left: ${CELL_SIZE + 4}px;`;
-            currentGrid.forEach((_, waveIdx) => {
-                const hdr = document.createElement('div');
-                hdr.style.cssText = `width: ${CELL_SIZE}px; text-align: center; font-size: 10px; color: #84cc16; font-family: monospace;`;
-                hdr.textContent = `W${waveIdx}`;
-                headerRow.appendChild(hdr);
+            // Header
+            grid.appendChild(Object.assign(document.createElement('div'), { className: 'col-hdr' }));
+            for (let c = 0; c < COLS; c++) {
+                const h = document.createElement('div');
+                h.className = 'col-hdr';
+                h.textContent = c;
+                grid.appendChild(h);
+            }
+
+            // Rows
+            currentGrid.forEach((wave, wi) => {
+                const lbl = document.createElement('div');
+                lbl.className = 'row-lbl';
+                lbl.textContent = wi;
+                grid.appendChild(lbl);
+
+                for (let si = 0; si < COLS; si++) {
+                    grid.appendChild(createGridCell(wi, si, wave[si] || '00'));
+                }
             });
-            container.appendChild(headerRow);
 
-            // Rows (one per slot)
-            for (let slotIdx = 0; slotIdx < 8; slotIdx++) {
-                const row = document.createElement('div');
-                row.style.cssText = 'display: flex; gap: 2px; margin-bottom: 2px;';
+            container.appendChild(grid);
+        }
 
-                // Row label
-                const label = document.createElement('div');
-                label.style.cssText = `width: ${CELL_SIZE}px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #84cc16; font-family: monospace;`;
-                label.textContent = slotIdx;
-                row.appendChild(label);
+        function createGridCell(wi, si, code) {
+            const cell = document.createElement('div');
+            cell.className = 'grid-cell' + (code !== '00' ? ' occupied' : '');
 
-                currentGrid.forEach((wave, waveIdx) => {
-                    const code = wave[slotIdx] || "00";
-                    const cell = document.createElement('div');
-                    cell.className = 'grid-cell' + (code !== '00' ? ' occupied' : '');
-                    cell.style.cssText = `width: ${CELL_SIZE}px; height: ${CELL_SIZE}px;`;
-                    cell.onclick = () => openPalette(waveIdx, slotIdx);
+            if (code !== '00') {
+                const enemyURL = getEnemyBaseURL(code);
+                if (enemyURL) {
+                    const img = document.createElement('img');
+                    img.src = enemyURL;
+                    img.className = 'enemy-img';
+                    img.draggable = false;
+                    cell.appendChild(img);
+                }
 
-                    if (code !== '00') {
-                        const frameName = getFrameNameForCode(code);
-                        if (frameName && frameThumbs[frameName]) {
-                            const img = document.createElement('img');
-                            img.src = frameThumbs[frameName].toDataURL();
-                            img.className = 'sprite-icon';
-                            img.title = code;
-                            cell.appendChild(img);
+                // Code label
+                const cl = document.createElement('span');
+                cl.className = 'code-label';
+                cl.textContent = code;
+                cell.appendChild(cl);
+
+                // Powerup bubble
+                const dropId = code[1];
+                if (dropId && dropId !== '0') {
+                    const bubble = document.createElement('div');
+                    bubble.className = 'powerup-bubble';
+                    const pURL = getPowerupURL(dropId);
+                    if (pURL) {
+                        const pImg = document.createElement('img');
+                        pImg.src = pURL;
+                        bubble.appendChild(pImg);
+                    } else {
+                        const ptDef = POWERUP_TYPES.find(p => p.id === dropId);
+                        if (ptDef) {
+                            bubble.style.background = ptDef.color + '55';
+                            bubble.style.border = `1px solid ${ptDef.color}`;
+                            bubble.innerHTML = `<span style="font-size:8px;font-weight:700;color:#fff">${ptDef.id}</span>`;
                         }
-                        const codeLabel = document.createElement('span');
-                        codeLabel.className = 'code-label';
-                        codeLabel.textContent = code;
-                        cell.appendChild(codeLabel);
                     }
-
-                    row.appendChild(cell);
-                });
-                container.appendChild(row);
-            }
-        }
-
-        function openPalette(row, col) {
-            selectedCell = {row, col};
-            const modal = document.getElementById('palette-modal');
-            const container = document.getElementById('palette-grid');
-            container.innerHTML = '';
-
-            // Empty
-            const emptyBtn = createPaletteButton("00", null, "EMPTY");
-            container.appendChild(emptyBtn);
-
-            // All possible from enemyData
-            Object.keys(enemyData).forEach(enemyKey => {
-                const letter = enemyKey.replace(/enemy/i, '').toUpperCase().slice(0,1);
-                if (!letter) return;
-                for (let drop = 0; drop <= 3; drop++) {   // common drops 0-3
-                    const code = letter + drop;
-                    const frame = getFrameNameForCode(code);
-                    const btn = createPaletteButton(code, frame, code);
-                    container.appendChild(btn);
+                    cell.appendChild(bubble);
                 }
-            });
-
-            modal.classList.remove('hidden');
-        }
-
-        function createPaletteButton(code, frameName, label) {
-            const btn = document.createElement('button');
-            btn.className = 'flex flex-col items-center gap-1 p-3 hover:bg-zinc-700 rounded-xl w-full border border-zinc-700 hover:border-lime-400 transition-colors';
-            btn.onclick = () => {
-                if (selectedCell) {
-                    currentGrid[selectedCell.row][selectedCell.col] = code;
-                    closePalette();
-                    renderGrid();
-                    renderPreview();
-                }
-            };
-
-            if (frameName && frameThumbs[frameName]) {
-                const img = document.createElement('img');
-                img.src = frameThumbs[frameName].toDataURL();
-                img.className = 'thumb w-10 h-10';
-                btn.appendChild(img);
             }
 
-            const codeEl = document.createElement('div');
-            codeEl.className = 'font-mono text-[10px] text-zinc-400';
-            codeEl.textContent = label;
-            btn.appendChild(codeEl);
+            // Click
+            cell.onclick = () => handleCellClick(wi, si);
 
-            return btn;
+            // Drag-and-drop
+            cell.addEventListener('dragover', e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; cell.classList.add('drag-over'); });
+            cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+            cell.addEventListener('drop', e => { e.preventDefault(); cell.classList.remove('drag-over'); handleCellDrop(wi, si, e); });
+
+            return cell;
         }
 
-        function closePalette() {
-            document.getElementById('palette-modal').classList.add('hidden');
-            selectedCell = null;
-        }
-
-        function addWave() {
-            currentGrid = normalizeGrid(currentGrid);
-            currentGrid.push(createEmptyWave());
+        function handleCellClick(wi, si) {
+            if (currentTool === 'delete') {
+                currentGrid[wi][si] = '00';
+            } else if (currentTool === 'place' && selectedEnemyLetter) {
+                currentGrid[wi][si] = selectedEnemyLetter + selectedPowerup;
+            } else {
+                return;
+            }
             renderGrid();
             renderPreview();
         }
 
-        function deleteLastWave() {
-            if (currentGrid.length > 1) {
-                currentGrid.pop();
-                renderGrid();
-                renderPreview();
+        function handleCellDrop(wi, si, e) {
+            let data;
+            try { data = JSON.parse(e.dataTransfer.getData('application/json')); } catch { return; }
+            if (data.type === 'enemy') {
+                currentGrid[wi][si] = (data.letter || getEnemyLetter(data.key)) + selectedPowerup;
+            } else if (data.type === 'powerup') {
+                const cur = currentGrid[wi][si];
+                if (cur && cur !== '00') currentGrid[wi][si] = cur[0] + data.id;
             }
+            renderGrid();
+            renderPreview();
         }
 
+        // ================== RENDER ALL ==================
+        function renderAll() {
+            loadCurrentStage();
+            updateToolUI();
+        }
+
+        function loadCurrentStage() {
+            const obj = gameData ? (gameData[currentStageKey] || {}) : {};
+            currentGrid = normalizeGrid(obj.enemylist);
+            renderGrid();
+            renderPreview();
+            updateToolUI();
+        }
+
+        // ================== WAVES ==================
+        function addWave() {
+            currentGrid = normalizeGrid(currentGrid);
+            currentGrid.push(createEmptyWave());
+            renderGrid(); renderPreview();
+        }
+        function deleteLastWave() {
+            if (currentGrid.length > 1) { currentGrid.pop(); renderGrid(); renderPreview(); }
+        }
+
+        // ================== PREVIEW ==================
         function renderPreview() {
             currentGrid = normalizeGrid(currentGrid);
             const canvas = document.getElementById('preview-canvas');
+            if (!canvas) return;
             const ctx = canvas.getContext('2d');
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Simple vertical preview: waves scrolling up
-            const cellW = canvas.width / 8;
-            const cellH = 48;
-            currentGrid.forEach((wave, waveIdx) => {
-                const y = canvas.height - 80 - (waveIdx * cellH * 1.1);
+            const cellW = canvas.width / 8, cellH = 48;
+            currentGrid.forEach((wave, wi) => {
+                const y = canvas.height - 80 - (wi * cellH * 1.1);
                 wave.forEach((code, col) => {
-                    if (code === "00") return;
-                    const frameName = getFrameNameForCode(code);
-                    if (!frameName || !frameThumbs[frameName]) return;
-                    const thumb = frameThumbs[frameName];
-                    ctx.drawImage(thumb, col * cellW + (cellW-32)/2, y, 32, 32);
+                    if (code === '00') return;
+                    const fn = getFrameNameForCode(code);
+                    if (!fn || !frameThumbs[fn]) return;
+                    ctx.drawImage(frameThumbs[fn], col * cellW + (cellW - 32) / 2, y, 32, 32);
                 });
             });
         }
 
+        // ================== ENEMY EDITOR ==================
         function renderEnemyList() {
-            const container = document.getElementById('enemy-list');
-            container.innerHTML = '';
+            const c = document.getElementById('enemy-list');
+            c.innerHTML = '';
             Object.keys(enemyData).forEach(key => {
-                const div = document.createElement('div');
-                div.className = 'px-4 py-3 bg-zinc-900 hover:bg-zinc-800 cursor-pointer rounded flex justify-between items-center';
-                div.innerHTML = `<span class="font-mono">${key}</span>`;
-                div.onclick = () => editEnemy(key);
-                container.appendChild(div);
+                const b = document.createElement('button');
+                b.className = 'menu-btn';
+                b.style.cssText = 'display:inline-flex;padding:6px 10px;font-size:11px;';
+                b.textContent = key;
+                b.onclick = () => editEnemy(key);
+                c.appendChild(b);
             });
         }
 
@@ -521,307 +854,168 @@
         }
 
         function syncEnemyEditorForm(showErrors = false) {
-            const keyInput = document.getElementById('enemy-key');
-            const jsonInput = document.getElementById('enemy-json');
-            const draftKey = keyInput.value.trim();
-            const draftJson = jsonInput.value.trim();
-
-            if (!draftKey && !draftJson && !currentEnemyKey) {
-                return true;
-            }
-
-            if (!draftKey) {
-                if (showErrors) {
-                    switchTab(1);
-                    alert('Enemy key is required before saving or playing.');
-                }
-                return false;
-            }
-
-            let newData;
-            try {
-                newData = JSON.parse(draftJson || '{}');
-            } catch (e) {
-                if (showErrors) {
-                    switchTab(1);
-                    alert('Invalid enemy JSON');
-                }
-                return false;
-            }
-
-            if (currentEnemyKey && currentEnemyKey !== draftKey) {
-                delete enemyData[currentEnemyKey];
-            }
-
-            enemyData[draftKey] = newData;
+            const dk = document.getElementById('enemy-key').value.trim();
+            const dj = document.getElementById('enemy-json').value.trim();
+            if (!dk && !dj && !currentEnemyKey) return true;
+            if (!dk) { if (showErrors) alert('Enemy key required'); return false; }
+            let nd;
+            try { nd = JSON.parse(dj || '{}'); } catch { if (showErrors) alert('Invalid JSON'); return false; }
+            if (currentEnemyKey && currentEnemyKey !== dk) delete enemyData[currentEnemyKey];
+            enemyData[dk] = nd;
             gameData.enemyData = enemyData;
-            currentEnemyKey = draftKey;
+            currentEnemyKey = dk;
             renderEnemyList();
             return true;
         }
 
         function saveCurrentEnemy() {
-            if (!syncEnemyEditorForm(true)) {
-                return;
-            }
-            alert('Enemy saved');
+            if (syncEnemyEditorForm(true)) alert('Enemy saved');
         }
 
+        // ================== ATLAS ==================
         function renderAtlas() {
-            const container = document.getElementById('atlas-grid');
-            container.innerHTML = '';
+            const c = document.getElementById('atlas-grid');
+            c.innerHTML = '';
             const frames = atlasData ? atlasData.frames || {} : {};
             Object.keys(frames).forEach(key => {
-                const div = document.createElement('div');
-                div.className = 'bg-zinc-900 border border-zinc-700 rounded p-2 text-center';
-                const thumb = document.createElement('canvas');
-                thumb.width = 64; thumb.height = 64;
-                const tctx = thumb.getContext('2d');
+                const d = document.createElement('div');
+                d.style.cssText = 'text-align:center;';
+                const t = document.createElement('canvas');
+                t.width = 64; t.height = 64;
+                t.style.cssText = 'image-rendering:pixelated;width:100%;aspect-ratio:1;';
                 const f = frames[key].frame;
-                if (f && atlasImage) {
-                    tctx.drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, 64, 64);
-                }
-                div.appendChild(thumb);
-                const name = document.createElement('div');
-                name.className = 'text-[10px] mt-1 truncate';
-                name.textContent = key;
-                div.appendChild(name);
-                container.appendChild(div);
+                if (f && atlasImage) t.getContext('2d').drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, 64, 64);
+                d.appendChild(t);
+                const n = document.createElement('div');
+                n.style.cssText = 'font-size:8px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                n.textContent = key;
+                d.appendChild(n);
+                c.appendChild(d);
             });
-            // Add extraSprites
-            extraSprites.forEach((s, i) => {
-                const div = document.createElement('div');
-                div.className = 'bg-amber-900 border border-amber-400 rounded p-2 text-center';
-                div.appendChild(s.canvas);
-                const name = document.createElement('div');
-                name.className = 'text-[10px] mt-1 truncate text-amber-300';
-                name.textContent = s.key + ' (new)';
-                div.appendChild(name);
-                container.appendChild(div);
+            extraSprites.forEach(s => {
+                const d = document.createElement('div');
+                d.style.cssText = 'text-align:center;';
+                s.canvas.style.cssText = 'image-rendering:pixelated;width:100%;aspect-ratio:1;';
+                d.appendChild(s.canvas);
+                const n = document.createElement('div');
+                n.style.cssText = 'font-size:8px;color:#f59e0b;';
+                n.textContent = s.key + ' (new)';
+                d.appendChild(n);
+                c.appendChild(d);
             });
         }
 
         async function handleSpriteUpload(e) {
-            const files = e.target.files;
-            for (let file of files) {
+            for (let file of e.target.files) {
                 const img = new Image();
                 img.src = URL.createObjectURL(file);
-                await new Promise(res => img.onload = res);
+                await new Promise(r => img.onload = r);
                 const c = document.createElement('canvas');
-                c.width = img.width;
-                c.height = img.height;
+                c.width = img.width; c.height = img.height;
                 c.getContext('2d').drawImage(img, 0, 0);
-                extraSprites.push({
-                    key: file.name,
-                    canvas: c,
-                    w: img.width,
-                    h: img.height
-                });
+                extraSprites.push({ key: file.name, canvas: c, w: img.width, h: img.height });
             }
             renderAtlas();
         }
 
         function repackAtlas() {
-            if (!atlasData || !atlasImage) {
-                alert("Load atlas first");
-                return;
-            }
-            const allSprites = [];
-
-            // Existing frames
+            if (!atlasData || !atlasImage) { alert("Load atlas first"); return; }
+            const all = [];
             const frames = atlasData.frames || {};
-            const tempC = document.createElement('canvas');
-            const tctx = tempC.getContext('2d');
-            for (let key in frames) {
-                const f = frames[key].frame;
-                if (!f) continue;
-                tempC.width = f.w; tempC.height = f.h;
-                tctx.drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
-                allSprites.push({
-                    key: key,
-                    canvas: tempC.cloneNode(true), // copy
-                    w: f.w,
-                    h: f.h
-                });
+            const tc = document.createElement('canvas'), tx = tc.getContext('2d');
+            for (let k in frames) {
+                const f = frames[k].frame; if (!f) continue;
+                tc.width = f.w; tc.height = f.h;
+                tx.drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+                all.push({ key: k, canvas: tc.cloneNode(true), w: f.w, h: f.h });
             }
-            // New
-            allSprites.push(...extraSprites);
-
-            // Simple row packer
-            allSprites.sort((a, b) => b.h - a.h);
-            const MAX_W = 2048;
-            const PADDING = 4;
-            let curX = PADDING;
-            let curY = PADDING;
-            let rowMaxH = 0;
-            const positions = {};
-            let finalH = 0;
-
-            allSprites.forEach(s => {
-                if (curX + s.w + PADDING > MAX_W) {
-                    curY += rowMaxH + PADDING;
-                    curX = PADDING;
-                    rowMaxH = 0;
-                }
-                positions[s.key] = {x: curX, y: curY};
-                curX += s.w + PADDING;
-                rowMaxH = Math.max(rowMaxH, s.h);
-                finalH = Math.max(finalH, curY + s.h + PADDING);
+            all.push(...extraSprites);
+            all.sort((a, b) => b.h - a.h);
+            const MW = 2048, P = 4;
+            let cx = P, cy = P, rh = 0, fh = 0;
+            const pos = {};
+            all.forEach(s => {
+                if (cx + s.w + P > MW) { cy += rh + P; cx = P; rh = 0; }
+                pos[s.key] = { x: cx, y: cy }; cx += s.w + P;
+                rh = Math.max(rh, s.h); fh = Math.max(fh, cy + s.h + P);
             });
-
-            // Create new atlas canvas
-            const newAtlas = document.createElement('canvas');
-            newAtlas.width = MAX_W;
-            newAtlas.height = finalH;
-            const nctx = newAtlas.getContext('2d');
-            allSprites.forEach(s => {
-                const pos = positions[s.key];
-                nctx.drawImage(s.canvas, pos.x, pos.y);
+            const na = document.createElement('canvas'); na.width = MW; na.height = fh;
+            const nc = na.getContext('2d');
+            all.forEach(s => { const p = pos[s.key]; nc.drawImage(s.canvas, p.x, p.y); });
+            const nf = {};
+            all.forEach(s => {
+                const p = pos[s.key];
+                nf[s.key] = { frame: { x: p.x, y: p.y, w: s.w, h: s.h }, rotated: false, trimmed: false,
+                    spriteSourceSize: { x: 0, y: 0, w: s.w, h: s.h }, sourceSize: { w: s.w, h: s.h } };
             });
-
-            // Build new frames object
-            const newFrames = {};
-            allSprites.forEach(s => {
-                const pos = positions[s.key];
-                newFrames[s.key] = {
-                    frame: { x: pos.x, y: pos.y, w: s.w, h: s.h },
-                    rotated: false,
-                    trimmed: false,
-                    spriteSourceSize: { x: 0, y: 0, w: s.w, h: s.h },
-                    sourceSize: { w: s.w, h: s.h }
-                };
-            });
-
-            const newMeta = {
-                ... (atlasData.meta || {}),
-                image: ATLAS_PNG,
-                size: { w: MAX_W, h: finalH }
-            };
-
-            const newAtlasJSON = {
-                frames: newFrames,
-                meta: newMeta
-            };
-
-            // Write back
-            saveAtlasFiles(newAtlas, newAtlasJSON);
+            saveAtlasFiles(na, { frames: nf, meta: { ...(atlasData.meta || {}), image: ATLAS_PNG, size: { w: MW, h: fh } } });
         }
 
-        async function saveAtlasFiles(canvas, jsonObj) {
+        async function saveAtlasFiles(canvas, json) {
             try {
-                const assetsHandle = await dirHandle.getDirectoryHandle(ATLAS_DIR, { create: true });
-                
-                // PNG
-                const pngHandle = await assetsHandle.getFileHandle(ATLAS_PNG, { create: true });
-                const pngWritable = await pngHandle.createWritable();
-                const pngBlob = await new Promise(r => canvas.toBlob(r, 'image/png'));
-                await pngWritable.write(pngBlob);
-                await pngWritable.close();
+                const ah = await dirHandle.getDirectoryHandle(ATLAS_DIR, { create: true });
+                const pw = await (await ah.getFileHandle(ATLAS_PNG, { create: true })).createWritable();
+                await pw.write(await new Promise(r => canvas.toBlob(r, 'image/png'))); await pw.close();
+                const jw = await (await ah.getFileHandle(ATLAS_JSON, { create: true })).createWritable();
+                await jw.write(JSON.stringify(json, null, 2)); await jw.close();
+                alert('Atlas updated!'); extraSprites = []; await loadGameFiles();
+            } catch (e) { alert('Atlas write failed: ' + e.message); }
+        }
 
-                // JSON
-                const jsonHandle = await assetsHandle.getFileHandle(ATLAS_JSON, { create: true });
-                const jsonWritable = await jsonHandle.createWritable();
-                await jsonWritable.write(JSON.stringify(jsonObj, null, 2));
-                await jsonWritable.close();
-
-                alert('Atlas updated successfully! Reload editor to see changes.');
-                // Reload atlas
-                extraSprites = [];
-                await loadGameFiles();
-            } catch (e) {
-                alert('Failed to write atlas: ' + e.message + '\n\nMake sure you have write permission.');
-            }
+        // ================== SAVE ==================
+        function quickSave() {
+            if (dirHandle && gameData) saveAll();
+            else saveToFirebase();
         }
 
         async function saveAll() {
-            if (!dirHandle || !gameData) {
-                alert("Load directory first");
-                return;
-            }
-
-            // Update current stage
+            if (!dirHandle || !gameData) { alert("Load directory first"); return; }
             gameData[currentStageKey] = gameData[currentStageKey] || {};
             gameData[currentStageKey].enemylist = normalizeGrid(currentGrid);
-
-            // Write game.json
             try {
-                let jsonPath = [GAME_JSON_NAME];
-                let handle;
-                try {
-                    handle = await getFileHandle(jsonPath);
-                } catch {
-                    jsonPath = [ATLAS_DIR, GAME_JSON_NAME];
-                    handle = await getFileHandle(jsonPath);
-                }
-                const writable = await handle.createWritable();
-                await writable.write(JSON.stringify(gameData, null, 2));
-                await writable.close();
-                alert('✅ game.json & atlas live patched!');
-            } catch (e) {
-                alert('Write failed: ' + e.message);
-            }
+                let h;
+                try { h = await getFileHandle([GAME_JSON_NAME]); }
+                catch { h = await getFileHandle([ATLAS_DIR, GAME_JSON_NAME]); }
+                const w = await h.createWritable();
+                await w.write(JSON.stringify(gameData, null, 2)); await w.close();
+                alert('Saved!');
+            } catch (e) { alert('Write failed: ' + e.message); }
         }
 
         function buildRuntimeRecipe() {
-            const recipe = JSON.parse(JSON.stringify(gameData || {}));
-            recipe.enemyData = JSON.parse(JSON.stringify(enemyData || {}));
-            recipe[currentStageKey] = recipe[currentStageKey] || {};
-            recipe[currentStageKey].enemylist = normalizeGrid(currentGrid);
-            return recipe;
+            const r = JSON.parse(JSON.stringify(gameData || {}));
+            r.enemyData = JSON.parse(JSON.stringify(enemyData || {}));
+            r[currentStageKey] = r[currentStageKey] || {};
+            r[currentStageKey].enemylist = normalizeGrid(currentGrid);
+            return r;
         }
 
         function playCurrentStage() {
-            if (!gameData) {
-                alert('Load directory first');
-                return;
-            }
-
-            if (!syncEnemyEditorForm(true)) {
-                return;
-            }
-
-            const stageId = getCurrentStageId();
-            const recipe = buildRuntimeRecipe();
-
+            if (!gameData) { alert('Load directory first'); return; }
+            if (!syncEnemyEditorForm(true)) return;
+            const sid = getCurrentStageId();
             try {
-                localStorage.setItem(EDITOR_PLAY_RECIPE_KEY, JSON.stringify(recipe));
-                localStorage.setItem(EDITOR_PLAY_STAGE_KEY, String(stageId));
-            } catch (e) {
-                alert('Unable to prepare editor play data: ' + e.message);
-                return;
-            }
-
-            const popup = window.open(`phaser-game.html?editorPlay=1&stage=${stageId}`, '_blank');
-            if (!popup) {
-                alert('Popup blocked. Allow popups for this page to launch Phaser.');
-            }
+                localStorage.setItem(EDITOR_PLAY_RECIPE_KEY, JSON.stringify(buildRuntimeRecipe()));
+                localStorage.setItem(EDITOR_PLAY_STAGE_KEY, String(sid));
+            } catch (e) { alert('Error: ' + e.message); return; }
+            window.open(`phaser-game.html?editorPlay=1&stage=${sid}`, '_blank');
         }
 
         function exportCurrentLevelJSON() {
-            const levelData = {
-                name: currentStageKey,
-                enemylist: normalizeGrid(currentGrid),
-                width: 8,
-                exportedAt: new Date().toISOString()
-            };
-            const blob = new Blob([JSON.stringify(levelData, null, 2)], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
+            const d = { name: currentStageKey, enemylist: normalizeGrid(currentGrid), width: 8, exportedAt: new Date().toISOString() };
             const a = document.createElement('a');
-            a.href = url;
-            a.download = `${currentStageKey}-level.json`;
-            a.click();
-            URL.revokeObjectURL(url);
+            a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }));
+            a.download = `${currentStageKey}-level.json`; a.click();
         }
 
-        // Keyboard shortcuts
+        // ================== KEYBOARD ==================
         document.addEventListener('keydown', e => {
-            if (e.key === 's' && e.ctrlKey) {
-                e.preventDefault();
-                saveAll();
-            }
+            if (e.key === 's' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); quickSave(); }
+            if (e.key === 'Escape') { closePicker(); closeMenu(); }
+            if (e.key === 'd' && !e.ctrlKey && !e.metaKey && !e.target.closest('input,textarea')) { e.preventDefault(); setDeleteMode(); }
         });
 
-        // ================== FIREBASE LEVEL PERSISTENCE ==================
+        // ================== FIREBASE ==================
         const FIREBASE_CONFIG = {
             apiKey: "AIzaSyAHY_agipyNEXvY2J4jDgnlk9kLeM6O37Y",
             authDomain: "evil-invaders.firebaseapp.com",
@@ -832,146 +1026,71 @@
             appId: "1:149257705855:web:3f048481dfc66cef61224a",
         };
         const FIREBASE_LEVELS_PATH = "levels";
-
-        let firebaseApp = null;
-        let firebaseDb = null;
+        let firebaseApp = null, firebaseDb = null;
 
         function initFirebase() {
             if (firebaseDb) return;
-            if (typeof firebase === 'undefined') {
-                console.warn('Firebase SDK not loaded');
-                return;
-            }
-            if (!firebase.apps || firebase.apps.length === 0) {
-                firebaseApp = firebase.initializeApp(FIREBASE_CONFIG);
-            } else {
-                firebaseApp = firebase.apps[0];
-            }
+            if (typeof firebase === 'undefined') return;
+            firebaseApp = (!firebase.apps || !firebase.apps.length) ? firebase.initializeApp(FIREBASE_CONFIG) : firebase.apps[0];
             firebaseDb = firebase.database();
         }
 
-        function sanitizeLevelName(name) {
-            return name.replace(/[.#$/\[\]]/g, '_').trim();
-        }
+        function sanitizeLevelName(n) { return n.replace(/[.#$/\[\]]/g, '_').trim(); }
 
         async function saveToFirebase() {
             initFirebase();
-            if (!firebaseDb) {
-                alert('Firebase not available.');
-                return;
-            }
-
-            let levelName = document.getElementById('firebase-level-name').value.trim();
-            if (!levelName) {
-                levelName = prompt('Enter a name for this level:');
-                if (!levelName) return;
-            }
-            levelName = sanitizeLevelName(levelName);
-
-            const levelData = {
-                name: levelName,
-                stageKey: currentStageKey,
-                enemylist: normalizeGrid(currentGrid),
-                enemyData: enemyData || {},
-                width: 8,
-                savedAt: firebase.database.ServerValue.TIMESTAMP,
-            };
-
+            if (!firebaseDb) { alert('Firebase not available'); return; }
+            let name = document.getElementById('firebase-level-name').value.trim();
+            if (!name) { name = prompt('Level name:'); if (!name) return; }
+            name = sanitizeLevelName(name);
             try {
-                await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${levelName}`).set(levelData);
-                document.getElementById('firebase-level-name').value = levelName;
-                alert(`Level "${levelName}" saved to Firebase!`);
-            } catch (e) {
-                alert('Firebase save failed: ' + e.message);
-            }
+                await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${name}`).set({
+                    name, stageKey: currentStageKey, enemylist: normalizeGrid(currentGrid),
+                    enemyData: enemyData || {}, width: 8, savedAt: firebase.database.ServerValue.TIMESTAMP
+                });
+                document.getElementById('firebase-level-name').value = name;
+                alert(`"${name}" saved!`);
+            } catch (e) { alert('Save failed: ' + e.message); }
         }
 
-        async function loadFromFirebase(levelName) {
+        async function loadFromFirebase(name) {
             initFirebase();
-            if (!firebaseDb) {
-                alert('Firebase not available.');
-                return false;
-            }
-
-            levelName = sanitizeLevelName(levelName);
-
+            if (!firebaseDb) { alert('Firebase not available'); return false; }
+            name = sanitizeLevelName(name);
             try {
-                const snapshot = await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${levelName}`).once('value');
-                const data = snapshot.val();
-                if (!data) {
-                    alert(`Level "${levelName}" not found in Firebase.`);
-                    return false;
-                }
-
-                currentGrid = normalizeGrid(data.enemylist || []);
-                if (data.enemyData && typeof data.enemyData === 'object') {
-                    enemyData = data.enemyData;
-                }
-                if (data.stageKey) {
-                    currentStageKey = data.stageKey;
-                }
-
-                document.getElementById('firebase-level-name').value = levelName;
-                renderGrid();
-                renderPreview();
-                renderEnemyList();
-
-                document.getElementById('status').innerHTML = `
-                    <div class="w-2 h-2 bg-orange-400 rounded-full"></div>
-                    Loaded from Firebase: ${levelName}
-                `;
-
+                const snap = await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${name}`).once('value');
+                const d = snap.val();
+                if (!d) { alert(`"${name}" not found`); return false; }
+                currentGrid = normalizeGrid(d.enemylist || []);
+                if (d.enemyData && typeof d.enemyData === 'object') enemyData = d.enemyData;
+                if (d.stageKey) currentStageKey = d.stageKey;
+                document.getElementById('firebase-level-name').value = name;
+                document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Firebase: ${name}</span>`;
+                renderGrid(); renderPreview(); updateToolUI();
                 return true;
-            } catch (e) {
-                alert('Firebase load failed: ' + e.message);
-                return false;
-            }
+            } catch (e) { alert('Load failed: ' + e.message); return false; }
         }
 
         function loadFromFirebasePrompt() {
-            const name = prompt('Enter level name to load:');
-            if (name) loadFromFirebase(name);
+            const n = prompt('Level name:');
+            if (n) loadFromFirebase(n);
         }
 
         function playFirebaseLevel() {
-            let levelName = document.getElementById('firebase-level-name').value.trim();
-            if (!levelName) {
-                alert('Enter a Firebase level name first, or save/load a level.');
-                return;
-            }
-            levelName = sanitizeLevelName(levelName);
-            const stageId = getCurrentStageId();
-            const url = `phaser-game.html?level=${encodeURIComponent(levelName)}&stage=${stageId}`;
-            const popup = window.open(url, '_blank');
-            if (!popup) {
-                alert('Popup blocked. Allow popups for this page to launch the game.');
-            }
+            let name = document.getElementById('firebase-level-name').value.trim();
+            if (!name) { alert('Enter a level name first'); return; }
+            window.open(`phaser-game.html?level=${encodeURIComponent(sanitizeLevelName(name))}&stage=${getCurrentStageId()}`, '_blank');
         }
 
-        // ================== URL PARAM LEVEL LOADING ==================
-        function getLevelFromURL() {
-            return new URLSearchParams(window.location.search).get('level');
-        }
-
-        // Init
+        // ================== INIT ==================
         window.onload = () => {
-            switchTab(0);
-            console.log('%cEvil Invaders Level Editor ready. Click Load Game Directory.', 'color:lime; font-size:13px');
-
-            // Auto-load level from URL param if present
-            const urlLevel = getLevelFromURL();
+            updateToolUI();
+            const urlLevel = new URLSearchParams(window.location.search).get('level');
             if (urlLevel) {
                 document.getElementById('firebase-level-name').value = urlLevel;
                 initFirebase();
-                if (firebaseDb) {
-                    loadFromFirebase(urlLevel);
-                } else {
-                    // Firebase SDK may still be loading, retry after short delay
-                    setTimeout(() => {
-                        initFirebase();
-                        loadFromFirebase(urlLevel);
-                    }, 1000);
-                }
+                const tryLoad = () => { initFirebase(); loadFromFirebase(urlLevel); };
+                firebaseDb ? tryLoad() : setTimeout(tryLoad, 1000);
             }
         };
     </script>
