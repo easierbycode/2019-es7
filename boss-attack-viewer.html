@@ -316,17 +316,23 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
         var projB = sc.bossProjDataB || sc.bossProjData;
         var projC = sc.bossProjDataC || sc.bossProjData;
         if (seed < 0.3) {
-            var volleys = 0;
-            var beamStep = function() {
-                if (!sc._bossAlive() || volleys >= 3) {
-                    if (sc._bossAlive()) sc.time.delayedCall(1000, function() { sc.bossShootStart(); });
+            // Beam spread: charge anim → 500ms → (shoot anim + beam) x3 cycling 105°/90°/75°
+            var beamAngles = [105, 90, 75];
+            var beamIdx = 0;
+            _playBossAnim(sc, "charge");
+            sc.time.delayedCall(500, function beamStep() {
+                if (!sc._bossAlive() || beamIdx >= 3) {
+                    if (sc._bossAlive()) {
+                        _playBossAnim(sc, "idle");
+                        sc.time.delayedCall(1000, function() { sc.bossShootStart(); });
+                    }
                     return;
                 }
-                volleys++;
-                sc.bossShootSpread(projA, 3, 25);
+                _playBossAnim(sc, "shoot");
+                sc.bossShootBeam(projA, beamAngles[beamIdx]);
+                beamIdx++;
                 sc.time.delayedCall(500, beamStep);
-            };
-            sc.time.delayedCall(300, beamStep);
+            });
         } else if (seed < 0.7) {
             sc.bossShootRadial(projC || projA, 8);
             sc.time.delayedCall(1500, function() { sc.bossShootStart(); });
@@ -695,6 +701,25 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 bullet.setOrigin(0.5); bullet.setDepth(5);
                 bullet.setData("speed", speed);
                 bullet.setData("rotX", Math.cos(angle)); bullet.setData("rotY", Math.sin(angle));
+                if (frames.length > 1) { bullet.setData("frames", frames); bullet.setData("animIdx", 0); bullet.setData("animTimer", 0); }
+                this.worldContainer.add(bullet);
+                this.enemyBullets.push(bullet);
+            }
+        }
+
+        bossShootBeam(projData, degree) {
+            if (!projData || !this.bossSprite) return;
+            var frames = projData.texture || [];
+            var frameKey = frames[0] || "normalProjectile0.gif";
+            var speed = projData.speed || 1;
+            var rad = degree * Math.PI / 180;
+            for (var i = 0; i < 2; i++) {
+                var offsetX = i === 0 ? -10 : 10;
+                var bullet = this.add.sprite(this.bossSprite.x + offsetX, this.bossSprite.y + 20, "game_asset", frameKey);
+                bullet.setOrigin(0.5); bullet.setDepth(5);
+                bullet.setRotation(rad);
+                bullet.setData("speed", speed);
+                bullet.setData("rotX", Math.cos(rad)); bullet.setData("rotY", Math.sin(rad));
                 if (frames.length > 1) { bullet.setData("frames", frames); bullet.setData("animIdx", 0); bullet.setData("animTimer", 0); }
                 this.worldContainer.add(bullet);
                 this.enemyBullets.push(bullet);

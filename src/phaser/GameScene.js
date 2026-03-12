@@ -40,6 +40,7 @@ import {
     bossShootStart as _bossShootStart,
     bossShootStraight as _bossShootStraight,
     bossShootAimed as _bossShootAimed,
+    bossShootBeam as _bossShootBeam,
     bossShootSpread as _bossShootSpread,
     bossShootRadial as _bossShootRadial,
     checkBossDanger as _checkBossDanger,
@@ -89,6 +90,7 @@ export class PhaserGameScene extends Phaser.Scene {
     bossShootStart() { _bossShootStart(this); }
     bossShootStraight(projData) { _bossShootStraight(this, projData); }
     bossShootAimed(projData) { _bossShootAimed(this, projData); }
+    bossShootBeam(projData, degree) { _bossShootBeam(this, projData, degree); }
     bossShootSpread(projData, count, angleDeg) { _bossShootSpread(this, projData, count, angleDeg); }
     bossShootRadial(projData, count) { _bossShootRadial(this, projData, count); }
     checkBossDanger() { _checkBossDanger(this); }

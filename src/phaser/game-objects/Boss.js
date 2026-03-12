@@ -102,6 +102,14 @@ export function bossAdd(scene) {
     scene.bossShadow = createShadow(scene, scene.bossSprite, bossFrame, bossShadowReverse, bossShadowOffsetY);
     scene.bossSprite.setData("shadow", scene.bossShadow);
 
+    // Store fang animation sets for pattern use (stageId 4)
+    if (stageId === 4 && bossData.anim) {
+        scene.fangAnimIdle = bossData.anim.idle || [];
+        scene.fangAnimWait = bossData.anim.wait || [];
+        scene.fangAnimCharge = bossData.anim.charge || [];
+        scene.fangAnimShoot = bossData.anim.shoot || [];
+    }
+
     scene.enemies.push(scene.bossSprite);
 
     var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
@@ -400,6 +408,39 @@ export function bossShootAimed(scene, projData) {
     bullet.setData("rotY", dy / dist);
 
     scene.enemyBullets.push(bullet);
+}
+
+export function bossShootBeam(scene, projData, degree) {
+    if (!projData || !scene.bossSprite) return;
+
+    var frames = projData.texture || [];
+    var frameKey = frames[0] || "normalProjectile0.gif";
+    var speed = projData.speed || 1;
+    var rad = degree * Math.PI / 180;
+
+    // PIXI fires 2 beams per call at slightly offset x positions
+    for (var i = 0; i < 2; i++) {
+        var offsetX = i === 0 ? -10 : 10;
+        var bullet = scene.add.sprite(scene.bossSprite.x + offsetX, scene.bossSprite.y + 20, "game_asset", frameKey);
+        bullet.setOrigin(0.5);
+        bullet.setDepth(47);
+        bullet.setRotation(rad);
+        bullet.setData("speed", speed);
+        bullet.setData("damage", projData.damage || 1);
+        bullet.setData("hp", projData.hp || 1);
+        bullet.setData("score", projData.score || 0);
+        bullet.setData("spgage", projData.spgage || 0);
+        bullet.setData("rotX", Math.cos(rad));
+        bullet.setData("rotY", Math.sin(rad));
+
+        if (frames.length > 1) {
+            bullet.setData("frames", frames);
+            bullet.setData("animIdx", 0);
+            bullet.setData("animTimer", 0);
+        }
+
+        scene.enemyBullets.push(bullet);
+    }
 }
 
 export function bossShootSpread(scene, projData, count, angleDeg) {
