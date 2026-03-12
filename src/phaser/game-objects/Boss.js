@@ -45,6 +45,7 @@ var BOSS_BALLOON_OFFSETS = [
 export function bossAdd(scene) {
     if (scene.bossActive) return;
     scene.bossActive = true;
+    scene.bossReached = true;
     scene.bossEntering = true;
     scene.enemyWaveFlg = false;
 

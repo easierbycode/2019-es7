@@ -156,12 +156,10 @@
             <!-- Enemy picker button -->
             <button id="enemy-picker-btn" class="tb-btn" style="background:#4d8bc4" onclick="openPicker('enemy')">
                 <span id="enemy-btn-img"></span>
-                <span id="enemy-btn-label" class="hidden-mobile">Enemy</span>
             </button>
             <!-- Item picker button -->
             <button id="powerup-picker-btn" class="tb-btn" style="background:#5db872" onclick="openPicker('powerup')">
                 <span id="powerup-btn-img"></span>
-                <span id="powerup-btn-label" class="hidden-mobile">Item</span>
             </button>
             <!-- Delete -->
             <button id="delete-mode-btn" class="tb-btn" style="background:#821c35" onclick="setDeleteMode()">
@@ -307,6 +305,7 @@
         let frameThumbs = {};       // key -> canvas
         let thumbDataURLs = {};     // key -> dataURL (cached)
         let extraSprites = [];
+        let replacedFrames = {};
         let currentEnemyKey = null;
 
         // Tool state
@@ -884,17 +883,27 @@
             const frames = atlasData ? atlasData.frames || {} : {};
             Object.keys(frames).forEach(key => {
                 const d = document.createElement('div');
-                d.style.cssText = 'text-align:center;';
+                d.style.cssText = 'text-align:center;cursor:pointer;';
+                d.title = 'Click to replace';
+                const isReplaced = !!replacedFrames[key];
+                if (isReplaced) d.style.outline = '2px solid #84cc16';
                 const t = document.createElement('canvas');
                 t.width = 64; t.height = 64;
                 t.style.cssText = 'image-rendering:pixelated;width:100%;aspect-ratio:1;';
-                const f = frames[key].frame;
-                if (f && atlasImage) t.getContext('2d').drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, 64, 64);
+                if (isReplaced) {
+                    const rc = replacedFrames[key].canvas;
+                    t.getContext('2d').drawImage(rc, 0, 0, rc.width, rc.height, 0, 0, 64, 64);
+                } else {
+                    const f = frames[key].frame;
+                    if (f && atlasImage) t.getContext('2d').drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, 64, 64);
+                }
                 d.appendChild(t);
                 const n = document.createElement('div');
-                n.style.cssText = 'font-size:8px;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-                n.textContent = key;
+                n.style.cssText = 'font-size:8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+                n.style.color = isReplaced ? '#84cc16' : '#888';
+                n.textContent = key + (isReplaced ? ' (replaced)' : '');
                 d.appendChild(n);
+                d.onclick = () => replaceFrame(key);
                 c.appendChild(d);
             });
             extraSprites.forEach(s => {
@@ -908,6 +917,25 @@
                 d.appendChild(n);
                 c.appendChild(d);
             });
+        }
+
+        function replaceFrame(frameName) {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = async function() {
+                const file = input.files[0];
+                if (!file) return;
+                const img = new Image();
+                img.src = URL.createObjectURL(file);
+                await new Promise(r => img.onload = r);
+                const cv = document.createElement('canvas');
+                cv.width = img.width; cv.height = img.height;
+                cv.getContext('2d').drawImage(img, 0, 0);
+                replacedFrames[frameName] = { key: frameName, canvas: cv, w: img.width, h: img.height };
+                renderAtlas();
+            };
+            input.click();
         }
 
         async function handleSpriteUpload(e) {
@@ -930,9 +958,13 @@
             const tc = document.createElement('canvas'), tx = tc.getContext('2d');
             for (let k in frames) {
                 const f = frames[k].frame; if (!f) continue;
-                tc.width = f.w; tc.height = f.h;
-                tx.drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
-                all.push({ key: k, canvas: tc.cloneNode(true), w: f.w, h: f.h });
+                if (replacedFrames[k]) {
+                    all.push(replacedFrames[k]);
+                } else {
+                    tc.width = f.w; tc.height = f.h;
+                    tx.drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+                    all.push({ key: k, canvas: tc.cloneNode(true), w: f.w, h: f.h });
+                }
             }
             all.push(...extraSprites);
             all.sort((a, b) => b.h - a.h);
@@ -963,7 +995,7 @@
                 await pw.write(await new Promise(r => canvas.toBlob(r, 'image/png'))); await pw.close();
                 const jw = await (await ah.getFileHandle(ATLAS_JSON, { create: true })).createWritable();
                 await jw.write(JSON.stringify(json, null, 2)); await jw.close();
-                alert('Atlas updated!'); extraSprites = []; await loadGameFiles();
+                alert('Atlas updated!'); extraSprites = []; replacedFrames = {}; await loadGameFiles();
             } catch (e) { alert('Atlas write failed: ' + e.message); }
         }
 
