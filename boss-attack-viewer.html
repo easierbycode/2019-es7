@@ -342,6 +342,12 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
         }
     }
 
+    function _playBossAnim(sc, animName) {
+        if (!sc.bossSprite || !sc.activeBoss) return;
+        var key = sc.activeBoss + "_" + animName;
+        if (sc.anims.exists(key)) sc.bossSprite.play(key);
+    }
+
     function patternGoki(sc, seed) {
         var boss = sc.bossSprite;
         var projA = sc.bossProjDataA || sc.bossProjData;
@@ -353,12 +359,19 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 var volleys = 0;
                 var shootStep = function() {
                     if (!sc._bossAlive() || volleys >= 6) {
-                        if (sc._bossAlive()) sc.time.delayedCall(300, function() { sc.bossShootStart(); });
+                        if (sc._bossAlive()) {
+                            _playBossAnim(sc, "idle");
+                            sc.time.delayedCall(300, function() { sc.bossShootStart(); });
+                        }
                         return;
                     }
-                    sc.bossShootStraight(projA);
+                    _playBossAnim(sc, "shootA");
                     volleys++;
-                    sc.time.delayedCall(320, shootStep);
+                    sc.time.delayedCall(200, function() {
+                        if (!sc._bossAlive()) return;
+                        sc.bossShootStraight(projA);
+                        sc.time.delayedCall(120, shootStep);
+                    });
                 };
                 shootStep();
             }});
@@ -366,25 +379,33 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             var px2 = clamp(sc.playerSprite.x, 30, GW - 30);
             sc.tweens.add({ targets: boss, x: px2, duration: 400, onComplete: function() {
                 if (!sc._bossAlive()) return;
-                sc.time.delayedCall(400, function() {
+                _playBossAnim(sc, "shootB");
+                sc.time.delayedCall(500, function() {
                     if (!sc._bossAlive()) return;
                     sc.bossShootStraight(projB);
-                    sc.time.delayedCall(800, function() { sc.bossShootStart(); });
+                    sc.time.delayedCall(800, function() {
+                        _playBossAnim(sc, "idle");
+                        sc.bossShootStart();
+                    });
                 });
             }});
         } else if (seed < 0.9) {
+            _playBossAnim(sc, "syngoku");
             sc.tweens.add({ targets: boss, y: GH - 20, duration: 1200, onComplete: function() {
                 if (!sc._bossAlive()) return;
                 var nx = Math.random() * (GW - 60) + 30;
                 boss.x = nx; boss.y = -50;
                 sc.tweens.add({ targets: boss, y: GH / 4, duration: 700, onComplete: function() {
+                    _playBossAnim(sc, "idle");
                     sc.time.delayedCall(300, function() { sc.bossShootStart(); });
                 }});
             }});
         } else {
+            _playBossAnim(sc, "syngoku");
             var nx2 = Math.random() * (GW - 60) + 30;
             var ny = Math.random() > 0.5 ? 60 : GH / 4;
             sc.tweens.add({ targets: boss, x: nx2, y: ny, duration: 700, onComplete: function() {
+                _playBossAnim(sc, "idle");
                 sc.time.delayedCall(300, function() { sc.bossShootStart(); });
             }});
         }

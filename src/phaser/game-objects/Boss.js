@@ -263,6 +263,20 @@ function _startGokiSequence(scene) {
                 scene.bossSprite.setData("score", scene.bossScore);
                 scene.bossSprite.setData("spgage", gokiData.spgage || 30);
 
+                // Store goki animation sets for pattern use
+                scene.gokiAnimIdle = (gokiData.anim && gokiData.anim.idle) || [];
+                scene.gokiAnimSyngoku = (gokiData.anim && gokiData.anim.syngoku) || [];
+                scene.gokiAnimShootA = (gokiData.anim && gokiData.anim.shootA) || [];
+                scene.gokiAnimShootB = (gokiData.anim && gokiData.anim.shootB) || [];
+
+                // Play syngoku anim on initial appearance (matches PIXI castAdded)
+                if (scene.gokiAnimSyngoku.length > 0) {
+                    scene.bossSprite.setData("frames", scene.gokiAnimSyngoku);
+                    scene.bossSprite.setData("animIdx", 0);
+                    scene.bossSprite.setData("animTimer", 0);
+                    scene.bossSprite.setFrame(scene.gokiAnimSyngoku[0]);
+                }
+
                 // BossGoki shadow
                 var gokiShadowReverse = gokiData.shadowReverse !== false;
                 var gokiShadowOffsetY = gokiData.shadowOffsetY || 10;
