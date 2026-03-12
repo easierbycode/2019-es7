@@ -156,12 +156,10 @@
             <!-- Enemy picker button -->
             <button id="enemy-picker-btn" class="tb-btn" style="background:#4d8bc4" onclick="openPicker('enemy')">
                 <span id="enemy-btn-img"></span>
-                <span id="enemy-btn-label" class="hidden-mobile">Enemy</span>
             </button>
             <!-- Item picker button -->
             <button id="powerup-picker-btn" class="tb-btn" style="background:#5db872" onclick="openPicker('powerup')">
                 <span id="powerup-btn-img"></span>
-                <span id="powerup-btn-label" class="hidden-mobile">Item</span>
             </button>
             <!-- Delete -->
             <button id="delete-mode-btn" class="tb-btn" style="background:#821c35" onclick="setDeleteMode()">
@@ -177,8 +175,7 @@
 
             <!-- Boss Viewer -->
             <a href="boss-viewer.html" class="tb-btn" style="background:#4a1a1a;text-decoration:none">
-                <span style="font-size:14px">&#x1F47E;</span>
-                <span class="hidden-mobile" style="font-size:11px">Bosses</span>
+                <span style="font-size:14px">👹</span>
             </a>
             <!-- Save -->
             <button class="tb-btn" style="background:#4f9e61" onclick="quickSave()">
@@ -775,7 +772,13 @@
             } else if (currentTool === 'place' && selectedEnemyLetter) {
                 currentGrid[wi][si] = selectedEnemyLetter + selectedPowerup;
             } else {
-                return;
+                // Apply selected powerup to existing enemy
+                const cur = currentGrid[wi][si];
+                if (cur && cur !== '00' && selectedPowerup !== '0') {
+                    currentGrid[wi][si] = cur[0] + selectedPowerup;
+                } else {
+                    return;
+                }
             }
             renderGrid();
             renderPreview();
