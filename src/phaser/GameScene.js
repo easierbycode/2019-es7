@@ -122,6 +122,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this.theWorldFlg = false;
         this.sceneSwitch = 0;
         this.bossActive = false;
+        this.bossReached = false;
         this.bossTimerCountDown = 99;
         this.bossTimerFrameCnt = 0;
         this.bossTimerStartFlg = false;
@@ -818,7 +819,7 @@ export class PhaserGameScene extends Phaser.Scene {
 
     fixedUpdate(time, step) {
         if (this.stageBg && !this.playerDead && !this.stageCleared) {
-            if (!this.bossActive) {
+            if (!this.bossActive && !this.bossReached) {
                 var bgMove = this.gameStarted ? (this.stageBgAmountMove || 0.7) : 0.7;
                 this.stageBg.tilePositionY -= bgMove;
             }

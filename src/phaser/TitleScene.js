@@ -129,7 +129,6 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.howtoBtn.setOrigin(0, 0);
         this.howtoBtn.setScale(1, 0);
         this.howtoBtn.on("pointerup", function () {
-            if (window.cordova) return;
             try {
                 window.location.href = "level-editor.html";
             } catch (e) {}
