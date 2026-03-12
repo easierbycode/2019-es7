@@ -102,6 +102,13 @@ export function bossAdd(scene) {
     scene.bossShadow = createShadow(scene, scene.bossSprite, bossFrame, bossShadowReverse, bossShadowOffsetY);
     scene.bossSprite.setData("shadow", scene.bossShadow);
 
+    // Store vega animation sets for pattern use (stageId 3)
+    if (stageId === 3 && bossData.anim) {
+        scene.vegaAnimIdle = bossData.anim.idle || [];
+        scene.vegaAnimShoot = bossData.anim.shoot || [];
+        scene.vegaAnimAttack = bossData.anim.attack || [];
+    }
+
     // Store fang animation sets for pattern use (stageId 4)
     if (stageId === 4 && bossData.anim) {
         scene.fangAnimIdle = bossData.anim.idle || [];
