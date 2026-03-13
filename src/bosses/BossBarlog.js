@@ -105,15 +105,18 @@ export class BossBarlog extends Boss {
             const randomY = Math.random() * (GAME_DIMENSIONS.HEIGHT - 400) + 60;
             this.tlShoot.addCallback(this.onMove, "+=0.0", null, this);
             this.tlShoot.to(this.unit, 0.6, { x: randomX, y: randomY });
-            this.tlShoot.addCallback(this.onMoveStop, "+=0.1", null, this);
+            this.tlShoot.addCallback(this.onShootAnim, "+=0.1", null, this);
+            this.tlShoot.addCallback(this.onShootFire, "+=0.3", null, this);
+            this.tlShoot.addCallback(this.onMoveStop, "+=0.3", null, this);
             return;
         }
 
         if (seed >= 0.31 && seed <= 0.8) {
             this.tlShoot.addCallback(this.onMove, "+=0.0", null, this);
             this.tlShoot.to(this.unit, 0.3, { x: targetX });
-            this.tlShoot.addCallback(this.onShoot, "+=0.4", null, this);
-            this.tlShoot.addCallback(this.onMoveStop, "+=0.5", null, this);
+            this.tlShoot.addCallback(this.onShootAnim, "+=0.4", null, this);
+            this.tlShoot.addCallback(this.onShootFire, "+=0.3", null, this);
+            this.tlShoot.addCallback(this.onMoveStop, "+=0.2", null, this);
             return;
         }
 
@@ -165,11 +168,20 @@ export class BossBarlog extends Boss {
 
     onAttackVoice() {}
 
-    onShoot() {
+    onShootAnim() {
         this.character.textures = this.animList.shoot;
         this.shadow.textures = this.animList.shoot;
         this.character.play();
         this.shadow.play();
+    }
+
+    onShootFire() {
+        this.shoot();
+        play("boss_barlog_voice_projectile");
+    }
+
+    onShoot() {
+        this.onShootAnim();
         this.shoot();
         play("boss_barlog_voice_projectile");
     }

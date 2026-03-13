@@ -138,6 +138,26 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
         }
     }
 
+    function barlogPlayShoot(sc) {
+        var shootKey = sc.activeBoss + "_shoot";
+        if (sc.anims.exists(shootKey)) sc.bossSprite.play(shootKey);
+    }
+
+    function barlogPlayIdle(sc) {
+        var idleKey = sc.activeBoss + "_idle";
+        if (sc.anims.exists(idleKey)) sc.bossSprite.play(idleKey);
+    }
+
+    function barlogPlayCharge(sc) {
+        var chargeKey = sc.activeBoss + "_charge";
+        if (sc.anims.exists(chargeKey)) sc.bossSprite.play(chargeKey);
+    }
+
+    function barlogPlayAttack(sc) {
+        var attackKey = sc.activeBoss + "_attack";
+        if (sc.anims.exists(attackKey)) sc.bossSprite.play(attackKey);
+    }
+
     function patternBarlog(sc, seed) {
         var boss = sc.bossSprite;
         var baseY = 80, diveY = GH - 40;
@@ -146,8 +166,13 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             var ry = clamp(60 + Math.random() * 120, 60, 200);
             sc.tweens.add({ targets: boss, x: rx, y: ry, duration: 600, onComplete: function() {
                 if (!sc._bossAlive()) return;
-                sc.bossShootStraight(sc.bossProjData);
-                sc.time.delayedCall(600, function() { sc.bossShootStart(); });
+                barlogPlayShoot(sc);
+                sc.time.delayedCall(300, function() {
+                    if (!sc._bossAlive()) return;
+                    sc.bossShootStraight(sc.bossProjData);
+                    barlogPlayIdle(sc);
+                    sc.time.delayedCall(600, function() { sc.bossShootStart(); });
+                });
             }});
         } else if (seed < 0.8) {
             var px = clamp(sc.playerSprite.x, 30, GW - 30);
@@ -155,24 +180,34 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 if (!sc._bossAlive()) return;
                 sc.time.delayedCall(400, function() {
                     if (!sc._bossAlive()) return;
-                    sc.bossShootStraight(sc.bossProjData);
-                    sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                    barlogPlayShoot(sc);
+                    sc.time.delayedCall(300, function() {
+                        if (!sc._bossAlive()) return;
+                        sc.bossShootStraight(sc.bossProjData);
+                        barlogPlayIdle(sc);
+                        sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                    });
                 });
             }});
         } else {
             var px2 = clamp(sc.playerSprite.x, 30, GW - 30);
             sc.tweens.add({ targets: boss, x: px2, duration: 500, onComplete: function() {
                 if (!sc._bossAlive()) return;
-                sc.bossShootStraight(sc.bossProjData);
-                sc.tweens.add({ targets: boss, y: baseY - 70, duration: 300, onComplete: function() {
+                barlogPlayCharge(sc);
+                sc.time.delayedCall(700, function() {
                     if (!sc._bossAlive()) return;
-                    sc.tweens.add({ targets: boss, y: diveY, duration: 600, onComplete: function() {
+                    barlogPlayAttack(sc);
+                    sc.tweens.add({ targets: boss, y: baseY - 70, duration: 300, onComplete: function() {
                         if (!sc._bossAlive()) return;
-                        sc.tweens.add({ targets: boss, y: baseY, duration: 200, onComplete: function() {
-                            sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                        sc.tweens.add({ targets: boss, y: diveY, duration: 600, onComplete: function() {
+                            if (!sc._bossAlive()) return;
+                            sc.tweens.add({ targets: boss, y: baseY, duration: 200, onComplete: function() {
+                                barlogPlayIdle(sc);
+                                sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                            }});
                         }});
                     }});
-                }});
+                });
             }});
         }
     }
