@@ -975,6 +975,15 @@ export class PhaserGameScene extends Phaser.Scene {
                 continue;
             }
 
+            // Boss-player collision (boss damages player but doesn't die)
+            if (isBoss && rectOverlap(eRect, pRect)) {
+                var now = this.time.now;
+                if (!this._lastBossContactTime || now - this._lastBossContactTime > 1000) {
+                    this._lastBossContactTime = now;
+                    this.playerDamage(1);
+                }
+            }
+
             // Off-screen cleanup
             if (!isBoss && (enemy.y > GH + 20 || enemy.x < -40 || enemy.x > GW + 40)) {
                 var idx = this.enemies.indexOf(enemy);
