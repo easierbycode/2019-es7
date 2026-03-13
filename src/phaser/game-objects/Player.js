@@ -199,6 +199,7 @@ export function playerDie(scene) {
     scene.playerDead = true;
     scene.gameStarted = false;
 
+    triggerHaptic("death");
     scene.showExplosion(scene.playerSprite.x, scene.playerSprite.y);
     scene.playerSprite.setVisible(false);
     if (scene.playerShadow) scene.playerShadow.setVisible(false);
