@@ -1043,6 +1043,7 @@ export class PhaserGameScene extends Phaser.Scene {
                         this.playerBullets.splice(pbb, 1);
                     }
                     if (ebHp <= 0) {
+                        triggerHaptic("deflect");
                         var ebScore = eBullet.getData("score") || 0;
                         var ebSpgage = eBullet.getData("spgage") || 0;
                         if (ebScore > 0) {

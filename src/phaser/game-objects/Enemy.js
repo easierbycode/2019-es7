@@ -6,6 +6,7 @@ import { GAME_DIMENSIONS } from "../../constants.js";
 import { gameState } from "../../gameState.js";
 import { PLAYER_STATES } from "../../enums/player-boss-states.js";
 import { createShadow, updateShadowPosition } from "./Shadow.js";
+import { triggerHaptic } from "../../haptics.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
 var GH = GAME_DIMENSIONS.HEIGHT;
@@ -182,6 +183,7 @@ export function enemyDie(scene, enemy, isSp) {
         scene.dropItem(enemy.x, enemy.y, itemName);
     }
 
+    triggerHaptic("kill");
     scene.showExplosion(enemy.x, enemy.y);
     scene.showScorePopup(enemy.x, enemy.y, score, ratio);
     scene.playSound("se_explosion", 0.35);

@@ -77,6 +77,33 @@ var HAPTIC_PRESETS = {
         tapticNotification: "success",
         tapticImpact: "medium",
     },
+    kill: {
+        cooldown: 80,
+        duration: 10,
+        vibration: 8,
+        weakMagnitude: 0.15,
+        strongMagnitude: 0.06,
+        tapticKind: "selection",
+        tapticImpact: "light",
+    },
+    death: {
+        cooldown: 2000,
+        duration: 60,
+        vibration: [30, 40, 50, 30, 80],
+        weakMagnitude: 1,
+        strongMagnitude: 1,
+        tapticNotification: "error",
+        tapticImpact: "heavy",
+    },
+    deflect: {
+        cooldown: 100,
+        duration: 8,
+        vibration: 6,
+        weakMagnitude: 0.12,
+        strongMagnitude: 0.05,
+        tapticKind: "selection",
+        tapticImpact: "light",
+    },
 };
 
 var lastHapticByPreset = Object.create(null);
