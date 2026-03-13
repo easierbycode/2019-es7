@@ -49,8 +49,10 @@ jobs:
             cordova platform add android@14.0.1
           fi
 
-      - name: Copy project config.xml into Cordova project
-        run: cp config.xml cordova/config.xml
+      - name: Copy project config.xml and resources into Cordova project
+        run: |
+          cp config.xml cordova/config.xml
+          cp -r res cordova/res
 
       - name: Normalize config.xml for Cordova Android 14
         run: |
