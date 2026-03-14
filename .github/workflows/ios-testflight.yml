@@ -161,7 +161,7 @@ jobs:
             -archivePath $RUNNER_TEMP/app.xcarchive \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="${{ secrets.CODE_SIGN_IDENTITY }}" \
-            PROVISIONING_PROFILE_SPECIFIER="${PP_UUID}" \
+            PROVISIONING_PROFILE_SPECIFIER="${PP_NAME}" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
             IPHONEOS_DEPLOYMENT_TARGET=14.0 \
             -allowProvisioningUpdates
