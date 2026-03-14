@@ -64,6 +64,22 @@
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
         }
+        /* How-to / level-editor modal overlay */
+        #howtoModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            background: rgba(0,0,0,0.92);
+            align-items: center;
+            justify-content: center;
+        }
+        #howtoModal.visible { display: flex; }
+        #howtoModal iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
         /* Force portrait layout hack */
         @media screen and (orientation: landscape) {
             html {
@@ -113,6 +129,26 @@
         </span>
         <button id="iosInstallDismiss" style="position:absolute; top:4px; right:8px; background:none; border:none; color:#888; font-size:18px; cursor:pointer; padding:4px 8px; line-height:1;">×</button>
     </div>
+
+    <!-- How-to / level-editor modal -->
+    <div id="howtoModal">
+        <iframe id="howtoIframe"></iframe>
+    </div>
+    <script>
+        window.howtoModalOpen = function () {
+            var modal = document.getElementById("howtoModal");
+            var iframe = document.getElementById("howtoIframe");
+            if (!modal) return;
+            if (iframe) iframe.src = "level-editor.html";
+            modal.classList.add("visible");
+        };
+        window.howtoModalClose = function () {
+            var modal = document.getElementById("howtoModal");
+            var iframe = document.getElementById("howtoIframe");
+            if (modal) modal.classList.remove("visible");
+            if (iframe) iframe.src = "about:blank";
+        };
+    </script>
 
     <!-- Libraries (loaded before game boot) -->
     <script src="./src/lib/pixi.min.js"></script>
