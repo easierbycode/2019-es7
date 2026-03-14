@@ -40,9 +40,6 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Install iOS platform
-        run: xcodebuild -downloadPlatform iOS
-
       # ── Apple Certificate & Provisioning Profile ──────────────────────
       - name: Install Apple certificate and provisioning profile
         env:
@@ -147,6 +144,7 @@ jobs:
           xcodebuild archive \
             -workspace "${{ env.APP_NAME }}.xcworkspace" \
             -scheme "${{ env.APP_NAME }}" \
+            -sdk iphoneos \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath $RUNNER_TEMP/app.xcarchive \
