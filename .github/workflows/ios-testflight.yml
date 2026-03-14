@@ -11,6 +11,7 @@ on:
   workflow_dispatch:
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   CORDOVA_VERSION: "12"
   CORDOVA_IOS_VERSION: "7.1.1"
   NODE_VERSION: "20"
@@ -116,31 +117,17 @@ jobs:
 
       # ── Export Options & Build ─────────────────────────────────────────
       - name: Create ExportOptions.plist
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          cat > cordova/ExportOptions.plist <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>method</key>
-    <string>app-store-connect</string>
-    <key>signingStyle</key>
-    <string>manual</string>
-    <key>teamID</key>
-    <string>${{ secrets.APPLE_TEAM_ID }}</string>
-    <key>provisioningProfiles</key>
-    <dict>
-        <key>com.easierbycode.game2028.ai</key>
-        <string>${PP_NAME}</string>
-    </dict>
-    <key>uploadBitcode</key>
-    <false/>
-    <key>uploadSymbols</key>
-    <true/>
-</dict>
-</plist>
-EOF
+          /usr/libexec/PlistBuddy -c "Clear dict" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :method string app-store-connect" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :teamID string $TEAM_ID" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.easierbycode.game2028.ai string $PP_NAME" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :uploadBitcode bool false" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :uploadSymbols bool true" cordova/ExportOptions.plist
 
       - name: Debug ExportOptions.plist
         run: |
