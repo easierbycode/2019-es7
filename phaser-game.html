@@ -57,42 +57,21 @@
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
         }
-        /* How-to modal overlay */
+        /* How-to / level-editor modal overlay */
         #howtoModal {
             display: none;
             position: fixed;
             inset: 0;
             z-index: 3000;
-            background: rgba(0,0,0,0.88);
+            background: rgba(0,0,0,0.92);
             align-items: center;
             justify-content: center;
-            padding: 16px;
         }
         #howtoModal.visible { display: flex; }
-        #howtoModalContent {
-            background: #222;
-            color: #fff;
-            border-radius: 8px;
-            padding: 20px;
-            max-width: 260px;
+        #howtoModal iframe {
             width: 100%;
-            font-size: 13px;
-            line-height: 1.6;
-            text-align: center;
-            position: relative;
-        }
-        #howtoModalContent h3 { margin: 0 0 12px; font-size: 16px; }
-        #howtoModalContent p { margin: 8px 0; }
-        #howtoModalClose {
-            position: absolute;
-            top: 6px;
-            right: 10px;
-            background: none;
+            height: 100%;
             border: none;
-            color: #888;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 4px 8px;
         }
         /* Force portrait layout hack */
         @media screen and (orientation: landscape) {
@@ -140,17 +119,9 @@
         <button id="iosInstallDismiss" style="position:absolute; top:4px; right:8px; background:none; border:none; color:#888; font-size:18px; cursor:pointer; padding:4px 8px; line-height:1;">×</button>
     </div>
 
-    <!-- How-to modal -->
+    <!-- How-to / level-editor modal -->
     <div id="howtoModal">
-        <div id="howtoModalContent">
-            <button id="howtoModalClose">×</button>
-            <h3>HOW TO PLAY</h3>
-            <p><strong>Move:</strong> Drag / Arrow keys / WASD</p>
-            <p><strong>Shoot:</strong> Automatic</p>
-            <p><strong>Special:</strong> Tap SP gauge / Spacebar</p>
-            <p>Defeat enemies, collect power-ups, and beat bosses!</p>
-            <p style="font-size:11px; color:#888; margin-top:16px;">Tap outside to close</p>
-        </div>
+        <iframe id="howtoIframe"></iframe>
     </div>
 
     <!-- Phaser 4.0.0-rc.6 -->
@@ -165,24 +136,17 @@
         // -----------------------------------------------------------------------
         window.howtoModalOpen = function () {
             var modal = document.getElementById("howtoModal");
-            if (modal) modal.classList.add("visible");
+            var iframe = document.getElementById("howtoIframe");
+            if (!modal) return;
+            if (iframe) iframe.src = "level-editor.html";
+            modal.classList.add("visible");
         };
         window.howtoModalClose = function () {
             var modal = document.getElementById("howtoModal");
+            var iframe = document.getElementById("howtoIframe");
             if (modal) modal.classList.remove("visible");
+            if (iframe) iframe.src = "about:blank";
         };
-        (function () {
-            var modal = document.getElementById("howtoModal");
-            var closeBtn = document.getElementById("howtoModalClose");
-            if (modal) {
-                modal.addEventListener("click", function (e) {
-                    if (e.target === modal) window.howtoModalClose();
-                });
-            }
-            if (closeBtn) {
-                closeBtn.addEventListener("click", window.howtoModalClose);
-            }
-        })();
 
         // -----------------------------------------------------------------------
         // Orientation lock
