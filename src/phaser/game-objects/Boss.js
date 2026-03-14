@@ -7,6 +7,7 @@ import { gameState } from "../../gameState.js";
 import { triggerHaptic } from "../../haptics.js";
 import { createShadow, updateShadowPosition } from "./Shadow.js";
 import { showBossExplosion } from "../effects/Explosions.js";
+import { explodeToPixels, assembleFromPixels } from "../effects/PixelTransform.js";
 import {
     bossPatternBison,
     bossPatternBarlog,
@@ -58,6 +59,14 @@ export function bossAdd(scene) {
     var isGokiStage = stageId === 3 && Number(gameState.continueCnt || 0) === 0;
     if (isGokiStage) {
         scene.gokiFlg = true;
+    }
+
+    // secondLoop ugly sister: Vega starts as "flirty girl" form and transforms
+    // into "ugly sister" (attack anim form) via pixel implosion when defeated
+    scene.uglySisterFlg = false;
+    scene.uglySisterPhase = 0; // 0 = flirty girl, 1 = ugly sister
+    if (stageId === 3 && gameState.secondLoop && !isGokiStage) {
+        scene.uglySisterFlg = true;
     }
 
     var bossData = scene.recipe.bossData ? scene.recipe.bossData["boss" + String(stageId)] : null;
@@ -331,6 +340,130 @@ function _startGokiSequence(scene) {
 }
 
 // -----------------------------------------------------------------------
+// secondLoop ugly sister transformation sequence
+// When the "flirty girl" form (Vega idle/shoot) is defeated, she explodes
+// into pixels and reassembles as the "ugly sister" form (Vega attack anims)
+// with renewed HP. Uses pixel implosion effect from boss-viewer.
+// -----------------------------------------------------------------------
+
+function _startUglySisterTransform(scene, boss) {
+    scene.theWorldFlg = true;
+    scene.spBtn.setAlpha(0);
+    scene.uglySisterPhase = 1;
+
+    // Clear player bullets
+    for (var pb = scene.playerBullets.length - 1; pb >= 0; pb--) {
+        if (scene.playerBullets[pb] && scene.playerBullets[pb].active) {
+            scene.playerBullets[pb].destroy();
+        }
+    }
+    scene.playerBullets = [];
+
+    // Clear enemy bullets
+    for (var eb = scene.enemyBullets.length - 1; eb >= 0; eb--) {
+        if (scene.enemyBullets[eb] && scene.enemyBullets[eb].active) {
+            scene.enemyBullets[eb].destroy();
+        }
+    }
+    scene.enemyBullets = [];
+
+    // Remove danger balloon if shown
+    if (boss.dangerBalloon && boss.dangerBalloon.active) {
+        boss.dangerBalloon.destroy();
+    }
+    scene.bossDangerShown = false;
+
+    // Hide boss HP bar during transformation
+    scene.bossHpBarBg.setVisible(false);
+    scene.bossHpBarFg.setVisible(false);
+    scene.bossTimerStartFlg = false;
+
+    var bossX = boss.x;
+    var bossY = boss.y;
+
+    scene.playSound("boss_vega_voice_ko", 0.9);
+
+    // Step 1: Explode the "flirty girl" form into pixels
+    explodeToPixels(scene, boss, function () {
+        // Destroy boss shadow
+        if (scene.bossShadow && scene.bossShadow.active) {
+            scene.bossShadow.destroy();
+            scene.bossShadow = null;
+        }
+
+        // Remove old boss from enemies array
+        var idx = scene.enemies.indexOf(boss);
+        if (idx >= 0) scene.enemies.splice(idx, 1);
+        if (boss && boss.active) boss.destroy();
+
+        // Brief pause before reassembly
+        scene.time.delayedCall(500, function () {
+            // Step 2: Assemble "ugly sister" form from pixels using attack frame
+            var attackFrames = scene.vegaAnimAttack || [];
+            var attackFrame = attackFrames[0] || "vega_attack0.gif";
+
+            assembleFromPixels(scene, attackFrame, bossX, bossY, function () {
+                // Hold assembled form briefly
+                scene.time.delayedCall(800, function () {
+                    // Step 3: Create the new "ugly sister" boss sprite
+                    var bossData = scene.recipe.bossData ? scene.recipe.bossData.boss3 : null;
+                    if (!bossData) {
+                        scene.theWorldFlg = false;
+                        scene.stageClear();
+                        return;
+                    }
+
+                    // Use attack frames as the ugly sister idle animation
+                    var uglySisterFrames = attackFrames.length > 0 ? attackFrames : (bossData.anim.idle || []);
+                    var uglySisterFrame = uglySisterFrames[0] || "vega_attack0.gif";
+
+                    scene.bossSprite = scene.add.sprite(bossX, bossY, "game_asset", uglySisterFrame);
+                    scene.bossSprite.setOrigin(0.5);
+                    scene.bossSprite.setDepth(45);
+                    scene.bossSprite.setData("type", "boss");
+
+                    // Ugly sister has renewed HP (50% of original)
+                    var newHp = Math.floor((bossData.hp || 300) * 0.5);
+                    scene.bossHp = newHp;
+                    scene.bossMaxHp = newHp;
+                    scene.bossSprite.setData("hp", newHp);
+                    scene.bossSprite.setData("frames", uglySisterFrames);
+                    scene.bossSprite.setData("animIdx", 0);
+                    scene.bossSprite.setData("animTimer", 0);
+                    scene.bossSprite.setData("projData", scene.bossProjData);
+                    scene.bossSprite.setData("score", scene.bossScore);
+                    scene.bossSprite.setData("spgage", bossData.spgage || 30);
+
+                    // Update Vega anim sets: ugly sister uses attack frames as idle
+                    scene.vegaAnimIdle = uglySisterFrames;
+
+                    // Boss shadow
+                    var shadowReverse = bossData.shadowReverse !== false;
+                    var shadowOffsetY = bossData.shadowOffsetY || 10;
+                    scene.bossShadow = createShadow(scene, scene.bossSprite, uglySisterFrame, shadowReverse, shadowOffsetY);
+                    scene.bossSprite.setData("shadow", scene.bossShadow);
+
+                    scene.enemies.push(scene.bossSprite);
+
+                    scene.playSound("boss_vega_voice_add", 0.7);
+
+                    // Resume the fight
+                    scene.theWorldFlg = false;
+                    scene.spBtn.setAlpha(1);
+                    scene.bossTimerStartFlg = true;
+                    scene.bossTimerLabel.setVisible(true);
+                    scene.bossTimerNum.container.setVisible(true);
+
+                    scene.time.delayedCall(1000, function () {
+                        bossShootStart(scene);
+                    });
+                });
+            });
+        });
+    });
+}
+
+// -----------------------------------------------------------------------
 // Boss attack pattern dispatcher
 // -----------------------------------------------------------------------
 
@@ -596,6 +729,12 @@ export function syncBossVisuals(scene) {
 
 export function bossDie(scene, boss) {
     if (scene.stageCleared) return;
+
+    // secondLoop ugly sister: first defeat triggers pixel transformation
+    if (scene.uglySisterFlg && scene.uglySisterPhase === 0) {
+        _startUglySisterTransform(scene, boss);
+        return;
+    }
 
     // Destroy boss shadow
     if (scene.bossShadow && scene.bossShadow.active) {
