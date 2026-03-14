@@ -130,7 +130,7 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.howtoBtn.setScale(1, 0);
         this.howtoBtn.on("pointerup", function () {
             try {
-                if (window.cordova && typeof window.howtoModalOpen === "function") {
+                if (typeof window.howtoModalOpen === "function") {
                     window.howtoModalOpen();
                 } else {
                     window.location.href = "level-editor.html";
