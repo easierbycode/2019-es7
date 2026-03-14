@@ -301,9 +301,9 @@ function _startGokiSequence(scene) {
                 scene.enemies.push(scene.bossSprite);
                 scene.bossDangerShown = false;
 
-                // Update boss HP bar
-                scene.bossHpBarBg.setVisible(true);
-                scene.bossHpBarFg.setVisible(true);
+                // Boss HP bar kept hidden
+                scene.bossHpBarBg.setVisible(false);
+                scene.bossHpBarFg.setVisible(false);
 
                 // Change BGM to Goki BGM
                 try {
