@@ -710,29 +710,8 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     updateBossHpBar() {
-        if (!this.bossActive || !this.bossSprite || !this.bossSprite.active) {
-            this.bossHpBarBg.setVisible(false);
-            this.bossHpBarFg.setVisible(false);
-            return;
-        }
-
-        var barW = 120;
-        var barH = 6;
-        var barX = GCX - barW / 2;
-        var barY = 52;
-
-        this.bossHpBarBg.setVisible(true);
-        this.bossHpBarBg.clear();
-        this.bossHpBarBg.fillStyle(0x333333, 0.8);
-        this.bossHpBarBg.fillRect(barX, barY, barW, barH);
-
-        var hpRatio = Math.max(0, this.bossHp / this.bossMaxHp);
-        var color = hpRatio > 0.5 ? 0xff4444 : hpRatio > 0.25 ? 0xff8800 : 0xff0000;
-
-        this.bossHpBarFg.setVisible(true);
-        this.bossHpBarFg.clear();
-        this.bossHpBarFg.fillStyle(color, 1);
-        this.bossHpBarFg.fillRect(barX, barY, barW * hpRatio, barH);
+        this.bossHpBarBg.setVisible(false);
+        this.bossHpBarFg.setVisible(false);
     }
 
     // =================================================================
@@ -892,6 +871,10 @@ export class PhaserGameScene extends Phaser.Scene {
                 if (isBoss && this.bossEntering) continue;
 
                 if (enemy.y >= 40 && rectOverlap(eRect, bRect)) {
+                    // Tint bullet on collision (matches PIXI: TweenMax tint 16773120)
+                    pb.setTint(16773120);
+                    pb.setData("_tintTimer", 5);
+
                     var applyDamage = true;
 
                     if (this.shootMode === "big") {
@@ -1035,6 +1018,9 @@ export class PhaserGameScene extends Phaser.Scene {
                 if (!pb2 || !pb2.active) continue;
                 var pb2Rect = { x: pb2.x - pb2.width / 2, y: pb2.y - pb2.height / 2, w: pb2.width, h: pb2.height };
                 if (rectOverlap(pb2Rect, ebRect1)) {
+                    // Tint bullet on collision (matches PIXI: TweenMax tint 16773120)
+                    pb2.setTint(16773120);
+                    pb2.setData("_tintTimer", 5);
                     var pb2dmg = pb2.getData("damage") || 1;
                     ebHp -= pb2dmg;
                     eBullet.setData("hp", ebHp);

@@ -75,6 +75,16 @@ export function updatePlayerBullets(scene) {
             continue;
         }
 
+        // Clear collision tint after a few frames
+        var tintTimer = bullet.getData("_tintTimer") || 0;
+        if (tintTimer > 0) {
+            tintTimer--;
+            bullet.setData("_tintTimer", tintTimer);
+            if (tintTimer <= 0) {
+                bullet.clearTint();
+            }
+        }
+
         var angle = bullet.getData("angle") || 0;
         bullet.y -= 3.5;
         bullet.x += angle * 3.5;
