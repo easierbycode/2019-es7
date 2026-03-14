@@ -176,6 +176,7 @@ jobs:
           cp level-editor.html dist/
           cp boss-viewer.html dist/
           cp boss-attack-viewer.html dist/
+          cp support.html dist/
           cp manifest.json dist/ || true
           cp favicon.ico dist/ || true
           cp app-original.js dist/ || true
