@@ -50,6 +50,7 @@
     </platform>
 
     <platform name="ios">
+        <preference name="deployment-target" value="14.0" />
         <preference name="Orientation" value="portrait" />
         <preference name="AllowBackForwardNavigationGestures" value="false" />
         <preference name="DisallowOverscroll" value="true" />
