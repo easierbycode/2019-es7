@@ -217,6 +217,9 @@
     <!-- MENU DRAWER -->
     <div id="menu-backdrop" class="menu-backdrop hidden" onclick="closeMenu()"></div>
     <div id="menu-panel" class="menu-panel hidden">
+        <div id="back-to-game-section" class="menu-section" style="display:none">
+            <button class="menu-btn" style="background:#b91c1c;color:#fff;font-weight:700" onclick="closeMenu();if(window.parent&&window.parent!==window&&typeof window.parent.howtoModalClose==='function')window.parent.howtoModalClose()">✕ Back to Game</button>
+        </div>
         <div class="menu-section">
             <div class="menu-section-title">Waves</div>
             <button class="menu-btn" onclick="addWave();closeMenu()">+ Add Wave</button>
@@ -395,6 +398,12 @@
             const pt = POWERUP_TYPES.find(p => p.id === dropId);
             if (!pt || !pt.frame) return null;
             return getThumbURL(pt.frame);
+        }
+
+        // Show "Back to Game" when loaded inside an iframe (Cordova modal)
+        if (window.parent && window.parent !== window) {
+            var bsec = document.getElementById('back-to-game-section');
+            if (bsec) bsec.style.display = '';
         }
 
         // ================== MENU ==================
