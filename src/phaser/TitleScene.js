@@ -75,7 +75,7 @@ export class PhaserTitleScene extends Phaser.Scene {
 
         this.highScoreText = this.add.text(
             this.scoreTitleImg.x + this.scoreTitleImg.width + 3,
-            this.scoreTitleImg.y,
+            this.scoreTitleImg.y + this.scoreTitleImg.height / 2,
             String(getDisplayedHighScore()),
             {
                 fontFamily: "Arial",
@@ -86,6 +86,7 @@ export class PhaserTitleScene extends Phaser.Scene {
                 strokeThickness: 2,
             }
         );
+        this.highScoreText.setOrigin(0, 0.5);
 
         this.scoreSyncLabel = this.add.text(
             32, this.scoreTitleImg.y + 22,
