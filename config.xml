@@ -53,6 +53,11 @@
         <preference name="Orientation" value="portrait" />
         <preference name="AllowBackForwardNavigationGestures" value="false" />
         <preference name="DisallowOverscroll" value="true" />
+        <!-- Use https scheme so fetch() API works in WKWebView.
+             The default "app://" scheme doesn't route fetch() through
+             the WKURLSchemeHandler, causing all Phaser 4 asset loads to fail. -->
+        <preference name="scheme" value="https" />
+        <preference name="hostname" value="localhost" />
     </platform>
 
     <!-- Plugins removed: cordova-plugin-statusbar and cordova-plugin-vibration
