@@ -59,6 +59,8 @@
              the WKURLSchemeHandler, causing all Phaser 4 asset loads to fail. -->
         <preference name="scheme" value="https" />
         <preference name="hostname" value="localhost" />
+        <preference name="MediaPlaybackRequiresUserAction" value="false" />
+        <preference name="AllowsInlineMediaPlayback" value="true" />
     </platform>
 
     <!-- Plugins removed: cordova-plugin-statusbar and cordova-plugin-vibration
