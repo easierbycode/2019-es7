@@ -1,5 +1,5 @@
 {
-  "name": "2028-ai",
+  "name": "phaser-game",
   "version": "1.0.0",
   "description": "2028.ai — AI vs The World",
   "main": "main.js",
@@ -9,7 +9,7 @@
   },
   "build": {
     "appId": "com.easierbycode.game2028",
-    "productName": "2028.ai",
+    "productName": "phaser-game",
     "linux": {
       "target": "AppImage",
       "icon": "icons/icon-512.png",
