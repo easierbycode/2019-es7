@@ -94,6 +94,10 @@ jobs:
         run: |
           sed -i '' 's|<content src="index.html" />|<content src="phaser-game.html" />|' cordova/config.xml
 
+      - name: Set unique build number (CFBundleVersion)
+        run: |
+          sed -i '' "s|version=\"1.0.0\"|version=\"1.0.0\" ios-CFBundleVersion=\"1.0.${{ github.run_number }}\"|" cordova/config.xml
+
       - name: Copy hooks
         run: cp -r hooks cordova/hooks
 
