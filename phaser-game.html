@@ -253,7 +253,10 @@
         })();
     </script>
 
-    <!-- Boot the Phaser 4 game -->
+    <!-- Boot the Phaser 4 game.
+         For local dev (npx serve), the module script works fine.
+         For Cordova builds, CI bundles src/phaser/boot-entry.js into
+         lib/boot.bundle.js and replaces this block with a regular script. -->
     <script type="module">
         import { gameState } from "./src/gameState.js";
         import { initializeFirebaseScores } from "./src/firebaseScores.js";
@@ -263,12 +266,10 @@
             return new Promise(function (resolve) { setTimeout(resolve, ms); });
         }
 
-        // ?lowmode=1 skips audio loading for faster boot (useful for testing)
         if (new URLSearchParams(window.location.search).get("lowmode") === "1") {
             gameState.lowModeFlg = true;
         }
 
-        // Initialize Firebase scores (race with timeout for fast boot)
         Promise.race([
             initializeFirebaseScores().catch(function () {}),
             waitFor(1500),

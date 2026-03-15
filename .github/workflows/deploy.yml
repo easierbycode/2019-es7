@@ -118,6 +118,10 @@ jobs:
       - name: Save original APK
         run: cp cordova/platforms/android/app/build/outputs/apk/debug/*.apk ./game-original.apk
 
+      - name: Bundle JS modules with esbuild
+        run: |
+          npx --yes esbuild src/phaser/boot-entry.js --bundle --format=iife --outfile=lib/boot.bundle.js
+
       - name: Prepare Cordova www for phaser-game
         run: |
           rm -rf cordova/www/*
@@ -129,6 +133,9 @@ jobs:
           cp favicon.ico cordova/www/ || true
           cp phaser-game.html cordova/www/
           sed -i 's/<\/head>/<script src="cordova.js"><\/script><\/head>/' cordova/www/phaser-game.html
+
+          # Replace ES module boot script with bundled version for Cordova
+          sed -i '/<script type="module">/,/<\/script>/c\<script src="./lib/boot.bundle.js"></script>' cordova/www/phaser-game.html
 
       - name: Update config.xml for phaser-game entry point
         run: sed -i 's|<content src="index.html" />|<content src="phaser-game.html" />|' cordova/config.xml
