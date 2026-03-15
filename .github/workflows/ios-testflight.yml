@@ -166,6 +166,19 @@ jobs:
             IPHONEOS_DEPLOYMENT_TARGET=14.0 \
             -allowProvisioningUpdates
 
+      - name: Debug archive contents
+        run: |
+          echo "=== Archive app contents ==="
+          ls -la $RUNNER_TEMP/app.xcarchive/Products/Applications/2028.ai.app/
+          echo "=== Embedded provisioning profile ==="
+          if [ -f "$RUNNER_TEMP/app.xcarchive/Products/Applications/2028.ai.app/embedded.mobileprovision" ]; then
+            security cms -D -i "$RUNNER_TEMP/app.xcarchive/Products/Applications/2028.ai.app/embedded.mobileprovision" | plutil -extract Name raw -
+          else
+            echo "NO embedded.mobileprovision found!"
+          fi
+          echo "=== Code signing info ==="
+          codesign -dvvv "$RUNNER_TEMP/app.xcarchive/Products/Applications/2028.ai.app" 2>&1 || true
+
       - name: Export IPA
         run: |
           xcodebuild -exportArchive \
