@@ -284,7 +284,7 @@
 	"meta": {
 		"app": "",
 		"version": "1.0",
-		"image": "img/title_ui.png?t=201903190000",
+		"image": "img/title_ui.png",
 		"format": "RGBA8888",
 		"size": {
 			"w": 1048,
