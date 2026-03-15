@@ -61,6 +61,25 @@
         <preference name="hostname" value="localhost" />
         <preference name="MediaPlaybackRequiresUserAction" value="false" />
         <preference name="AllowsInlineMediaPlayback" value="true" />
+
+        <icon src="icons/ios/icon-20.png" width="20" height="20" />
+        <icon src="icons/ios/icon-20@2x.png" width="40" height="40" />
+        <icon src="icons/ios/icon-20@3x.png" width="60" height="60" />
+        <icon src="icons/ios/icon-29.png" width="29" height="29" />
+        <icon src="icons/ios/icon-29@2x.png" width="58" height="58" />
+        <icon src="icons/ios/icon-29@3x.png" width="87" height="87" />
+        <icon src="icons/ios/icon-40.png" width="40" height="40" />
+        <icon src="icons/ios/icon-40@2x.png" width="80" height="80" />
+        <icon src="icons/ios/icon-40@3x.png" width="120" height="120" />
+        <icon src="icons/ios/icon-60@2x.png" width="120" height="120" />
+        <icon src="icons/ios/icon-60@3x.png" width="180" height="180" />
+        <icon src="icons/ios/icon-76.png" width="76" height="76" />
+        <icon src="icons/ios/icon-76@2x.png" width="152" height="152" />
+        <icon src="icons/ios/icon-83.5@2x.png" width="167" height="167" />
+        <icon src="icons/ios/icon-1024.png" width="1024" height="1024" />
+
+        <splash src="res/splash/Default@2x~universal~anyany.png" />
+        <splash src="res/splash/Default@3x~universal~anyany.png" />
     </platform>
 
     <!-- Plugins removed: cordova-plugin-statusbar and cordova-plugin-vibration

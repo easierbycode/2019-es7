@@ -87,8 +87,11 @@ jobs:
           cd cordova
           cordova platform add ios@${{ env.CORDOVA_IOS_VERSION }}
 
-      - name: Copy config.xml
-        run: cp config.xml cordova/config.xml
+      - name: Copy config.xml and resources
+        run: |
+          cp config.xml cordova/config.xml
+          cp -r icons cordova/icons
+          cp -r res cordova/res
 
       - name: Update config.xml for Phaser entry point
         run: |
