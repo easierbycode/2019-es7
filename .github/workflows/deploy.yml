@@ -193,9 +193,7 @@ jobs:
 
       - name: Build AppImage
         working-directory: electron
-        run: npx electron-builder --linux AppImage
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --linux AppImage --publish never
 
       - name: Upload AppImage artifact
         uses: actions/upload-artifact@v4
