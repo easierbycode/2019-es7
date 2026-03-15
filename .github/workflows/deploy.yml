@@ -70,9 +70,9 @@ jobs:
           fi
           # Keep a known-good Gradle wrapper version for CI reproducibility.
           if grep -q "android-gradle-distribution-url" cordova/config.xml; then
-            sed -i 's|android-gradle-distribution-url" value=".*"|android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.12-bin.zip"|' cordova/config.xml
+            sed -i 's|android-gradle-distribution-url" value=".*"|android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.14.2-bin.zip"|' cordova/config.xml
           else
-            sed -i '/<\/widget>/i \    <preference name="android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.12-bin.zip" \/>' cordova/config.xml
+            sed -i '/<\/widget>/i \    <preference name="android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.14.2-bin.zip" \/>' cordova/config.xml
           fi
 
       - name: Copy hooks into Cordova project
@@ -112,7 +112,7 @@ jobs:
       - name: Build Cordova Android (APK)
         working-directory: cordova
         env:
-          CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL: https://services.gradle.org/distributions/gradle-8.12-bin.zip
+          CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL: https://services.gradle.org/distributions/gradle-8.14.2-bin.zip
         run: cordova compile android --debug --packageType=apk
 
       - name: Save original APK
@@ -147,7 +147,7 @@ jobs:
       - name: Build Cordova Android (phaser-game APK)
         working-directory: cordova
         env:
-          CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL: https://services.gradle.org/distributions/gradle-8.12-bin.zip
+          CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL: https://services.gradle.org/distributions/gradle-8.14.2-bin.zip
         run: cordova compile android --debug --packageType=apk
 
       - name: Save phaser-game APK
