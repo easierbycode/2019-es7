@@ -167,8 +167,44 @@ jobs:
           name: phaser-game-apk
           path: ./phaser-game.apk
 
+  electron:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Prepare Electron app
+        run: |
+          cd electron
+          mkdir -p www icons
+          cp -r ../assets www/
+          cp -r ../src www/
+          cp ../icons/icon-512.png icons/icon-512.png || true
+          cp ../phaser-game.html www/phaser-game.html
+          cp ../manifest.json www/ || true
+          cp ../favicon.ico www/ || true
+
+      - name: Install Electron dependencies
+        working-directory: electron
+        run: npm install
+
+      - name: Build AppImage
+        working-directory: electron
+        run: npx electron-builder --linux AppImage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-appimage
+          path: electron/dist/*.AppImage
+
   web:
-    needs: cordova
+    needs: [cordova, electron]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -206,12 +242,20 @@ jobs:
           name: phaser-game-apk
           path: ./phaser-apk-tmp
 
-      - name: Copy APKs to dist
+      - name: Download AppImage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: electron-appimage
+          path: ./appimage-tmp
+
+      - name: Copy APKs and AppImage to dist
         run: |
           cp apk-tmp/*.apk dist/game.apk
           cp phaser-apk-tmp/*.apk dist/phaser-game.apk
-          ls -l dist/game.apk dist/phaser-game.apk
-          rm -rf apk-tmp phaser-apk-tmp
+          cp appimage-tmp/*.AppImage dist/phaser-game.AppImage
+          cp phaser-game.desktop dist/phaser-game.desktop
+          ls -l dist/game.apk dist/phaser-game.apk dist/phaser-game.AppImage dist/phaser-game.desktop
+          rm -rf apk-tmp phaser-apk-tmp appimage-tmp
 
       - name: Create downloadable zip of built site
         run: |

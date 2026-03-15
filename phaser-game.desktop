@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=2028.ai
+Comment=AI vs The World
+Exec=phaser-game.AppImage
+Icon=phaser-game
+Type=Application
+Categories=Game;
+Terminal=false

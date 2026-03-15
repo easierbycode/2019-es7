@@ -1,0 +1,32 @@
+{
+  "name": "2028-ai",
+  "version": "1.0.0",
+  "description": "2028.ai — AI vs The World",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --linux AppImage"
+  },
+  "build": {
+    "appId": "com.easierbycode.game2028",
+    "productName": "2028.ai",
+    "linux": {
+      "target": "AppImage",
+      "icon": "icons/icon-512.png",
+      "category": "Game",
+      "artifactName": "phaser-game.AppImage"
+    },
+    "files": [
+      "main.js",
+      "www/**/*",
+      "icons/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  }
+}
