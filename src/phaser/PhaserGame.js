@@ -34,7 +34,7 @@ export function createPhaserGame() {
             autoCenter: Phaser.Scale.CENTER_BOTH
         },
         audio: {
-            disableWebAudio: true
+            disableWebAudio: !!window.cordova
         },
         scene: [
             BootScene,
