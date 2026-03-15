@@ -123,6 +123,7 @@ jobs:
           rm -rf cordova/www/*
           cp -r assets cordova/www/
           cp -r src cordova/www/
+          cp -r lib cordova/www/
           cp -r icons cordova/www/ || true
           cp manifest.json cordova/www/ || true
           cp favicon.ico cordova/www/ || true
@@ -172,6 +173,7 @@ jobs:
           mkdir dist
           cp -r assets dist/
           cp -r src dist/
+          cp -r lib dist/
           cp -r icons dist/ || true
           cp index.html dist/
           cp phaser-game.html dist/
