@@ -182,10 +182,16 @@ jobs:
           mkdir -p www icons
           cp -r ../assets www/
           cp -r ../src www/
+          cp -r ../lib www/
           cp ../icons/icon-512.png icons/icon-512.png || true
           cp ../phaser-game.html www/phaser-game.html
           cp ../manifest.json www/ || true
           cp ../favicon.ico www/ || true
+
+      - name: Bundle JS modules with esbuild for Electron
+        run: |
+          npx --yes esbuild src/phaser/boot-entry.js --bundle --format=iife --outfile=electron/www/lib/boot.bundle.js
+          sed -i '/<script type="module">/,/<\/script>/c\<script src="./lib/boot.bundle.js"></script>' electron/www/phaser-game.html
 
       - name: Install Electron dependencies
         working-directory: electron
