@@ -128,9 +128,6 @@
             background: #111; color: #fff; font-size: 13px; margin-bottom: 8px;
         }
 
-        /* ===== PREVIEW (desktop only) ===== */
-        #preview-section { display: none; padding: 16px; }
-        @media (min-width: 900px) { #preview-section { display: block; } }
         canvas { image-rendering: pixelated; }
 
         /* ===== DESKTOP TWEAKS ===== */
@@ -192,10 +189,6 @@
             <div id="grid-icon-view"></div>
         </div>
 
-        <!-- PREVIEW (desktop only) -->
-        <div id="preview-section">
-            <canvas id="preview-canvas" width="640" height="480" style="border:1px solid #333;background:#000;max-width:100%;"></canvas>
-        </div>
     </div>
 
     <!-- ENEMY PICKER OVERLAY -->
@@ -791,8 +784,7 @@
                 }
             }
             renderGrid();
-            renderPreview();
-        }
+                   }
 
         function handleCellDrop(wi, si, e) {
             let data;
@@ -804,8 +796,7 @@
                 if (cur && cur !== '00') currentGrid[wi][si] = cur[0] + data.id;
             }
             renderGrid();
-            renderPreview();
-        }
+                   }
 
         // ================== RENDER ALL ==================
         function renderAll() {
@@ -817,39 +808,18 @@
             const obj = gameData ? (gameData[currentStageKey] || {}) : {};
             currentGrid = normalizeGrid(obj.enemylist);
             renderGrid();
-            renderPreview();
-            updateToolUI();
+                       updateToolUI();
         }
 
         // ================== WAVES ==================
         function addWave() {
             currentGrid = normalizeGrid(currentGrid);
             currentGrid.push(createEmptyWave());
-            renderGrid(); renderPreview();
-        }
+            renderGrid();        }
         function deleteLastWave() {
-            if (currentGrid.length > 1) { currentGrid.pop(); renderGrid(); renderPreview(); }
+            if (currentGrid.length > 1) { currentGrid.pop(); renderGrid(); }
         }
 
-        // ================== PREVIEW ==================
-        function renderPreview() {
-            currentGrid = normalizeGrid(currentGrid);
-            const canvas = document.getElementById('preview-canvas');
-            if (!canvas) return;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = '#0a0a0a';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-            const cellW = canvas.width / 8, cellH = 48;
-            currentGrid.forEach((wave, wi) => {
-                const y = canvas.height - 80 - (wi * cellH * 1.1);
-                wave.forEach((code, col) => {
-                    if (code === '00') return;
-                    const fn = getFrameNameForCode(code);
-                    if (!fn || !frameThumbs[fn]) return;
-                    ctx.drawImage(frameThumbs[fn], col * cellW + (cellW - 32) / 2, y, 32, 32);
-                });
-            });
-        }
 
         // ================== ENEMY EDITOR ==================
         function renderEnemyList() {
@@ -1117,7 +1087,7 @@
                 if (d.stageKey) currentStageKey = d.stageKey;
                 document.getElementById('firebase-level-name').value = name;
                 document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Firebase: ${name}</span>`;
-                renderGrid(); renderPreview(); updateToolUI();
+                renderGrid(); updateToolUI();
                 return true;
             } catch (e) { alert('Load failed: ' + e.message); return false; }
         }
@@ -1168,8 +1138,7 @@
                     });
                     buildFrameThumbs();
                     renderGrid();
-                    renderPreview();
-                    updateToolUI();
+                                       updateToolUI();
                 }
             } catch (e) { console.warn('Auto-load atlas failed:', e); }
         }
