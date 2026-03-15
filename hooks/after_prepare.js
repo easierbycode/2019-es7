@@ -38,7 +38,72 @@ function findFile(dir, filename) {
     return null;
 }
 
+function patchIOSWebViewInspectable(context) {
+    const platformRoot = path.join(
+        context.opts.projectRoot, "platforms", "ios"
+    );
+    if (!fs.existsSync(platformRoot)) return;
+
+    // Find CDVViewController.m or the main AppDelegate/ViewController to
+    // enable WKWebView.isInspectable (iOS 16.4+).
+    // cordova-ios 7.x reads the InspectableWebview preference from config.xml
+    // automatically, but we also patch the Swift/ObjC source as a fallback
+    // to ensure it works on debug builds.
+
+    const appDelegatePath = findFile(
+        path.join(platformRoot, "App"), "AppDelegate.swift"
+    );
+
+    if (!appDelegatePath) {
+        console.log("after_prepare hook: AppDelegate.swift not found – skipping iOS inspectable patch");
+        return;
+    }
+
+    let src = fs.readFileSync(appDelegatePath, "utf8");
+
+    // Guard against patching twice
+    if (src.includes("isInspectable")) return;
+
+    // Add WKWebView isInspectable = true after the webView is configured.
+    // In cordova-ios 7.x, the CDVWebViewEngine creates the WKWebView.
+    // We inject code in didFinishLaunchingWithOptions to set inspectable after
+    // the web view is created by calling into the viewController.
+    const inspectablePatch = `
+        // Enable remote debugging (iOS 16.4+)
+        if #available(iOS 16.4, *) {
+            if let vc = self.window?.rootViewController,
+               let webView = vc.view?.subviews.compactMap({ $0 as? WKWebView }).first {
+                webView.isInspectable = true
+            }
+        }`;
+
+    // Try to insert after "return true" in didFinishLaunchingWithOptions
+    if (src.includes("return true")) {
+        src = src.replace(
+            /(\s*return true\s*\n\s*\})/,
+            inspectablePatch + "\n$1"
+        );
+
+        // Add WKWebView import if missing
+        if (!src.includes("import WebKit")) {
+            src = src.replace(
+                /(import UIKit)/,
+                "$1\nimport WebKit"
+            );
+        }
+
+        fs.writeFileSync(appDelegatePath, src, "utf8");
+        console.log("after_prepare hook: patched AppDelegate.swift with WKWebView.isInspectable = true");
+    } else {
+        console.log("after_prepare hook: could not locate insertion point in AppDelegate.swift");
+    }
+}
+
 module.exports = function (context) {
+    // ── iOS: enable WKWebView remote inspection ─────────────────────
+    patchIOSWebViewInspectable(context);
+
+    // ── Android: immersive sticky mode ──────────────────────────────
     const platformRoot = path.join(
         context.opts.projectRoot, "platforms", "android"
     );

@@ -157,6 +157,68 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
 
+    <!-- Mobile audio unlock: intercept ALL AudioContexts and resume on first gesture -->
+    <script>
+        (function unlockAudioContext() {
+            var allContexts = [];
+            var unlocked = false;
+            var OrigAC = window.AudioContext || window.webkitAudioContext;
+            if (!OrigAC) return;
+
+            function PatchedAC() {
+                var ctx = new OrigAC();
+                allContexts.push(ctx);
+                return ctx;
+            }
+            PatchedAC.prototype = OrigAC.prototype;
+            if (window.AudioContext) window.AudioContext = PatchedAC;
+            if (window.webkitAudioContext) window.webkitAudioContext = PatchedAC;
+
+            function resumeContext(ctx) {
+                if (!ctx) return;
+                if (ctx.state === "suspended" || ctx.state === "interrupted") {
+                    ctx.resume().catch(function () {});
+                }
+                try {
+                    var buf = ctx.createBuffer(1, 1, 22050);
+                    var src = ctx.createBufferSource();
+                    src.buffer = buf;
+                    src.connect(ctx.destination);
+                    if (src.start) { src.start(0); } else { src.noteOn(0); }
+                } catch (e) {}
+            }
+
+            function unlock() {
+                if (unlocked) return;
+                unlocked = true;
+
+                for (var i = 0; i < allContexts.length; i++) {
+                    resumeContext(allContexts[i]);
+                }
+
+                // PIXI.sound's WebAudio context
+                if (window.PIXI && PIXI.sound && PIXI.sound.context &&
+                    PIXI.sound.context.audioContext) {
+                    resumeContext(PIXI.sound.context.audioContext);
+                }
+
+                if (allContexts.length === 0) {
+                    resumeContext(new OrigAC());
+                }
+
+                document.removeEventListener("touchstart", unlock, true);
+                document.removeEventListener("touchend", unlock, true);
+                document.removeEventListener("click", unlock, true);
+                document.removeEventListener("pointerup", unlock, true);
+            }
+
+            document.addEventListener("touchstart", unlock, true);
+            document.addEventListener("touchend", unlock, true);
+            document.addEventListener("click", unlock, true);
+            document.addEventListener("pointerup", unlock, true);
+        })();
+    </script>
+
     <script type="module" src="./src/main.js"></script>
 </body>
 </html>

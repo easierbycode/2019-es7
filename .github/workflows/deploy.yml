@@ -132,7 +132,9 @@ jobs:
           cp manifest.json cordova/www/ || true
           cp favicon.ico cordova/www/ || true
           cp phaser-game.html cordova/www/
+          cp level-editor.html cordova/www/
           sed -i 's/<\/head>/<script src="cordova.js"><\/script><\/head>/' cordova/www/phaser-game.html
+          sed -i 's/<\/head>/<script src="cordova.js"><\/script><\/head>/' cordova/www/level-editor.html
 
           # Replace ES module boot script with bundled version for Cordova
           sed -i '/<script type="module">/,/<\/script>/c\<script src="./lib/boot.bundle.js"></script>' cordova/www/phaser-game.html

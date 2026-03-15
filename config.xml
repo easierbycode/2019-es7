@@ -61,6 +61,9 @@
         <preference name="hostname" value="localhost" />
         <preference name="MediaPlaybackRequiresUserAction" value="false" />
         <preference name="AllowsInlineMediaPlayback" value="true" />
+        <preference name="MediaTypesRequiringUserActionForPlayback" value="none" />
+        <!-- Remote debugging: make WKWebView inspectable via Safari/chrome://inspect -->
+        <preference name="InspectableWebview" value="true" />
 
         <icon src="icons/ios/icon-20.png" width="20" height="20" />
         <icon src="icons/ios/icon-20@2x.png" width="40" height="40" />
