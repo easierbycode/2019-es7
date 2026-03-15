@@ -166,6 +166,19 @@ export class BootScene extends Phaser.Scene {
         this.load.on("filecomplete-image-loading_bg", ensureLoadingPreview);
         this.load.on("filecomplete-image-loading0", ensureLoadingPreview);
 
+        this.load.on("loaderror", function (file) {
+            console.error("LOAD ERROR:", file.key, file.type, file.src || file.url);
+            // Show visible error on screen for Cordova debugging
+            var el = document.getElementById("loadError");
+            if (!el) {
+                el = document.createElement("div");
+                el.id = "loadError";
+                el.style.cssText = "position:fixed;top:0;left:0;right:0;background:red;color:white;font:12px monospace;padding:4px;z-index:9999;max-height:30vh;overflow:auto;";
+                document.body.appendChild(el);
+            }
+            el.textContent += "ERR: " + file.key + " (" + file.type + ") " + (file.src || file.url || "") + "\n";
+        });
+
         this.load.on("complete", function () {
             if (self.loadingG) {
                 self.loadingG.destroy();
@@ -174,6 +187,21 @@ export class BootScene extends Phaser.Scene {
             if (self.loadingBg) {
                 self.loadingBg.destroy();
                 self.loadingBg = null;
+            }
+
+            // Debug: log atlas texture status
+            var atlasKeys = ["title_ui", "game_ui", "game_asset"];
+            for (var a = 0; a < atlasKeys.length; a++) {
+                var k = atlasKeys[a];
+                var tex = self.textures.exists(k) ? self.textures.get(k) : null;
+                if (tex) {
+                    var src = tex.source && tex.source[0];
+                    console.log("ATLAS " + k + ": frames=" + tex.getFrameNames().length +
+                        " img=" + (src && src.image ? src.image.width + "x" + src.image.height : "none") +
+                        " src=" + (src && src.image ? src.image.src : "none"));
+                } else {
+                    console.warn("ATLAS " + k + ": NOT FOUND in textures");
+                }
             }
         });
 

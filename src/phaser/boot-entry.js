@@ -1,6 +1,21 @@
 // Boot entry point — bundled by esbuild into a single non-module script
 // for Cordova compatibility (WKWebView may not support ES module imports).
 
+// Global error overlay for Cordova debugging
+window.onerror = function (msg, src, line, col, err) {
+    var el = document.getElementById("loadError");
+    if (!el) {
+        el = document.createElement("div");
+        el.id = "loadError";
+        el.style.cssText = "position:fixed;top:0;left:0;right:0;background:red;color:white;font:12px monospace;padding:4px;z-index:9999;max-height:30vh;overflow:auto;white-space:pre-wrap;";
+        document.body.appendChild(el);
+    }
+    el.textContent += "JS: " + msg + " @ " + src + ":" + line + "\n";
+};
+window.onunhandledrejection = function (e) {
+    console.error("Unhandled rejection:", e.reason);
+};
+
 import { gameState } from "../gameState.js";
 import { initializeFirebaseScores } from "../firebaseScores.js";
 import { createPhaserGame } from "./PhaserGame.js";
