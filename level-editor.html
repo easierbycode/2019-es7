@@ -1034,6 +1034,7 @@
             if (e.key === 's' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); quickSave(); }
             if (e.key === 'Escape') { closePicker(); closeMenu(); }
             if (e.key === 'd' && !e.ctrlKey && !e.metaKey && !e.target.closest('input,textarea')) { e.preventDefault(); setDeleteMode(); }
+            if (e.key === 'Enter' && e.target.id === 'firebase-level-name') { e.preventDefault(); playFirebaseLevel(); }
         });
 
         // ================== FIREBASE ==================
