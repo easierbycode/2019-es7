@@ -151,8 +151,9 @@ export class PhaserGameScene extends Phaser.Scene {
         this.stageBg = this.add.tileSprite(0, 0, GW, GH, "stage_loop" + stageId);
         this.stageBg.setOrigin(0, 0);
 
-        this.stageEndBg = this.add.image(0, -GH, "stage_end" + stageId);
+        this.stageEndBg = this.add.image(0, 0, "stage_end" + stageId);
         this.stageEndBg.setOrigin(0, 0);
+        this.stageEndBg.y = -this.stageEndBg.height;
         this.stageEndBg.setVisible(false);
 
         this.unitGroup = this.add.group();
@@ -824,6 +825,15 @@ export class PhaserGameScene extends Phaser.Scene {
             if (!this.bossActive && !this.bossReached) {
                 var bgMove = this.gameStarted ? (this.stageBgAmountMove || 0.7) : 0.7;
                 this.stageBg.tilePositionY -= bgMove;
+            }
+            if (this.bossAppearBgFlg) {
+                var scrollAmt = this.stageBgAmountMove || 0.7;
+                this.stageBg.y += scrollAmt;
+                this.stageEndBg.y += scrollAmt;
+                this.bossAppearBgScroll = (this.bossAppearBgScroll || 0) + scrollAmt;
+                if (this.bossAppearBgScroll >= 214 || this.stageEndBg.y >= 42) {
+                    this.bossAppearBgFlg = false;
+                }
             }
         }
 
