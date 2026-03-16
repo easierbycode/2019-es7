@@ -73,12 +73,11 @@
             height: 100%;
             border: none;
         }
-        /* Force portrait layout on landscape screens (mobile web only).
-           Skipped entirely inside Electron (.electron class) because CSS
-           rotation breaks Phaser input hit-testing.  Electron uses xrandr
-           for physical rotation instead. */
+        /* Force portrait layout on landscape screens.
+           Skipped when Electron has physically rotated the display via
+           xrandr (.electron-rotated) to avoid double-rotation. */
         @media screen and (orientation: landscape) {
-            html:not(.electron) {
+            html:not(.electron-rotated) {
                 transform: rotate(-90deg);
                 transform-origin: left top;
                 width: 100vh;
@@ -88,7 +87,7 @@
                 top: 100%;
                 left: 0;
             }
-            html:not(.electron) #phaser-canvas {
+            html:not(.electron-rotated) #phaser-canvas {
                 height: 100%;
             }
         }
@@ -329,6 +328,7 @@
                     for (var j = 0; j < mutations[i].addedNodes.length; j++) {
                         if (mutations[i].addedNodes[j].tagName === "CANVAS") {
                             fitCanvas();
+                            patchCanvasInputForRotation(mutations[i].addedNodes[j]);
                             obs.disconnect();
                             return;
                         }
@@ -337,6 +337,58 @@
             });
             obs.observe(container, { childList: true });
         })();
+
+        // -----------------------------------------------------------------------
+        // Fix Phaser hit-testing when CSS rotation is active.
+        // Phaser uses getBoundingClientRect() to map pointer coords to game
+        // coords, but CSS rotation makes the bbox axis-aligned in viewport
+        // space, breaking the mapping.  We override getBoundingClientRect on
+        // the canvas to return virtual bounds that make Phaser's linear
+        // mapping produce correct game coordinates, and swap clientX/clientY
+        // on pointer events so the axes match the rotated layout.
+        // -----------------------------------------------------------------------
+        function patchCanvasInputForRotation(canvas) {
+            var htmlStyle = window.getComputedStyle(document.documentElement);
+            if (!htmlStyle.transform || htmlStyle.transform === "none") return;
+
+            var origBCR = HTMLElement.prototype.getBoundingClientRect;
+
+            // Override getBoundingClientRect to return the un-rotated bounds
+            // Phaser expects.  We derive them from the real rotated rect by
+            // swapping width/height and adjusting left/top.
+            canvas.getBoundingClientRect = function () {
+                var r = origBCR.call(canvas);
+                // The CSS rotation is -90° so visual width↔height are swapped.
+                // Return a virtual rect where width=r.height, height=r.width
+                // and the origin is adjusted so Phaser's linear interpolation
+                // maps correctly after our clientX↔clientY swap below.
+                return {
+                    left: r.top,
+                    top: window.innerHeight - r.right,
+                    right: r.bottom,
+                    bottom: window.innerHeight - r.left,
+                    width: r.height,
+                    height: r.width,
+                    x: r.top,
+                    y: window.innerHeight - r.right,
+                };
+            };
+
+            // Swap clientX/clientY on pointer events in the capture phase
+            // so they align with the virtual getBoundingClientRect above.
+            var vh = window.innerHeight;
+            function swapCoords(e) {
+                var cx = e.clientX;
+                var cy = e.clientY;
+                Object.defineProperty(e, "clientX", { value: cy });
+                Object.defineProperty(e, "clientY", { value: vh - cx });
+            }
+            var evts = ["pointerdown", "pointerup", "pointermove",
+                        "mousedown", "mouseup", "mousemove"];
+            for (var i = 0; i < evts.length; i++) {
+                canvas.addEventListener(evts[i], swapCoords, true);
+            }
+        }
 
         // Prevent back-navigation
         window.addEventListener("popstate", function () {

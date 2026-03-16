@@ -111,13 +111,15 @@ function createWindow() {
     win.loadURL("app://game/phaser-game.html");
 
     win.webContents.on("did-finish-load", function () {
-        // Mark <html> as Electron so the CSS rotation hack is skipped
-        // entirely (CSS rotation breaks Phaser input/hit-testing).
-        // When xrandr succeeded, also add 'electron-rotated'.
-        var cls = "'electron'" + (rotated ? ",'electron-rotated'" : "");
-        win.webContents.executeJavaScript(
-            "document.documentElement.classList.add(" + cls + ")"
-        );
+        // When xrandr physically rotated the display, mark <html> so the
+        // CSS rotation fallback is skipped (it would double-rotate).
+        // When xrandr failed, do NOT add any class — let the CSS rotation
+        // hack in phaser-game.html handle portrait layout.
+        if (rotated) {
+            win.webContents.executeJavaScript(
+                "document.documentElement.classList.add('electron-rotated')"
+            );
+        }
         // Trigger manual canvas scaling (Phaser uses Scale.NONE)
         win.webContents.executeJavaScript(
             "window.__fitCanvas && window.__fitCanvas()"
