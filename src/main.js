@@ -63,7 +63,7 @@ if (document.fullscreenEnabled || document.webkitFullscreenEnabled) {
 // ---------------------------------------------------------------------------
 // Canvas FIT scaling — scales 256x480 to fill viewport, maintaining aspect ratio
 // ---------------------------------------------------------------------------
-function fitCanvas() {
+export function fitCanvas() {
     var c = document.querySelector("#canvas canvas");
     if (c) {
         var vw = window.innerWidth;
@@ -84,6 +84,7 @@ function fitCanvas() {
 }
 
 window.addEventListener("resize", fitCanvas);
+window.__fitCanvas = fitCanvas;
 
 // ---------------------------------------------------------------------------
 // Edge-swipe prevention
