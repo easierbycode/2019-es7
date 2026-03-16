@@ -1100,7 +1100,7 @@
         function playFirebaseLevel() {
             let name = document.getElementById('firebase-level-name').value.trim();
             if (!name) { alert('Enter a level name first'); return; }
-            window.open(`phaser-game.html?level=${encodeURIComponent(sanitizeLevelName(name))}&stage=${getCurrentStageId()}`, '_blank');
+            window.open(`phaser-game.html?level=${encodeURIComponent(sanitizeLevelName(name))}`, '_blank');
         }
 
         // ================== AUTO-LOAD FROM SERVER ==================

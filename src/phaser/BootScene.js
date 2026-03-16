@@ -18,17 +18,6 @@ function readLevelParam() {
     }
 }
 
-function readStageParam() {
-    if (typeof window === "undefined") {
-        return null;
-    }
-    try {
-        return new URLSearchParams(window.location.search).get("stage");
-    } catch (e) {
-        return null;
-    }
-}
-
 function fetchFirebaseLevel(levelName) {
     if (typeof firebase === "undefined" || !firebase.database) {
         return Promise.reject(new Error("Firebase not available"));
@@ -249,8 +238,6 @@ export class BootScene extends Phaser.Scene {
     _loadFirebaseLevel(levelName) {
         var self = this;
         var game = this.game;
-        var stageParam = readStageParam();
-
         fetchFirebaseLevel(levelName).then(function (data) {
             var baseRecipe = self.cache.json.get("recipe") || {};
             var stageKey = data.stageKey || "stage0";
@@ -262,9 +249,7 @@ export class BootScene extends Phaser.Scene {
 
             gameState._phaserRecipe = baseRecipe;
 
-            var stageId = stageParam != null
-                ? parseStageId(stageParam)
-                : parseStageId(stageKey.replace("stage", ""));
+            var stageId = parseStageId(stageKey.replace("stage", ""));
             primeGameStateForStage(baseRecipe, stageId);
 
             setTimeout(function () {
