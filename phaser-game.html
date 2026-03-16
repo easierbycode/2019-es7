@@ -94,19 +94,6 @@
             cursor: pointer;
             padding: 4px 8px;
         }
-        /* Force portrait layout hack */
-        @media screen and (orientation: landscape) {
-            html {
-                transform: rotate(-90deg);
-                transform-origin: left top;
-                width: 100vh;
-                height: 100vw;
-                overflow: hidden;
-                position: absolute;
-                top: 100%;
-                left: 0;
-            }
-        }
     </style>
 
     <!-- Firebase config (global, loaded before compat libs) -->
