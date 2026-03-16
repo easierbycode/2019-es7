@@ -66,8 +66,11 @@ if (document.fullscreenEnabled || document.webkitFullscreenEnabled) {
 export function fitCanvas() {
     var vw = window.innerWidth;
     var vh = window.innerHeight;
-    // CSS rotation hack swaps axes in landscape — use swapped values
-    if (vw > vh) { var tmp = vw; vw = vh; vh = tmp; }
+    // When the CSS rotation hack is active (mobile web landscape fallback),
+    // innerWidth/Height still report landscape — swap to match visual viewport.
+    var htmlTransform = window.getComputedStyle(document.documentElement).transform;
+    var cssRotated = htmlTransform && htmlTransform !== "none";
+    if (cssRotated && vw > vh) { var tmp = vw; vw = vh; vh = tmp; }
 
     var c = document.querySelector("#canvas canvas");
     if (c) {

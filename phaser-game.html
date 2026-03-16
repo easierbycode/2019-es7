@@ -73,11 +73,12 @@
             height: 100%;
             border: none;
         }
-        /* Force portrait layout on landscape screens (mobile web fallback).
-           Skipped when Electron has rotated the display via xrandr
-           (.electron-rotated class added by electron/main.js). */
+        /* Force portrait layout on landscape screens (mobile web only).
+           Skipped entirely inside Electron (.electron class) because CSS
+           rotation breaks Phaser input hit-testing.  Electron uses xrandr
+           for physical rotation instead. */
         @media screen and (orientation: landscape) {
-            html:not(.electron-rotated) {
+            html:not(.electron) {
                 transform: rotate(-90deg);
                 transform-origin: left top;
                 width: 100vh;
@@ -87,7 +88,7 @@
                 top: 100%;
                 left: 0;
             }
-            html:not(.electron-rotated) #phaser-canvas {
+            html:not(.electron) #phaser-canvas {
                 height: 100%;
             }
         }
@@ -305,8 +306,13 @@
             if (!pc) return;
             var vw = window.innerWidth;
             var vh = window.innerHeight;
-            // CSS rotation hack swaps axes in landscape — use swapped values
-            if (vw > vh) { var tmp = vw; vw = vh; vh = tmp; }
+            // When the CSS rotation hack is active (mobile web landscape
+            // fallback), the visual viewport is portrait but innerWidth/
+            // innerHeight still report landscape — swap them.
+            // Skip the swap inside Electron or when no CSS transform exists.
+            var htmlTransform = window.getComputedStyle(document.documentElement).transform;
+            var cssRotated = htmlTransform && htmlTransform !== "none";
+            if (cssRotated && vw > vh) { var tmp = vw; vw = vh; vh = tmp; }
             var scale = Math.min(vw / 256, vh / 480);
             pc.style.width = Math.floor(256 * scale) + "px";
             pc.style.height = Math.floor(480 * scale) + "px";
