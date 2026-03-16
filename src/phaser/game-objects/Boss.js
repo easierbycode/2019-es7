@@ -32,10 +32,11 @@ function clamp(v, lo, hi) {
 var BOSS_BALLOON_OFFSETS = [
     { x: 0, y: 20 },   // bison
     { x: 30, y: 20 },  // barlog
-    { x: 0, y: 15 },   // sagat
-    { x: 5, y: 20 },   // vega
+    { x: 0, y: 0 },    // sagat (no offset set in original)
+    { x: 0, y: 15 },   // vega
     { x: 70, y: 40 },  // fang
 ];
+var GOKI_BALLOON_OFFSET = { x: 5, y: 20 };
 
 /**
  * Spawns the boss sprite and begins its entry tween.
@@ -123,9 +124,14 @@ export function bossAdd(scene) {
     var voiceKey = "boss_" + (bossNames[stageId] || "bison") + "_voice_add";
     scene.playSound(voiceKey, 0.7);
 
+    // PIXI: bosses rest at unit.y = GAME_HEIGHT/4 (top-left origin), BossFang at y=48.
+    // Phaser uses center origin (0.5), so add half sprite height to match PIXI visual pos.
+    var pixiRestY = (stageId === 4) ? 48 : GH / 4;
+    var entryY = pixiRestY + scene.bossSprite.height / 2;
+    scene.bossBaseY = entryY;
     scene.tweens.add({
         targets: scene.bossSprite,
-        y: 80,
+        y: entryY,
         duration: 2000,
         ease: "Quint.easeOut",
         onComplete: function () {
@@ -311,10 +317,13 @@ function _startGokiSequence(scene) {
                 scene.playBgm("boss_goki_bgm", 0.4);
 
                 // BossGoki moves to fight position
+                // PIXI: goki rests at GAME_HEIGHT/4 (top-left), adjust for Phaser center origin
+                var gokiRestY = GH / 4 + gokiSprite.height / 2;
+                scene.bossBaseY = gokiRestY;
                 scene.tweens.add({
                     targets: gokiSprite,
                     x: GCX,
-                    y: 80,
+                    y: gokiRestY,
                     duration: 1000,
                     onComplete: function () {
                         scene.theWorldFlg = false;
@@ -518,7 +527,7 @@ export function checkBossDanger(scene) {
         // automatically.  pivot.y = height makes the bottom edge sit at (x, y).
         // Each boss class sets a unique (x, y) relative to the unit top-left.
         var stageId = scene.bossStageId || 0;
-        var offsets = BOSS_BALLOON_OFFSETS[stageId] || BOSS_BALLOON_OFFSETS[0];
+        var offsets = scene.bossIsGoki ? GOKI_BALLOON_OFFSET : (BOSS_BALLOON_OFFSETS[stageId] || BOSS_BALLOON_OFFSETS[0]);
 
         // Convert PIXI top-left-relative offsets to Phaser center-relative.
         // PIXI: balloon at (offsets.x, offsets.y) from unit top-left

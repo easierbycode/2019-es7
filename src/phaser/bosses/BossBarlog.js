@@ -9,7 +9,7 @@ function clamp(v, lo, hi) {
 
 export function bossPatternBarlog(scene, seed) {
     var boss = scene.bossSprite;
-    var baseY = 80;
+    var baseY = scene.bossBaseY || GH / 4;
     var diveY = GH - 40;
 
     if (seed < 0.3) {
