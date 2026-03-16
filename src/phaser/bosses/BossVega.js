@@ -29,7 +29,7 @@ function _setBossAnim(scene, boss, frames) {
 
 export function bossPatternVega(scene, seed) {
     var boss = scene.bossSprite;
-    var baseY = 80;
+    var baseY = scene.bossBaseY || GH / 4;
     var diveY = GH - 20;
     var projA = scene.bossProjDataA || scene.bossProjData;
     var projB = scene.bossProjDataB || scene.bossProjData;

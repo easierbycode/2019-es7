@@ -95,7 +95,7 @@ export function bossPatternGoki(scene, seed) {
                 boss.x = nx;
                 boss.y = -50;
                 scene.tweens.add({
-                    targets: boss, y: GH / 4, duration: 700,
+                    targets: boss, y: scene.bossBaseY || GH / 4, duration: 700,
                     onComplete: function () {
                         _setBossAnim(scene, boss, scene.gokiAnimIdle);
                         scene.time.delayedCall(300, function () { scene.bossShootStart(); });
@@ -109,7 +109,7 @@ export function bossPatternGoki(scene, seed) {
         _setBossAnim(scene, boss, scene.gokiAnimSyngoku);
         scene.playSound("boss_goki_voice_ashura", 0.7);
         var nx2 = Math.random() * (GW - 60) + 30;
-        var ny = Math.random() > 0.5 ? 60 : GH / 4;
+        var ny = Math.random() > 0.5 ? 60 : (scene.bossBaseY || GH / 4);
         scene.tweens.add({
             targets: boss, x: nx2, y: ny, duration: 700,
             onComplete: function () {
