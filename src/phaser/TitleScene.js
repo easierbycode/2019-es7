@@ -134,8 +134,6 @@ export class PhaserTitleScene extends Phaser.Scene {
             try {
                 if (typeof window.howtoModalOpen === "function") {
                     window.howtoModalOpen();
-                } else {
-                    window.location.href = "level-editor.html";
                 }
             } catch (e) {}
         });
