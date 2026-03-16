@@ -7,6 +7,7 @@ import {
     getHighScoreSyncTint,
 } from "../highScoreUi.js";
 import { StaffRollPanel } from "./StaffRollPanel.js";
+import { pollGamepads } from "./GamepadInput.js";
 
 export class PhaserTitleScene extends Phaser.Scene {
     constructor() {
@@ -403,10 +404,12 @@ export class PhaserTitleScene extends Phaser.Scene {
             this.scoreSyncLabel.setColor("#" + syncTint.toString(16).padStart(6, "0"));
         }
 
-        // Keyboard start
+        // Keyboard + gamepad start
+        var gp = pollGamepads();
         if (!this.transitioning && (
             (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)) ||
-            (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey))
+            (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) ||
+            gp.sp || gp.enter
         )) {
             this.titleStart();
         }

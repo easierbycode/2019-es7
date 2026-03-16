@@ -1,4 +1,5 @@
 import { GAME_DIMENSIONS, LANG } from "../constants.js";
+import { pollGamepads } from "./GamepadInput.js";
 import { gameState, saveHighScore } from "../gameState.js";
 import { submitHighScore } from "../firebaseScores.js";
 import {
@@ -398,10 +399,12 @@ export class PhaserContinueScene extends Phaser.Scene {
             this.scoreSyncText.setColor("#" + syncTint.toString(16).padStart(6, "0"));
         }
 
-        // Keyboard continue controls
+        // Keyboard + gamepad continue controls
+        var gp = pollGamepads();
         if (this.countActive) {
             if ((this.yKey && Phaser.Input.Keyboard.JustDown(this.yKey))
-                || (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey))) {
+                || (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey))
+                || gp.enter || gp.sp) {
                 this.selectYes();
             } else if (this.nKey && Phaser.Input.Keyboard.JustDown(this.nKey)) {
                 this.selectNo();
