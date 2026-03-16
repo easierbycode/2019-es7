@@ -154,11 +154,8 @@ export function bossAdd(scene) {
     });
 
     scene.stageEndBg.setVisible(true);
-    scene.tweens.add({
-        targets: scene.stageEndBg,
-        y: 0,
-        duration: 3000,
-    });
+    scene.bossAppearBgFlg = true;
+    scene.bossAppearBgScroll = 0;
 }
 
 // -----------------------------------------------------------------------
