@@ -23,7 +23,8 @@
     ],
     "directories": {
       "output": "dist"
-    }
+    },
+    "afterPack": "./afterPack.js"
   },
   "repository": {
     "type": "git",
