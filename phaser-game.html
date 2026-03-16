@@ -294,6 +294,46 @@
         import { gameState } from "./src/gameState.js";
         import { initializeFirebaseScores } from "./src/firebaseScores.js";
         import { createPhaserGame } from "./src/phaser/PhaserGame.js";
+        import { Ϫ } from "./src/constants.js";
+
+        // -----------------------------------------------------------------
+        // Auto-hide Phaser audio load errors on iOS TestFlight
+        // -----------------------------------------------------------------
+        (function hideAudioErrors() {
+            function hideErrorElements() {
+                var children = document.body.childNodes;
+                for (var i = children.length - 1; i >= 0; i--) {
+                    var node = children[i];
+                    if (node.id === "baseUrl" || node.id === "phaser-canvas" ||
+                        node.id === "iosInstallBanner" || node.id === "howtoModal" ||
+                        node.tagName === "SCRIPT" || node.tagName === "LINK") {
+                        continue;
+                    }
+                    var text = node.textContent || "";
+                    if (text.indexOf("ERR:") !== -1) {
+                        if (node.style) node.style.display = "none";
+                        if (node.nodeType === 3) node.textContent = "";
+                    }
+                }
+            }
+
+            var timer = null;
+            var observer = new MutationObserver(function () {
+                if (timer) return;
+                var bodyText = document.body.innerText || "";
+                if (bodyText.indexOf("ERR:") !== -1) {
+                    timer = setTimeout(function () {
+                        hideErrorElements();
+                        observer.disconnect();
+                    }, Ϫ);
+                }
+            });
+
+            observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+            setTimeout(function () { observer.disconnect(); }, 30000);
+        })();
+
+        // -----------------------------------------------------------------
 
         function waitFor(ms) {
             return new Promise(function (resolve) { setTimeout(resolve, ms); });
