@@ -31,15 +31,34 @@ var STICK_THRESHOLD = 0.5;
  * then use justPressed/isDown helpers to read input.
  */
 var _prevButtons = {};  // gamepadIndex -> { buttonIndex -> wasPressed }
+var _gamepadConnected = false;
+
+// Chromium/Electron requires a gamepadconnected event before getGamepads()
+// returns non-null entries. Listen early so the API activates on first connect.
+try {
+    window.addEventListener("gamepadconnected", function (e) {
+        _gamepadConnected = true;
+        console.log("Gamepad connected: " + e.gamepad.id + " (index " + e.gamepad.index + ")");
+    });
+    window.addEventListener("gamepaddisconnected", function (e) {
+        delete _prevButtons[e.gamepad.index];
+        console.log("Gamepad disconnected: " + e.gamepad.id);
+    });
+} catch (e) {}
 
 function getGamepads() {
     if (!navigator.getGamepads) return [];
-    var raw = navigator.getGamepads();
-    var pads = [];
-    for (var i = 0; i < raw.length; i++) {
-        if (raw[i]) pads.push(raw[i]);
+    try {
+        var raw = navigator.getGamepads();
+        if (!raw) return [];
+        var pads = [];
+        for (var i = 0; i < raw.length; i++) {
+            if (raw[i]) pads.push(raw[i]);
+        }
+        return pads;
+    } catch (e) {
+        return [];
     }
-    return pads;
 }
 
 function isButtonPressed(btn) {

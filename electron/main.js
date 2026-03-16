@@ -1,6 +1,12 @@
 const { app, BrowserWindow } = require("electron");
 const path = require("path");
 
+// Enable Chromium gamepad support (required for some Linux/Steam environments)
+app.commandLine.appendSwitch("enable-gamepad-extensions");
+app.commandLine.appendSwitch("enable-features", "WebHID,GamepadAPI");
+// Prevent Chromium from throttling gamepad polling when window loses focus
+app.commandLine.appendSwitch("disable-background-timer-throttling");
+
 function createWindow() {
   const win = new BrowserWindow({
     fullscreen: true,
