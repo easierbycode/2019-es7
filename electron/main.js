@@ -13,6 +13,10 @@ function createWindow() {
   });
 
   win.loadFile(path.join(__dirname, "www", "phaser-game.html"));
+
+  win.webContents.on("did-finish-load", () => {
+    win.webContents.executeJavaScript("window.__fitCanvas && window.__fitCanvas()");
+  });
 }
 
 app.whenReady().then(createWindow);
