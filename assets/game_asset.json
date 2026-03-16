@@ -3804,7 +3804,7 @@
 	"meta": {
 		"app": "",
 		"version": "1.0",
-		"image": "img/game_asset.png?t=201903150000",
+		"image": "img/game_asset.png",
 		"format": "RGBA8888",
 		"size": {
 			"w": 2048,

@@ -10,8 +10,9 @@ export class PhaserStageBackground {
         this.stageBg = scene.add.tileSprite(0, 0, GW, GH, "stage_loop" + stageId);
         this.stageBg.setOrigin(0, 0);
 
-        this.stageEndBg = scene.add.image(0, -GH, "stage_end" + stageId);
+        this.stageEndBg = scene.add.image(0, 0, "stage_end" + stageId);
         this.stageEndBg.setOrigin(0, 0);
+        this.stageEndBg.y = -this.stageEndBg.height;
         this.stageEndBg.setVisible(false);
 
         this.coverOverlay = null;
@@ -28,10 +29,17 @@ export class PhaserStageBackground {
 
     showEndBg() {
         this.stageEndBg.setVisible(true);
-        this.scene.tweens.add({
-            targets: this.stageEndBg,
-            y: 0,
-            duration: 3000,
-        });
+        this.bossAppearFlg = true;
+        this.bossAppearScroll = 0;
+    }
+
+    updateBossScroll(scrollAmount) {
+        if (!this.bossAppearFlg) return;
+        this.stageBg.y += scrollAmount;
+        this.stageEndBg.y += scrollAmount;
+        this.bossAppearScroll = (this.bossAppearScroll || 0) + scrollAmount;
+        if (this.bossAppearScroll >= 214 || this.stageEndBg.y >= 42) {
+            this.bossAppearFlg = false;
+        }
     }
 }

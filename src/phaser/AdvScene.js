@@ -1,5 +1,6 @@
 import { GAME_DIMENSIONS, LANG } from "../constants.js";
 import { gameState } from "../gameState.js";
+import { pollGamepads } from "./GamepadInput.js";
 
 var ADV_SCENARIO_JA = {
     stage0: {
@@ -277,10 +278,12 @@ export class PhaserAdvScene extends Phaser.Scene {
     }
 
     update(time, delta) {
-        // Keyboard advance
+        // Keyboard + gamepad advance
+        var gp = pollGamepads();
         if (this.partTextComp && this.nextBtn && this.nextBtn.visible && (
             (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)) ||
-            (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey))
+            (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) ||
+            gp.sp || gp.enter
         )) {
             this.onNextPress();
             return;

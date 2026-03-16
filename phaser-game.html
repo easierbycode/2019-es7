@@ -57,42 +57,21 @@
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
         }
-        /* How-to modal overlay */
+        /* How-to / level-editor modal overlay */
         #howtoModal {
             display: none;
             position: fixed;
             inset: 0;
             z-index: 3000;
-            background: rgba(0,0,0,0.88);
+            background: rgba(0,0,0,0.92);
             align-items: center;
             justify-content: center;
-            padding: 16px;
         }
         #howtoModal.visible { display: flex; }
-        #howtoModalContent {
-            background: #222;
-            color: #fff;
-            border-radius: 8px;
-            padding: 20px;
-            max-width: 260px;
+        #howtoModal iframe {
             width: 100%;
-            font-size: 13px;
-            line-height: 1.6;
-            text-align: center;
-            position: relative;
-        }
-        #howtoModalContent h3 { margin: 0 0 12px; font-size: 16px; }
-        #howtoModalContent p { margin: 8px 0; }
-        #howtoModalClose {
-            position: absolute;
-            top: 6px;
-            right: 10px;
-            background: none;
+            height: 100%;
             border: none;
-            color: #888;
-            font-size: 20px;
-            cursor: pointer;
-            padding: 4px 8px;
         }
     </style>
 
@@ -127,24 +106,16 @@
         <button id="iosInstallDismiss" style="position:absolute; top:4px; right:8px; background:none; border:none; color:#888; font-size:18px; cursor:pointer; padding:4px 8px; line-height:1;">×</button>
     </div>
 
-    <!-- How-to modal -->
+    <!-- How-to / level-editor modal -->
     <div id="howtoModal">
-        <div id="howtoModalContent">
-            <button id="howtoModalClose">×</button>
-            <h3>HOW TO PLAY</h3>
-            <p><strong>Move:</strong> Drag / Arrow keys / WASD</p>
-            <p><strong>Shoot:</strong> Automatic</p>
-            <p><strong>Special:</strong> Tap SP gauge / Spacebar</p>
-            <p>Defeat enemies, collect power-ups, and beat bosses!</p>
-            <p style="font-size:11px; color:#888; margin-top:16px;">Tap outside to close</p>
-        </div>
+        <iframe id="howtoIframe"></iframe>
     </div>
 
-    <!-- Phaser 4.0.0-rc.6 -->
-    <script src="https://cdn.jsdelivr.net/npm/phaser@4.0.0-rc.6/dist/phaser.min.js"></script>
-    <!-- Firebase (leaderboard support) -->
-    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+    <!-- Phaser 4.0.0-rc.6 (bundled locally for Cordova/offline support) -->
+    <script src="./lib/phaser.min.js"></script>
+    <!-- Firebase (leaderboard support, bundled locally) -->
+    <script src="./lib/firebase-app-compat.js"></script>
+    <script src="./lib/firebase-database-compat.js"></script>
 
     <script>
         // -----------------------------------------------------------------------
@@ -152,24 +123,17 @@
         // -----------------------------------------------------------------------
         window.howtoModalOpen = function () {
             var modal = document.getElementById("howtoModal");
-            if (modal) modal.classList.add("visible");
+            var iframe = document.getElementById("howtoIframe");
+            if (!modal) return;
+            if (iframe) iframe.src = "level-editor.html";
+            modal.classList.add("visible");
         };
         window.howtoModalClose = function () {
             var modal = document.getElementById("howtoModal");
+            var iframe = document.getElementById("howtoIframe");
             if (modal) modal.classList.remove("visible");
+            if (iframe) iframe.src = "about:blank";
         };
-        (function () {
-            var modal = document.getElementById("howtoModal");
-            var closeBtn = document.getElementById("howtoModalClose");
-            if (modal) {
-                modal.addEventListener("click", function (e) {
-                    if (e.target === modal) window.howtoModalClose();
-                });
-            }
-            if (closeBtn) {
-                closeBtn.addEventListener("click", window.howtoModalClose);
-            }
-        })();
 
         // -----------------------------------------------------------------------
         // Orientation lock
@@ -222,6 +186,81 @@
         }
 
         // -----------------------------------------------------------------------
+        // Mobile audio unlock — intercept ALL AudioContexts and resume on
+        // first gesture.  Monkey-patches the constructor so contexts that
+        // Phaser/PIXI.sound create *before* any touch are still captured.
+        // Also unlocks HTML5 Audio with a silent data-URI.
+        // -----------------------------------------------------------------------
+        (function unlockAudioContext() {
+            var allContexts = [];
+            var unlocked = false;
+            var OrigAC = window.AudioContext || window.webkitAudioContext;
+            if (!OrigAC) return;
+
+            function PatchedAC() {
+                var ctx = new OrigAC();
+                allContexts.push(ctx);
+                return ctx;
+            }
+            PatchedAC.prototype = OrigAC.prototype;
+            if (window.AudioContext) window.AudioContext = PatchedAC;
+            if (window.webkitAudioContext) window.webkitAudioContext = PatchedAC;
+
+            function resumeContext(ctx) {
+                if (!ctx) return;
+                if (ctx.state === "suspended" || ctx.state === "interrupted") {
+                    ctx.resume().catch(function () {});
+                }
+                try {
+                    var buf = ctx.createBuffer(1, 1, 22050);
+                    var src = ctx.createBufferSource();
+                    src.buffer = buf;
+                    src.connect(ctx.destination);
+                    if (src.start) { src.start(0); } else { src.noteOn(0); }
+                } catch (e) {}
+            }
+
+            function unlock() {
+                if (unlocked) return;
+                unlocked = true;
+
+                for (var i = 0; i < allContexts.length; i++) {
+                    resumeContext(allContexts[i]);
+                }
+
+                // Probe Phaser 4's game instance
+                var game = window.__PHASER_4_GAME__;
+                if (game && game.sound) {
+                    var ctx = game.sound.context || game.sound.audioContext;
+                    if (ctx) resumeContext(ctx);
+                    if (typeof game.sound.unlock === "function") {
+                        try { game.sound.unlock(); } catch (e) {}
+                    }
+                    if (game.sound.locked) game.sound.locked = false;
+                }
+
+                if (allContexts.length === 0) {
+                    resumeContext(new OrigAC());
+                }
+
+                // Also unlock HTML5 Audio with a silent mp3
+                var a = new Audio();
+                a.src = "data:audio/mpeg;base64,/+NIxAAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV";
+                a.play().catch(function(){});
+
+                document.removeEventListener("touchstart", unlock, true);
+                document.removeEventListener("touchend", unlock, true);
+                document.removeEventListener("click", unlock, true);
+                document.removeEventListener("pointerup", unlock, true);
+            }
+
+            document.addEventListener("touchstart", unlock, true);
+            document.addEventListener("touchend", unlock, true);
+            document.addEventListener("click", unlock, true);
+            document.addEventListener("pointerup", unlock, true);
+        })();
+
+        // -----------------------------------------------------------------------
         // Edge-swipe prevention
         // -----------------------------------------------------------------------
         (function preventEdgeSwipe() {
@@ -238,6 +277,41 @@
                 var w = window.innerWidth;
                 if (x < EDGE_PX || x > w - EDGE_PX) e.preventDefault();
             }, { passive: false, capture: true });
+        })();
+
+        // -----------------------------------------------------------------------
+        // Canvas FIT scaling — scales 256x480 to fill viewport
+        // -----------------------------------------------------------------------
+        function fitCanvas() {
+            var pc = document.querySelector("#phaser-canvas canvas");
+            if (!pc) return;
+            var vw = window.innerWidth;
+            var vh = window.innerHeight;
+            // CSS rotation hack swaps axes in landscape — use swapped values
+            if (vw > vh) { var tmp = vw; vw = vh; vh = tmp; }
+            var scale = Math.min(vw / 256, vh / 480);
+            pc.style.width = Math.floor(256 * scale) + "px";
+            pc.style.height = Math.floor(480 * scale) + "px";
+        }
+        window.addEventListener("resize", fitCanvas);
+        window.__fitCanvas = fitCanvas;
+
+        // Watch for Phaser canvas creation and auto-fit
+        (function observeCanvas() {
+            var container = document.getElementById("phaser-canvas");
+            if (!container) return;
+            var obs = new MutationObserver(function (mutations) {
+                for (var i = 0; i < mutations.length; i++) {
+                    for (var j = 0; j < mutations[i].addedNodes.length; j++) {
+                        if (mutations[i].addedNodes[j].tagName === "CANVAS") {
+                            fitCanvas();
+                            obs.disconnect();
+                            return;
+                        }
+                    }
+                }
+            });
+            obs.observe(container, { childList: true });
         })();
 
         // Prevent back-navigation
@@ -276,7 +350,10 @@
         })();
     </script>
 
-    <!-- Boot the Phaser 4 game -->
+    <!-- Boot the Phaser 4 game.
+         For local dev (npx serve), the module script works fine.
+         For Cordova builds, CI bundles src/phaser/boot-entry.js into
+         lib/boot.bundle.js and replaces this block with a regular script. -->
     <script type="module">
         import { gameState } from "./src/gameState.js";
         import { initializeFirebaseScores } from "./src/firebaseScores.js";
@@ -286,17 +363,16 @@
             return new Promise(function (resolve) { setTimeout(resolve, ms); });
         }
 
-        // ?lowmode=1 skips audio loading for faster boot (useful for testing)
         if (new URLSearchParams(window.location.search).get("lowmode") === "1") {
             gameState.lowModeFlg = true;
         }
 
-        // Initialize Firebase scores (race with timeout for fast boot)
         Promise.race([
             initializeFirebaseScores().catch(function () {}),
             waitFor(1500),
         ]).then(function () {
             createPhaserGame();
+            fitCanvas();
         });
     </script>
 </body>

@@ -30,8 +30,11 @@ export function createPhaserGame() {
             target: 60
         },
         scale: {
-            mode: Phaser.Scale.FIT,
-            autoCenter: Phaser.Scale.CENTER_BOTH
+            mode: Phaser.Scale.NONE,
+            autoCenter: Phaser.Scale.NO_CENTER
+        },
+        audio: {
+            disableWebAudio: false
         },
         scene: [
             BootScene,

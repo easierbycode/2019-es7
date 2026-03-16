@@ -11,15 +11,16 @@ on:
   workflow_dispatch:
 
 env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   CORDOVA_VERSION: "12"
   CORDOVA_IOS_VERSION: "7.1.1"
   NODE_VERSION: "20"
-  APP_ID: "com.easierbycode.game2028.ai"
+  APP_ID: "com.easierbycode.game2028"
   APP_NAME: "2028.ai"
 
 jobs:
   ios-build:
-    runs-on: macos-15
+    runs-on: macos-14
     timeout-minutes: 45
 
     steps:
@@ -35,7 +36,7 @@ jobs:
         run: npm i -g cordova@${{ env.CORDOVA_VERSION }}
 
       - name: Select Xcode version
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
+        run: sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer
 
       - name: Show Xcode version
         run: xcodebuild -version
@@ -69,9 +70,15 @@ jobs:
             $KEYCHAIN_PATH
           security list-keychain -d user -s $KEYCHAIN_PATH
 
-          # Install provisioning profile
+          # Install provisioning profile (must be named by its UUID)
           mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+          PP_UUID=$(/usr/libexec/PlistBuddy -c "Print :UUID" /dev/stdin <<< \
+            $(security cms -D -i $PP_PATH))
+          PP_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /dev/stdin <<< \
+            $(security cms -D -i $PP_PATH))
+          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/${PP_UUID}.mobileprovision
+          echo "PP_UUID=$PP_UUID" >> $GITHUB_ENV
+          echo "PP_NAME=$PP_NAME" >> $GITHUB_ENV
 
       # ── Cordova Project Setup ─────────────────────────────────────────
       - name: Create Cordova project
@@ -80,15 +87,27 @@ jobs:
           cd cordova
           cordova platform add ios@${{ env.CORDOVA_IOS_VERSION }}
 
-      - name: Copy config.xml
-        run: cp config.xml cordova/config.xml
+      - name: Copy config.xml and resources
+        run: |
+          cp config.xml cordova/config.xml
+          cp -r icons cordova/icons
+          cp -r res cordova/res
 
       - name: Update config.xml for Phaser entry point
         run: |
           sed -i '' 's|<content src="index.html" />|<content src="phaser-game.html" />|' cordova/config.xml
 
+      - name: Set unique build number (CFBundleVersion)
+        run: |
+          sed -i '' "s|version=\"1.0.0\"|version=\"1.0.0\" ios-CFBundleVersion=\"1.0.${{ github.run_number }}\"|" cordova/config.xml
+
       - name: Copy hooks
         run: cp -r hooks cordova/hooks
+
+      # ── Bundle ES modules for Cordova (WKWebView doesn't support ES module imports) ──
+      - name: Bundle JS modules with esbuild
+        run: |
+          npx --yes esbuild src/phaser/boot-entry.js --bundle --format=iife --outfile=lib/boot.bundle.js
 
       # ── Prepare www with Phaser build ─────────────────────────────────
       - name: Prepare Cordova www (Phaser version)
@@ -96,13 +115,20 @@ jobs:
           rm -rf cordova/www/*
           cp -r assets cordova/www/
           cp -r src cordova/www/
+          cp -r lib cordova/www/
           cp -r icons cordova/www/
           cp manifest.json cordova/www/ || true
           cp favicon.ico cordova/www/ || true
           cp phaser-game.html cordova/www/
+          cp level-editor.html cordova/www/
 
           # Inject cordova.js before closing </head>
           sed -i '' 's|</head>|<script src="cordova.js"></script></head>|' cordova/www/phaser-game.html
+          sed -i '' 's|</head>|<script src="cordova.js"></script></head>|' cordova/www/level-editor.html
+
+          # Replace ES module boot script with bundled version for Cordova
+          sed -i '' '/<script type="module">/,/<\/script>/c\
+          <script src="./lib/boot.bundle.js"></script>' cordova/www/phaser-game.html
 
       - name: Prepare Cordova iOS
         working-directory: cordova
@@ -110,31 +136,37 @@ jobs:
 
       # ── Export Options & Build ─────────────────────────────────────────
       - name: Create ExportOptions.plist
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          cat > cordova/ExportOptions.plist << 'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-            "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>app-store-connect</string>
-              <key>signingStyle</key>
-              <string>manual</string>
-              <key>teamID</key>
-              <string>${{ secrets.APPLE_TEAM_ID }}</string>
-              <key>provisioningProfiles</key>
-              <dict>
-                  <key>com.easierbycode.game2028.ai</key>
-                  <string>${{ secrets.PROVISIONING_PROFILE_NAME }}</string>
-              </dict>
-              <key>uploadBitcode</key>
-              <false/>
-              <key>uploadSymbols</key>
-              <true/>
-          </dict>
-          </plist>
-          PLIST
+          /usr/libexec/PlistBuddy -c "Clear dict" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :method string app-store-connect" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :teamID string $TEAM_ID" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.easierbycode.game2028 string $PP_NAME" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :uploadBitcode bool false" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :uploadSymbols bool true" cordova/ExportOptions.plist
+
+      - name: Debug ExportOptions.plist
+        run: |
+          echo "ExportOptions.plist contents:"
+          cat cordova/ExportOptions.plist
+          echo "---"
+          plutil -lint cordova/ExportOptions.plist
+
+      - name: Debug provisioning profile
+        run: |
+          echo "Installed profiles:"
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/
+          echo "---"
+          for f in ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision; do
+            echo "Profile: $f"
+            security cms -D -i "$f" | plutil -extract Name raw - || true
+            security cms -D -i "$f" | plutil -extract UUID raw - || true
+            security cms -D -i "$f" | plutil -extract Entitlements.application-identifier raw - || true
+            echo "---"
+          done
 
       - name: Build iOS archive
         working-directory: cordova/platforms/ios
@@ -142,20 +174,37 @@ jobs:
           xcodebuild archive \
             -workspace "${{ env.APP_NAME }}.xcworkspace" \
             -scheme "${{ env.APP_NAME }}" \
+            -sdk iphoneos \
             -configuration Release \
+            -destination 'generic/platform=iOS' \
             -archivePath $RUNNER_TEMP/app.xcarchive \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="${{ secrets.CODE_SIGN_IDENTITY }}" \
-            PROVISIONING_PROFILE_SPECIFIER="${{ secrets.PROVISIONING_PROFILE_NAME }}" \
+            PROVISIONING_PROFILE_SPECIFIER="${PP_NAME}" \
             DEVELOPMENT_TEAM="${{ secrets.APPLE_TEAM_ID }}" \
+            IPHONEOS_DEPLOYMENT_TARGET=14.0 \
             -allowProvisioningUpdates
+
+      - name: Debug archive contents
+        run: |
+          echo "=== Archive app contents ==="
+          ls -la $RUNNER_TEMP/app.xcarchive/Products/Applications/2028.ai.app/
+          echo "=== Embedded provisioning profile ==="
+          if [ -f "$RUNNER_TEMP/app.xcarchive/Products/Applications/2028.ai.app/embedded.mobileprovision" ]; then
+            security cms -D -i "$RUNNER_TEMP/app.xcarchive/Products/Applications/2028.ai.app/embedded.mobileprovision" | plutil -extract Name raw -
+          else
+            echo "NO embedded.mobileprovision found!"
+          fi
+          echo "=== Code signing info ==="
+          codesign -dvvv "$RUNNER_TEMP/app.xcarchive/Products/Applications/2028.ai.app" 2>&1 || true
 
       - name: Export IPA
         run: |
           xcodebuild -exportArchive \
             -archivePath $RUNNER_TEMP/app.xcarchive \
             -exportOptionsPlist cordova/ExportOptions.plist \
-            -exportPath $RUNNER_TEMP/export
+            -exportPath $RUNNER_TEMP/export \
+            -allowProvisioningUpdates
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4

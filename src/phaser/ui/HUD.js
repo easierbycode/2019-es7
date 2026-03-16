@@ -96,28 +96,7 @@ export class PhaserHUD {
     }
 
     updateBossHpBar(active, bossSprite, bossHp, bossMaxHp) {
-        if (!active || !bossSprite || !bossSprite.active) {
-            this.bossHpBarBg.setVisible(false);
-            this.bossHpBarFg.setVisible(false);
-            return;
-        }
-
-        var barW = 120;
-        var barH = 6;
-        var barX = GCX - barW / 2;
-        var barY = 52;
-
-        this.bossHpBarBg.setVisible(true);
-        this.bossHpBarBg.clear();
-        this.bossHpBarBg.fillStyle(0x333333, 0.8);
-        this.bossHpBarBg.fillRect(barX, barY, barW, barH);
-
-        var hpRatio = Math.max(0, bossHp / bossMaxHp);
-        var color = hpRatio > 0.5 ? 0xff4444 : hpRatio > 0.25 ? 0xff8800 : 0xff0000;
-
-        this.bossHpBarFg.setVisible(true);
-        this.bossHpBarFg.clear();
-        this.bossHpBarFg.fillStyle(color, 1);
-        this.bossHpBarFg.fillRect(barX, barY, barW * hpRatio, barH);
+        this.bossHpBarBg.setVisible(false);
+        this.bossHpBarFg.setVisible(false);
     }
 }

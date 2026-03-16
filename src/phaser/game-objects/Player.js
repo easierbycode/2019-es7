@@ -7,6 +7,7 @@ import { gameState } from "../../gameState.js";
 import { PLAYER_STATES } from "../../enums/player-boss-states.js";
 import { triggerHaptic } from "../../haptics.js";
 import { createShadow, updateShadowPosition } from "./Shadow.js";
+import { pollGamepads } from "../GamepadInput.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
 var GH = GAME_DIMENSIONS.HEIGHT;
@@ -122,20 +123,21 @@ export function onScreenDragMove(scene, pointer) {
  * @param {Phaser.Scene} scene
  */
 export function handleKeyboardInput(scene) {
-    if (!scene.gameStarted || scene.playerDead || scene.theWorldFlg || !scene.cursors || !scene.wasd) return;
+    if (!scene.gameStarted || scene.playerDead || scene.theWorldFlg) return;
 
+    var gp = pollGamepads();
     var moveX = 0;
     var moveY = 0;
 
-    if (scene.cursors.left.isDown || scene.wasd.left.isDown) {
+    if ((scene.cursors && scene.cursors.left.isDown) || (scene.wasd && scene.wasd.left.isDown) || gp.left) {
         moveX = -scene.keyMoveSpeed;
-    } else if (scene.cursors.right.isDown || scene.wasd.right.isDown) {
+    } else if ((scene.cursors && scene.cursors.right.isDown) || (scene.wasd && scene.wasd.right.isDown) || gp.right) {
         moveX = scene.keyMoveSpeed;
     }
 
-    if (scene.cursors.up.isDown || scene.wasd.up.isDown) {
+    if ((scene.cursors && scene.cursors.up.isDown) || (scene.wasd && scene.wasd.up.isDown) || gp.up) {
         moveY = -scene.keyMoveSpeed;
-    } else if (scene.cursors.down.isDown || scene.wasd.down.isDown) {
+    } else if ((scene.cursors && scene.cursors.down.isDown) || (scene.wasd && scene.wasd.down.isDown) || gp.down) {
         moveY = scene.keyMoveSpeed;
     }
 
@@ -145,7 +147,7 @@ export function handleKeyboardInput(scene) {
         scene.playerUnitY = scene.playerSprite.y;
     }
 
-    if (scene.wasd.sp && Phaser.Input.Keyboard.JustDown(scene.wasd.sp)) {
+    if ((scene.wasd && scene.wasd.sp && Phaser.Input.Keyboard.JustDown(scene.wasd.sp)) || gp.sp) {
         scene.onSpFire();
     }
 }

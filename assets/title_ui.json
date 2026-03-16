@@ -284,11 +284,11 @@
 	"meta": {
 		"app": "",
 		"version": "1.0",
-		"image": "img/title_ui.png?t=201903190000",
+		"image": "img/title_ui.png",
 		"format": "RGBA8888",
 		"size": {
-			"w": 1048,
-			"h": 2048
+			"w": 1024,
+			"h": 512
 		},
 		"scale": "1",
 		"smartupdate": "$TexturePacker:SmartUpdate:2f213a6b451f9f5719773418dfe80ae8$"

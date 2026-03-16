@@ -63,11 +63,14 @@ if (document.fullscreenEnabled || document.webkitFullscreenEnabled) {
 // ---------------------------------------------------------------------------
 // Canvas FIT scaling — scales 256x480 to fill viewport, maintaining aspect ratio
 // ---------------------------------------------------------------------------
-function fitCanvas() {
+export function fitCanvas() {
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
+    // CSS rotation hack swaps axes in landscape — use swapped values
+    if (vw > vh) { var tmp = vw; vw = vh; vh = tmp; }
+
     var c = document.querySelector("#canvas canvas");
     if (c) {
-        var vw = window.innerWidth;
-        var vh = window.innerHeight;
         var scale = Math.min(vw / 256, vh / 480);
         c.style.width = Math.floor(256 * scale) + "px";
         c.style.height = Math.floor(480 * scale) + "px";
@@ -75,15 +78,14 @@ function fitCanvas() {
 
     var pc = document.querySelector("#phaser-canvas canvas");
     if (pc) {
-        var vw2 = window.innerWidth;
-        var vh2 = window.innerHeight;
-        var scale2 = Math.min(vw2 / 256, vh2 / 480);
+        var scale2 = Math.min(vw / 256, vh / 480);
         pc.style.width = Math.floor(256 * scale2) + "px";
         pc.style.height = Math.floor(480 * scale2) + "px";
     }
 }
 
 window.addEventListener("resize", fitCanvas);
+window.__fitCanvas = fitCanvas;
 
 // ---------------------------------------------------------------------------
 // Edge-swipe prevention
