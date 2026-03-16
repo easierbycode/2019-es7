@@ -242,6 +242,17 @@ export class LoadScene extends BaseScene {
         var iosBanner = document.getElementById("iosInstallBanner");
         if (iosBanner) { iosBanner.style.display = "none"; }
 
+        // Unlock Web Audio context (iOS requires this inside a user-gesture)
+        if (typeof PIXI !== "undefined" && PIXI.sound && PIXI.sound.context) {
+            var ctx = PIXI.sound.context;
+            if (ctx.audioContext && ctx.audioContext.state === "suspended") {
+                ctx.audioContext.resume();
+            }
+            if (typeof ctx.playEmptySound === "function") {
+                ctx.playEmptySound();
+            }
+        }
+
         this.state.lowModeFlg = false;
 
         log("Launching Phaser 4 game...");
@@ -269,6 +280,20 @@ export class LoadScene extends BaseScene {
         // Hide iOS install banner during gameplay
         var iosBanner = document.getElementById("iosInstallBanner");
         if (iosBanner) { iosBanner.style.display = "none"; }
+
+        // Unlock the Web Audio context on iOS — must happen inside a user-gesture
+        // call stack so that resume() is allowed to transition the context from
+        // "suspended" to "running" before any decodeAudioData calls land.
+        if (typeof PIXI !== "undefined" && PIXI.sound && PIXI.sound.context) {
+            var ctx = PIXI.sound.context;
+            if (ctx.audioContext && ctx.audioContext.state === "suspended") {
+                ctx.audioContext.resume();
+            }
+            // Also play the tiny empty-buffer trick that pixi-sound uses internally
+            if (typeof ctx.playEmptySound === "function") {
+                ctx.playEmptySound();
+            }
+        }
 
         if (typeof document !== "undefined") {
             var element = document.querySelector("#canvas canvas") || document.documentElement;
