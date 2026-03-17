@@ -1008,6 +1008,19 @@ export class PhaserGameScene extends Phaser.Scene {
             eBullet.x += rotX * spd;
             eBullet.y += rotY * spd;
 
+            // Animate multi-frame enemy bullets (smoke, etc.)
+            var ebFrames = eBullet.getData("frames");
+            if (ebFrames && ebFrames.length > 1) {
+                var ebAnimTimer = (eBullet.getData("animTimer") || 0) + step;
+                eBullet.setData("animTimer", ebAnimTimer);
+                if (ebAnimTimer > 150) {
+                    eBullet.setData("animTimer", 0);
+                    var ebAnimIdx = ((eBullet.getData("animIdx") || 0) + 1) % ebFrames.length;
+                    eBullet.setData("animIdx", ebAnimIdx);
+                    try { eBullet.setFrame(ebFrames[ebAnimIdx]); } catch (e) {}
+                }
+            }
+
             if (eBullet.y > GH + 20 || eBullet.y < -20 || eBullet.x < -20 || eBullet.x > GW + 20) {
                 eBullet.destroy();
                 this.enemyBullets.splice(eb, 1);
