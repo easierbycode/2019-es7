@@ -414,6 +414,12 @@ export function bossShootAimed(scene, projData) {
     bullet.setData("rotX", dx / dist);
     bullet.setData("rotY", dy / dist);
 
+    if (frames.length > 1) {
+        bullet.setData("frames", frames);
+        bullet.setData("animIdx", 0);
+        bullet.setData("animTimer", 0);
+    }
+
     scene.enemyBullets.push(bullet);
 }
 
