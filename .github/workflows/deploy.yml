@@ -133,6 +133,8 @@ jobs:
           cp favicon.ico cordova/www/ || true
           cp phaser-game.html cordova/www/
           cp level-editor.html cordova/www/
+          cp boss-viewer.html cordova/www/
+          cp boss-attack-viewer.html cordova/www/
           sed -i 's/<\/head>/<script src="cordova.js"><\/script><\/head>/' cordova/www/phaser-game.html
           sed -i 's/<\/head>/<script src="cordova.js"><\/script><\/head>/' cordova/www/level-editor.html
 
