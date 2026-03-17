@@ -18,6 +18,28 @@ function readLevelParam() {
     }
 }
 
+function readStageParam() {
+    if (typeof window === "undefined") {
+        return null;
+    }
+    try {
+        return new URLSearchParams(window.location.search).get("stage");
+    } catch (e) {
+        return null;
+    }
+}
+
+function readBossRushParam() {
+    if (typeof window === "undefined") {
+        return false;
+    }
+    try {
+        return new URLSearchParams(window.location.search).get("bossRush") === "1";
+    } catch (e) {
+        return false;
+    }
+}
+
 function fetchFirebaseLevel(levelName) {
     if (typeof firebase === "undefined" || !firebase.database) {
         return Promise.reject(new Error("Firebase not available"));
@@ -264,6 +286,8 @@ export class BootScene extends Phaser.Scene {
     _loadFirebaseLevel(levelName) {
         var self = this;
         var game = this.game;
+        var stageParam = readStageParam();
+
         fetchFirebaseLevel(levelName).then(function (data) {
             var baseRecipe = self.cache.json.get("recipe") || {};
             var stageKey = data.stageKey || "stage0";
@@ -275,8 +299,13 @@ export class BootScene extends Phaser.Scene {
 
             gameState._phaserRecipe = baseRecipe;
 
-            var stageId = parseStageId(stageKey.replace("stage", ""));
+            var stageId = stageParam != null
+                ? parseStageId(stageParam)
+                : parseStageId(stageKey.replace("stage", ""));
             primeGameStateForStage(baseRecipe, stageId);
+            if (readBossRushParam()) {
+                gameState.shortFlg = true;
+            }
 
             setTimeout(function () {
                 game.scene.stop("BootScene");
@@ -295,9 +324,21 @@ export class BootScene extends Phaser.Scene {
             gameState._phaserRecipe = recipe;
         }
 
+        var stageParam = readStageParam();
+        var bossRush = readBossRushParam();
+
         var nextSceneKey = "PhaserTitleScene";
         if (editorPlay && recipe) {
             primeGameStateForStage(recipe, editorPlay.stageId);
+            if (bossRush) {
+                gameState.shortFlg = true;
+            }
+            nextSceneKey = "PhaserGameScene";
+        } else if (stageParam != null || bossRush) {
+            primeGameStateForStage(recipe, stageParam != null ? stageParam : 0);
+            if (bossRush) {
+                gameState.shortFlg = true;
+            }
             nextSceneKey = "PhaserGameScene";
         }
 
