@@ -63,9 +63,21 @@ if (document.fullscreenEnabled || document.webkitFullscreenEnabled) {
 // ---------------------------------------------------------------------------
 // Canvas FIT scaling — scales 256x480 to fill viewport, maintaining aspect ratio
 // ---------------------------------------------------------------------------
+function getContentArea(container) {
+    if (!container) return { w: window.innerWidth, h: window.innerHeight };
+    var cs = getComputedStyle(container);
+    var w = container.clientWidth
+        - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    var h = container.clientHeight
+        - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    return { w: w, h: h };
+}
+
 export function fitCanvas() {
-    var vw = window.innerWidth;
-    var vh = window.innerHeight;
+    var container = document.getElementById("canvas") || document.getElementById("phaser-canvas");
+    var area = getContentArea(container);
+    var vw = area.w;
+    var vh = area.h;
     // When the CSS rotation hack is active (mobile web landscape fallback),
     // innerWidth/Height still report landscape — swap to match visual viewport.
     var htmlTransform = window.getComputedStyle(document.documentElement).transform;
