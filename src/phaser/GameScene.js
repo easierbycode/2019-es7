@@ -149,6 +149,10 @@ export class PhaserGameScene extends Phaser.Scene {
         var enemyList = this.recipe[this.stageKey] ? this.recipe[this.stageKey].enemylist : [];
         this.stageEnemyPositionList = (enemyList || []).slice().reverse();
 
+        if (gameState.shortFlg) {
+            this.stageEnemyPositionList = [];
+        }
+
         this.stageBg = this.add.tileSprite(0, 0, GW, GH, "stage_loop" + stageId);
         this.stageBg.setOrigin(0, 0);
 
