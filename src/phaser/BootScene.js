@@ -196,6 +196,14 @@ export class BootScene extends Phaser.Scene {
                 self.loadingBg = null;
             }
 
+            // Auto-hide the #loadError div after 6.7s
+            var loadErrorEl = document.getElementById("loadError");
+            if (loadErrorEl) {
+                setTimeout(function () {
+                    loadErrorEl.style.display = "none";
+                }, 6700);
+            }
+
             // Debug: log atlas texture status
             var atlasKeys = ["title_ui", "game_ui", "game_asset"];
             for (var a = 0; a < atlasKeys.length; a++) {
