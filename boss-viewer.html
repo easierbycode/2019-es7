@@ -471,22 +471,29 @@
         }
 
         // ===================== INIT =====================
-        var viewerEl = document.getElementById("viewer");
+        function createGame() {
+            var viewerEl = document.getElementById("viewer");
+            var w = viewerEl.clientWidth || window.innerWidth;
+            var h = viewerEl.clientHeight || (window.innerHeight - 92);
 
-        var config = {
-            type: Phaser.AUTO,
-            width: viewerEl.clientWidth,
-            height: viewerEl.clientHeight,
-            parent: "viewer",
-            backgroundColor: "#0a0a0a",
-            scale: {
-                mode: Phaser.Scale.RESIZE,
-                autoCenter: Phaser.Scale.CENTER_BOTH
-            },
-            scene: [BossViewerScene]
-        };
+            var config = {
+                type: Phaser.AUTO,
+                width: w,
+                height: h,
+                parent: "viewer",
+                backgroundColor: "#0a0a0a",
+                scale: {
+                    mode: Phaser.Scale.RESIZE,
+                    autoCenter: Phaser.Scale.CENTER_BOTH
+                },
+                scene: [BossViewerScene]
+            };
 
-        game = new Phaser.Game(config);
+            game = new Phaser.Game(config);
+        }
+
+        // Defer creation to ensure flex layout is computed (fixes iOS WKWebView 0x0 canvas)
+        setTimeout(createGame, 0);
 
         // Handle resize
         window.addEventListener("resize", function() {
