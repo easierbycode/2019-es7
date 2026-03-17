@@ -152,6 +152,24 @@ export class BootScene extends Phaser.Scene {
             });
         }
 
+        // Auto-hide audio load errors after 6.7s
+        // Phaser may render "ERR:" text on canvas or add DOM elements
+        this.load.on("loaderror", function (file) {
+            console.warn("Load error:", file.key, file.src);
+            setTimeout(function () {
+                // Remove any Phaser-created text objects showing errors
+                if (self.children && self.children.list) {
+                    var children = self.children.list.slice();
+                    for (var e = 0; e < children.length; e++) {
+                        var child = children[e];
+                        if (child && child.type === "Text" && child.text && child.text.indexOf("ERR:") !== -1) {
+                            child.destroy();
+                        }
+                    }
+                }
+            }, 6700);
+        });
+
         this.load.on("filecomplete-image-loading_bg", ensureLoadingPreview);
         this.load.on("filecomplete-image-loading0", ensureLoadingPreview);
 
