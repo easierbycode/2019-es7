@@ -29,6 +29,17 @@ function readStageParam() {
     }
 }
 
+function readBossRushParam() {
+    if (typeof window === "undefined") {
+        return false;
+    }
+    try {
+        return new URLSearchParams(window.location.search).get("bossRush") === "1";
+    } catch (e) {
+        return false;
+    }
+}
+
 function fetchFirebaseLevel(levelName) {
     if (typeof firebase === "undefined" || !firebase.database) {
         return Promise.reject(new Error("Firebase not available"));
@@ -163,8 +174,39 @@ export class BootScene extends Phaser.Scene {
             });
         }
 
+        // Auto-hide audio load errors after 6.7s
+        // Phaser may render "ERR:" text on canvas or add DOM elements
+        this.load.on("loaderror", function (file) {
+            console.warn("Load error:", file.key, file.src);
+            setTimeout(function () {
+                // Remove any Phaser-created text objects showing errors
+                if (self.children && self.children.list) {
+                    var children = self.children.list.slice();
+                    for (var e = 0; e < children.length; e++) {
+                        var child = children[e];
+                        if (child && child.type === "Text" && child.text && child.text.indexOf("ERR:") !== -1) {
+                            child.destroy();
+                        }
+                    }
+                }
+            }, 6700);
+        });
+
         this.load.on("filecomplete-image-loading_bg", ensureLoadingPreview);
         this.load.on("filecomplete-image-loading0", ensureLoadingPreview);
+
+        this.load.on("loaderror", function (file) {
+            console.error("LOAD ERROR:", file.key, file.type, file.src || file.url);
+            // Show visible error on screen for Cordova debugging
+            var el = document.getElementById("loadError");
+            if (!el) {
+                el = document.createElement("div");
+                el.id = "loadError";
+                el.style.cssText = "position:fixed;top:0;left:0;right:0;background:red;color:white;font:12px monospace;padding:4px;z-index:9999;max-height:30vh;overflow:auto;";
+                document.body.appendChild(el);
+            }
+            el.textContent += "ERR: " + file.key + " (" + file.type + ") " + (file.src || file.url || "") + "\n";
+        });
 
         this.load.on("complete", function () {
             if (self.loadingG) {
@@ -174,6 +216,29 @@ export class BootScene extends Phaser.Scene {
             if (self.loadingBg) {
                 self.loadingBg.destroy();
                 self.loadingBg = null;
+            }
+
+            // Auto-hide the #loadError div after 6.7s
+            var loadErrorEl = document.getElementById("loadError");
+            if (loadErrorEl) {
+                setTimeout(function () {
+                    loadErrorEl.style.display = "none";
+                }, 6700);
+            }
+
+            // Debug: log atlas texture status
+            var atlasKeys = ["title_ui", "game_ui", "game_asset"];
+            for (var a = 0; a < atlasKeys.length; a++) {
+                var k = atlasKeys[a];
+                var tex = self.textures.exists(k) ? self.textures.get(k) : null;
+                if (tex) {
+                    var src = tex.source && tex.source[0];
+                    console.log("ATLAS " + k + ": frames=" + tex.getFrameNames().length +
+                        " img=" + (src && src.image ? src.image.width + "x" + src.image.height : "none") +
+                        " src=" + (src && src.image ? src.image.src : "none"));
+                } else {
+                    console.warn("ATLAS " + k + ": NOT FOUND in textures");
+                }
             }
         });
 
@@ -267,6 +332,9 @@ export class BootScene extends Phaser.Scene {
                     ? parseStageId(stageParam)
                     : parseStageId(stageKey.replace("stage", ""));
                 primeGameStateForStage(baseRecipe, stageId);
+                if (readBossRushParam()) {
+                    gameState.shortFlg = true;
+                }
 
                 setTimeout(function () {
                     game.scene.stop("BootScene");
@@ -345,9 +413,21 @@ export class BootScene extends Phaser.Scene {
             gameState._phaserRecipe = recipe;
         }
 
+        var stageParam = readStageParam();
+        var bossRush = readBossRushParam();
+
         var nextSceneKey = "PhaserTitleScene";
         if (editorPlay && recipe) {
             primeGameStateForStage(recipe, editorPlay.stageId);
+            if (bossRush) {
+                gameState.shortFlg = true;
+            }
+            nextSceneKey = "PhaserGameScene";
+        } else if (stageParam != null || bossRush) {
+            primeGameStateForStage(recipe, stageParam != null ? stageParam : 0);
+            if (bossRush) {
+                gameState.shortFlg = true;
+            }
             nextSceneKey = "PhaserGameScene";
         }
 

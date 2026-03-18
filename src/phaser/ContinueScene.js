@@ -1,4 +1,5 @@
 import { GAME_DIMENSIONS, LANG } from "../constants.js";
+import { pollGamepads } from "./GamepadInput.js";
 import { gameState, saveHighScore } from "../gameState.js";
 import { submitHighScore } from "../firebaseScores.js";
 import {
@@ -7,6 +8,7 @@ import {
     getHighScoreSyncText,
     getHighScoreSyncTint,
 } from "../highScoreUi.js";
+import { BigNumberDisplay } from "./ui/BigNumberDisplay.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
 var GH = GAME_DIMENSIONS.HEIGHT;
@@ -102,33 +104,6 @@ export class PhaserContinueScene extends Phaser.Scene {
             }
         );
         this.commentText.setOrigin(0.5);
-
-        this.worldBestText = this.add.text(
-            32, GH - 50,
-            getWorldBestLabel() + " " + String(getDisplayedHighScore()),
-            {
-                fontFamily: "Arial",
-                fontSize: "10px",
-                fontStyle: "bold",
-                color: "#ffffff",
-                stroke: "#000000",
-                strokeThickness: 2,
-            }
-        );
-
-        var syncTint = getHighScoreSyncTint();
-        this.scoreSyncText = this.add.text(
-            32, GH - 36,
-            getHighScoreSyncText(),
-            {
-                fontFamily: "Arial",
-                fontSize: "8px",
-                fontStyle: "bold",
-                color: "#" + syncTint.toString(16).padStart(6, "0"),
-                stroke: "#000000",
-                strokeThickness: 2,
-            }
-        );
 
         // Keyboard: Y for yes, N for no, Enter for yes
         this.yKey = null;
@@ -267,56 +242,89 @@ export class PhaserContinueScene extends Phaser.Scene {
             gameState.highScore = Number(gameState.score || 0);
             saveHighScore();
 
-            this.add.text(
-                GCX, this.loseFace.y + this.loseFace.height + 20,
-                "NEW RECORD!",
-                {
-                    fontFamily: "sans-serif",
-                    fontSize: "12px",
-                    fontStyle: "bold",
-                    color: "#ffff00",
-                }
-            ).setOrigin(0.5, 0);
+            this.add.sprite(
+                0, this.loseFace.y + this.loseFace.height + 10,
+                "game_ui", "continueNewrecord.gif"
+            ).setOrigin(0, 0);
         }
 
-        this.add.text(
-            32, this.loseFace.y + this.loseFace.height + 40,
-            "SCORE " + String(gameState.score || 0),
+        var scoreTitleTxt = this.add.sprite(
+            32, this.loseFace.y + this.loseFace.height + 30,
+            "game_ui", "scoreTxt.gif"
+        );
+        scoreTitleTxt.setOrigin(0, 0);
+
+        var bigNumDisplay = new BigNumberDisplay(this, 10);
+        bigNumDisplay.container.x = scoreTitleTxt.x + scoreTitleTxt.width + 3;
+        bigNumDisplay.container.y = scoreTitleTxt.y - 2;
+        bigNumDisplay.setValue(Number(gameState.score || 0));
+
+        this.worldBestText = this.add.text(
+            scoreTitleTxt.x, scoreTitleTxt.y + 22,
+            getWorldBestLabel() + " " + String(getDisplayedHighScore()),
             {
-                fontFamily: "sans-serif",
-                fontSize: "16px",
+                fontFamily: "Arial",
+                fontSize: "10px",
                 fontStyle: "bold",
                 color: "#ffffff",
+                stroke: "#000000",
+                strokeThickness: 2,
             }
         );
 
-        // PIXI Ie class: gotoTitleBtn0.gif (default), 1 (over), 2 (down)
-        // Position: GAME_CENTER - width/2, GAME_MIDDLE - height/2 + 160
-        var gotoBtn = this.add.sprite(0, 0, "game_ui", "gotoTitleBtn0.gif");
-        gotoBtn.setOrigin(0, 0);
-        gotoBtn.x = GCX - gotoBtn.width / 2;
-        gotoBtn.y = GCY - gotoBtn.height / 2 + 160;
-        gotoBtn.setInteractive({ useHandCursor: true });
+        var syncTint = getHighScoreSyncTint();
+        this.scoreSyncText = this.add.text(
+            scoreTitleTxt.x, scoreTitleTxt.y + 22 + 14,
+            getHighScoreSyncText(),
+            {
+                fontFamily: "Arial",
+                fontSize: "8px",
+                fontStyle: "bold",
+                color: "#" + syncTint.toString(16).padStart(6, "0"),
+                stroke: "#000000",
+                strokeThickness: 2,
+            }
+        );
+
+        this.gotoTitleBtn = this.add.sprite(0, 0, "game_ui", "gotoTitleBtn0.gif");
+        this.gotoTitleBtn.setOrigin(0, 0);
+        this.gotoTitleBtn.x = GCX - this.gotoTitleBtn.width / 2;
+        this.gotoTitleBtn.y = GCY - this.gotoTitleBtn.height / 2 + 160;
+        this.gotoTitleBtn.setInteractive({ useHandCursor: true });
 
         var self = this;
+        this.gotoTitleBtn.on("pointerover", function () {
+            self.gotoTitleBtn.setFrame("gotoTitleBtn1.gif");
+        });
+        this.gotoTitleBtn.on("pointerout", function () {
+            self.gotoTitleBtn.setFrame("gotoTitleBtn0.gif");
+        });
+        this.gotoTitleBtn.on("pointerdown", function () {
+            self.gotoTitleBtn.setFrame("gotoTitleBtn2.gif");
+        });
+        this.gotoTitleBtn.on("pointerup", function () {
+            self.gotoTitle();
+        });
+
+        this._gotoTitleReady = true;
+    }
+
+    gotoTitle() {
+        if (this._gotoTitleDone) return;
+        this._gotoTitleDone = true;
+
+        if (this.gotoTitleBtn) {
+            this.gotoTitleBtn.disableInteractive();
+        }
+
+        gameState.secondLoop = true;
+
+        this.stopAllSounds();
         var game = this.game;
-        gotoBtn.on("pointerover", function () {
-            gotoBtn.setFrame("gotoTitleBtn1.gif");
-        });
-        gotoBtn.on("pointerout", function () {
-            gotoBtn.setFrame("gotoTitleBtn0.gif");
-        });
-        gotoBtn.on("pointerdown", function () {
-            gotoBtn.setFrame("gotoTitleBtn2.gif");
-        });
-        gotoBtn.on("pointerup", function () {
-            gotoBtn.setFrame("gotoTitleBtn1.gif");
-            self.stopAllSounds();
-            setTimeout(function () {
-                game.scene.stop("PhaserContinueScene");
-                game.scene.start("PhaserTitleScene");
-            }, 50);
-        });
+        setTimeout(function () {
+            game.scene.stop("PhaserContinueScene");
+            game.scene.start("PhaserTitleScene");
+        }, 50);
     }
 
     goNext() {
@@ -398,14 +406,48 @@ export class PhaserContinueScene extends Phaser.Scene {
             this.scoreSyncText.setColor("#" + syncTint.toString(16).padStart(6, "0"));
         }
 
-        // Keyboard continue controls
+        // Keyboard + gamepad continue controls
+        var gp = pollGamepads();
         if (this.countActive) {
             if ((this.yKey && Phaser.Input.Keyboard.JustDown(this.yKey))
-                || (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey))) {
+                || (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey))
+                || gp.enter || gp.sp) {
                 this.selectYes();
             } else if (this.nKey && Phaser.Input.Keyboard.JustDown(this.nKey)) {
                 this.selectNo();
             }
+        }
+
+        // Go To Title: ENTER key or gamepad START/OPTIONS button
+        if (this._gotoTitleReady && !this._gotoTitleDone) {
+            if (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)) {
+                this.gotoTitle();
+            }
+
+            // Gamepad: START (9), OPTIONS/SELECT (8), or face buttons (0-3)
+            try {
+                var pads = navigator.getGamepads ? navigator.getGamepads() : [];
+                var anyPressed = false;
+                for (var p = 0; p < pads.length; p++) {
+                    var pad = pads[p];
+                    if (!pad) continue;
+                    var btnIndices = [0, 1, 2, 3, 8, 9];
+                    for (var b = 0; b < btnIndices.length; b++) {
+                        var btn = pad.buttons[btnIndices[b]];
+                        if (btn && btn.pressed) {
+                            anyPressed = true;
+                            if (!this._gamepadTitlePressed) {
+                                this._gamepadTitlePressed = true;
+                                this.gotoTitle();
+                            }
+                            break;
+                        }
+                    }
+                }
+                if (!anyPressed) {
+                    this._gamepadTitlePressed = false;
+                }
+            } catch (e) {}
         }
     }
 }

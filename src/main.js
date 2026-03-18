@@ -63,11 +63,29 @@ if (document.fullscreenEnabled || document.webkitFullscreenEnabled) {
 // ---------------------------------------------------------------------------
 // Canvas FIT scaling — scales 256x480 to fill viewport, maintaining aspect ratio
 // ---------------------------------------------------------------------------
-function fitCanvas() {
+function getContentArea(container) {
+    if (!container) return { w: window.innerWidth, h: window.innerHeight };
+    var cs = getComputedStyle(container);
+    var w = container.clientWidth
+        - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    var h = container.clientHeight
+        - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    return { w: w, h: h };
+}
+
+export function fitCanvas() {
+    var container = document.getElementById("canvas") || document.getElementById("phaser-canvas");
+    var area = getContentArea(container);
+    var vw = area.w;
+    var vh = area.h;
+    // When the CSS rotation hack is active (mobile web landscape fallback),
+    // innerWidth/Height still report landscape — swap to match visual viewport.
+    var htmlTransform = window.getComputedStyle(document.documentElement).transform;
+    var cssRotated = htmlTransform && htmlTransform !== "none";
+    if (cssRotated && vw > vh) { var tmp = vw; vw = vh; vh = tmp; }
+
     var c = document.querySelector("#canvas canvas");
     if (c) {
-        var vw = window.innerWidth;
-        var vh = window.innerHeight;
         var scale = Math.min(vw / 256, vh / 480);
         c.style.width = Math.floor(256 * scale) + "px";
         c.style.height = Math.floor(480 * scale) + "px";
@@ -75,15 +93,14 @@ function fitCanvas() {
 
     var pc = document.querySelector("#phaser-canvas canvas");
     if (pc) {
-        var vw2 = window.innerWidth;
-        var vh2 = window.innerHeight;
-        var scale2 = Math.min(vw2 / 256, vh2 / 480);
+        var scale2 = Math.min(vw / 256, vh / 480);
         pc.style.width = Math.floor(256 * scale2) + "px";
         pc.style.height = Math.floor(480 * scale2) + "px";
     }
 }
 
 window.addEventListener("resize", fitCanvas);
+window.__fitCanvas = fitCanvas;
 
 // ---------------------------------------------------------------------------
 // Edge-swipe prevention

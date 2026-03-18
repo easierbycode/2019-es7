@@ -1,4 +1,4 @@
-name: Build & Deploy (GitHub Pages + Cordova)
+name: Build & Deploy (GitHub Pages + Cordova + Electron)
 
 on:
   push:
@@ -70,9 +70,9 @@ jobs:
           fi
           # Keep a known-good Gradle wrapper version for CI reproducibility.
           if grep -q "android-gradle-distribution-url" cordova/config.xml; then
-            sed -i 's|android-gradle-distribution-url" value=".*"|android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.12-bin.zip"|' cordova/config.xml
+            sed -i 's|android-gradle-distribution-url" value=".*"|android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.14.2-bin.zip"|' cordova/config.xml
           else
-            sed -i '/<\/widget>/i \    <preference name="android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.12-bin.zip" \/>' cordova/config.xml
+            sed -i '/<\/widget>/i \    <preference name="android-gradle-distribution-url" value="https://services.gradle.org/distributions/gradle-8.14.2-bin.zip" \/>' cordova/config.xml
           fi
 
       - name: Copy hooks into Cordova project
@@ -112,22 +112,34 @@ jobs:
       - name: Build Cordova Android (APK)
         working-directory: cordova
         env:
-          CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL: https://services.gradle.org/distributions/gradle-8.12-bin.zip
+          CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL: https://services.gradle.org/distributions/gradle-8.14.2-bin.zip
         run: cordova compile android --debug --packageType=apk
 
       - name: Save original APK
         run: cp cordova/platforms/android/app/build/outputs/apk/debug/*.apk ./game-original.apk
+
+      - name: Bundle JS modules with esbuild
+        run: |
+          npx --yes esbuild src/phaser/boot-entry.js --bundle --format=iife --outfile=lib/boot.bundle.js
 
       - name: Prepare Cordova www for phaser-game
         run: |
           rm -rf cordova/www/*
           cp -r assets cordova/www/
           cp -r src cordova/www/
+          cp -r lib cordova/www/
           cp -r icons cordova/www/ || true
           cp manifest.json cordova/www/ || true
           cp favicon.ico cordova/www/ || true
           cp phaser-game.html cordova/www/
+          cp level-editor.html cordova/www/
+          cp boss-viewer.html cordova/www/
+          cp boss-attack-viewer.html cordova/www/
           sed -i 's/<\/head>/<script src="cordova.js"><\/script><\/head>/' cordova/www/phaser-game.html
+          sed -i 's/<\/head>/<script src="cordova.js"><\/script><\/head>/' cordova/www/level-editor.html
+
+          # Replace ES module boot script with bundled version for Cordova
+          sed -i '/<script type="module">/,/<\/script>/c\<script src="./lib/boot.bundle.js"></script>' cordova/www/phaser-game.html
 
       - name: Update config.xml for phaser-game entry point
         run: sed -i 's|<content src="index.html" />|<content src="phaser-game.html" />|' cordova/config.xml
@@ -139,7 +151,7 @@ jobs:
       - name: Build Cordova Android (phaser-game APK)
         working-directory: cordova
         env:
-          CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL: https://services.gradle.org/distributions/gradle-8.12-bin.zip
+          CORDOVA_ANDROID_GRADLE_DISTRIBUTION_URL: https://services.gradle.org/distributions/gradle-8.14.2-bin.zip
         run: cordova compile android --debug --packageType=apk
 
       - name: Save phaser-game APK
@@ -157,8 +169,48 @@ jobs:
           name: phaser-game-apk
           path: ./phaser-game.apk
 
+  electron:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Prepare Electron app
+        run: |
+          cd electron
+          mkdir -p www icons
+          cp -r ../assets www/
+          cp -r ../src www/
+          cp -r ../lib www/
+          cp ../icons/icon-512.png icons/icon-512.png || true
+          cp ../phaser-game.html www/phaser-game.html
+          cp ../manifest.json www/ || true
+          cp ../favicon.ico www/ || true
+
+      - name: Bundle JS modules with esbuild for Electron
+        run: |
+          npx --yes esbuild src/phaser/boot-entry.js --bundle --format=iife --outfile=electron/www/lib/boot.bundle.js
+          sed -i '/<script type="module">/,/<\/script>/c\<script src="./lib/boot.bundle.js"></script>' electron/www/phaser-game.html
+
+      - name: Install Electron dependencies
+        working-directory: electron
+        run: npm install
+
+      - name: Build AppImage
+        working-directory: electron
+        run: npx electron-builder --linux AppImage --publish never
+
+      - name: Upload AppImage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: electron-appimage
+          path: electron/dist/*.AppImage
+
   web:
-    needs: cordova
+    needs: [cordova, electron]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -172,6 +224,7 @@ jobs:
           mkdir dist
           cp -r assets dist/
           cp -r src dist/
+          cp -r lib dist/
           cp -r icons dist/ || true
           cp index.html dist/
           cp phaser-game.html dist/
@@ -195,12 +248,20 @@ jobs:
           name: phaser-game-apk
           path: ./phaser-apk-tmp
 
-      - name: Copy APKs to dist
+      - name: Download AppImage artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: electron-appimage
+          path: ./appimage-tmp
+
+      - name: Copy APKs and AppImage to dist
         run: |
           cp apk-tmp/*.apk dist/game.apk
           cp phaser-apk-tmp/*.apk dist/phaser-game.apk
-          ls -l dist/game.apk dist/phaser-game.apk
-          rm -rf apk-tmp phaser-apk-tmp
+          cp appimage-tmp/*.AppImage dist/phaser-game.AppImage
+          cp phaser-game.desktop dist/phaser-game.desktop
+          ls -l dist/game.apk dist/phaser-game.apk dist/phaser-game.AppImage dist/phaser-game.desktop
+          rm -rf apk-tmp phaser-apk-tmp appimage-tmp
 
       - name: Create downloadable zip of built site
         run: |

@@ -35,6 +35,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            box-sizing: border-box;
+            padding-top: env(safe-area-inset-top, 0px);
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            padding-left: env(safe-area-inset-left, 0px);
+            padding-right: env(safe-area-inset-right, 0px);
         }
         #canvas canvas, #phaser-canvas canvas {
             image-rendering: pixelated;
@@ -51,7 +56,7 @@
         #iosInstallBanner {
             display: none;
             position: fixed;
-            bottom: 0;
+            bottom: env(safe-area-inset-bottom, 0px);
             left: 0;
             right: 0;
             z-index: 2000;
@@ -63,6 +68,22 @@
             border-top: 1px solid #333;
             backdrop-filter: blur(8px);
             -webkit-backdrop-filter: blur(8px);
+        }
+        /* How-to / level-editor modal overlay */
+        #howtoModal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            z-index: 3000;
+            background: rgba(0,0,0,0.92);
+            align-items: center;
+            justify-content: center;
+        }
+        #howtoModal.visible { display: flex; }
+        #howtoModal iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
         }
         /* Force portrait layout hack */
         @media screen and (orientation: landscape) {
@@ -114,12 +135,94 @@
         <button id="iosInstallDismiss" style="position:absolute; top:4px; right:8px; background:none; border:none; color:#888; font-size:18px; cursor:pointer; padding:4px 8px; line-height:1;">×</button>
     </div>
 
+    <!-- How-to / level-editor modal -->
+    <div id="howtoModal">
+        <iframe id="howtoIframe"></iframe>
+    </div>
+    <script>
+        window.howtoModalOpen = function () {
+            var modal = document.getElementById("howtoModal");
+            var iframe = document.getElementById("howtoIframe");
+            if (!modal) return;
+            if (iframe) iframe.src = "level-editor.html";
+            modal.classList.add("visible");
+        };
+        window.howtoModalClose = function () {
+            var modal = document.getElementById("howtoModal");
+            var iframe = document.getElementById("howtoIframe");
+            if (modal) modal.classList.remove("visible");
+            if (iframe) iframe.src = "about:blank";
+        };
+    </script>
+
     <!-- Libraries (loaded before game boot) -->
     <script src="./src/lib/pixi.min.js"></script>
     <script src="./src/lib/pixi-sound.min.js"></script>
     <script src="./src/lib/TweenMax.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+
+    <!-- Mobile audio unlock: intercept ALL AudioContexts and resume on first gesture -->
+    <script>
+        (function unlockAudioContext() {
+            var allContexts = [];
+            var unlocked = false;
+            var OrigAC = window.AudioContext || window.webkitAudioContext;
+            if (!OrigAC) return;
+
+            function PatchedAC() {
+                var ctx = new OrigAC();
+                allContexts.push(ctx);
+                return ctx;
+            }
+            PatchedAC.prototype = OrigAC.prototype;
+            if (window.AudioContext) window.AudioContext = PatchedAC;
+            if (window.webkitAudioContext) window.webkitAudioContext = PatchedAC;
+
+            function resumeContext(ctx) {
+                if (!ctx) return;
+                if (ctx.state === "suspended" || ctx.state === "interrupted") {
+                    ctx.resume().catch(function () {});
+                }
+                try {
+                    var buf = ctx.createBuffer(1, 1, 22050);
+                    var src = ctx.createBufferSource();
+                    src.buffer = buf;
+                    src.connect(ctx.destination);
+                    if (src.start) { src.start(0); } else { src.noteOn(0); }
+                } catch (e) {}
+            }
+
+            function unlock() {
+                if (unlocked) return;
+                unlocked = true;
+
+                for (var i = 0; i < allContexts.length; i++) {
+                    resumeContext(allContexts[i]);
+                }
+
+                // PIXI.sound's WebAudio context
+                if (window.PIXI && PIXI.sound && PIXI.sound.context &&
+                    PIXI.sound.context.audioContext) {
+                    resumeContext(PIXI.sound.context.audioContext);
+                }
+
+                if (allContexts.length === 0) {
+                    resumeContext(new OrigAC());
+                }
+
+                document.removeEventListener("touchstart", unlock, true);
+                document.removeEventListener("touchend", unlock, true);
+                document.removeEventListener("click", unlock, true);
+                document.removeEventListener("pointerup", unlock, true);
+            }
+
+            document.addEventListener("touchstart", unlock, true);
+            document.addEventListener("touchend", unlock, true);
+            document.addEventListener("click", unlock, true);
+            document.addEventListener("pointerup", unlock, true);
+        })();
+    </script>
 
     <script type="module" src="./src/main.js"></script>
 </body>

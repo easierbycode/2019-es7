@@ -230,7 +230,11 @@ export function updateEnemy(scene, enemy, step) {
     enemy.y += speed;
 
     var enemyName = enemy.getData("name");
-    if (enemyName === "soliderB") {
+    if (enemyName === "soliderA") {
+        if (enemy.y >= GH / 1.5 && scene.playerSprite) {
+            enemy.x += 0.005 * (scene.playerSprite.x - enemy.x);
+        }
+    } else if (enemyName === "soliderB") {
         if (!enemy.getData("posName")) {
             if ((enemy.getData("spawnX") || 0) >= GW / 2) {
                 enemy.x = GW;

@@ -46,6 +46,7 @@ import {
     checkBossDanger as _checkBossDanger,
     bossDie as _bossDie,
     syncBossVisuals,
+    gokiPlayerAttack as _gokiPlayerAttack,
 } from "./game-objects/Boss.js";
 
 // --- Effects ---
@@ -148,11 +149,16 @@ export class PhaserGameScene extends Phaser.Scene {
         var enemyList = this.recipe[this.stageKey] ? this.recipe[this.stageKey].enemylist : [];
         this.stageEnemyPositionList = (enemyList || []).slice().reverse();
 
+        if (gameState.shortFlg) {
+            this.stageEnemyPositionList = [];
+        }
+
         this.stageBg = this.add.tileSprite(0, 0, GW, GH, "stage_loop" + stageId);
         this.stageBg.setOrigin(0, 0);
 
-        this.stageEndBg = this.add.image(0, -GH, "stage_end" + stageId);
+        this.stageEndBg = this.add.image(0, 0, "stage_end" + stageId);
         this.stageEndBg.setOrigin(0, 0);
+        this.stageEndBg.y = -this.stageEndBg.height;
         this.stageEndBg.setVisible(false);
 
         this.unitGroup = this.add.group();
@@ -353,57 +359,81 @@ export class PhaserGameScene extends Phaser.Scene {
         var stageId = gameState.stageId || 0;
         var self = this;
 
-        var bg = this.add.graphics();
-        bg.fillStyle(0xffffff, 0.2);
-        bg.fillRect(0, 0, GW, GH);
-        bg.setDepth(200);
-        bg.setAlpha(0);
+        // PIXI: stageId 4 shows black overlay + "here comes a new challenger"
+        // voice before the normal stage title sequence
+        var preDelay = 0;
+        var preOverlay = null;
+        if (stageId === 4) {
+            preOverlay = this.add.rectangle(GCX, GCY, GW, GH, 0x000000);
+            preOverlay.setDepth(202);
+            preOverlay.setAlpha(1);
+            this.playSound("voice_another_fighter", 0.7);
+            preDelay = 3000;
+        }
 
-        var stageNumIdx = Math.min(stageId + 1, 4);
-        var stageNumSprite = this.add.image(0, GCY - 20, "game_ui", "stageNum" + String(stageNumIdx) + ".gif");
-        stageNumSprite.setOrigin(0, 0);
-        stageNumSprite.setDepth(201);
-        stageNumSprite.setAlpha(0);
+        this.time.delayedCall(preDelay, function () {
+            // Fade out the "new challenger" overlay if present
+            if (preOverlay) {
+                self.tweens.add({
+                    targets: preOverlay,
+                    alpha: 0,
+                    duration: 300,
+                    onComplete: function () { preOverlay.destroy(); },
+                });
+            }
 
-        var fightSprite = this.add.image(GCX, GCY + 12, "game_ui", "stageFight.gif");
-        fightSprite.setOrigin(0.5);
-        fightSprite.setDepth(201);
-        fightSprite.setAlpha(0);
-        fightSprite.setScale(1.2);
+            var bg = self.add.graphics();
+            bg.fillStyle(0xffffff, 0.2);
+            bg.fillRect(0, 0, GW, GH);
+            bg.setDepth(200);
+            bg.setAlpha(0);
 
-        this.tweens.add({ targets: bg, alpha: 1, duration: 300 });
+            var stageNumIdx = Math.min(stageId + 1, 4);
+            var stageNumSprite = self.add.image(0, GCY - 20, "game_ui", "stageNum" + String(stageNumIdx) + ".gif");
+            stageNumSprite.setOrigin(0, 0);
+            stageNumSprite.setDepth(201);
+            stageNumSprite.setAlpha(0);
 
-        this.time.delayedCall(300, function () {
-            self.playSound("voice_round" + String(Math.min(stageId, 3)), 0.7);
-            self.tweens.add({ targets: stageNumSprite, alpha: 1, duration: 300 });
-        });
+            var fightSprite = self.add.image(GCX, GCY + 12, "game_ui", "stageFight.gif");
+            fightSprite.setOrigin(0.5);
+            fightSprite.setDepth(201);
+            fightSprite.setAlpha(0);
+            fightSprite.setScale(1.2);
 
-        this.time.delayedCall(1600, function () {
-            self.tweens.add({ targets: stageNumSprite, alpha: 0, duration: 100 });
-            self.tweens.add({ targets: fightSprite, alpha: 1, duration: 200 });
-            self.tweens.add({ targets: fightSprite, scaleX: 1, scaleY: 1, duration: 200 });
-        });
+            self.tweens.add({ targets: bg, alpha: 1, duration: 300 });
 
-        this.time.delayedCall(1800, function () {
-            self.playSound("voice_fight", 0.7);
-        });
+            self.time.delayedCall(300, function () {
+                self.playSound("voice_round" + String(Math.min(stageId, 3)), 0.7);
+                self.tweens.add({ targets: stageNumSprite, alpha: 1, duration: 300 });
+            });
 
-        this.time.delayedCall(2200, function () {
-            self.tweens.add({ targets: fightSprite, scaleX: 1.5, scaleY: 1.5, duration: 200 });
-            self.tweens.add({ targets: fightSprite, alpha: 0, duration: 200 });
-        });
+            self.time.delayedCall(1600, function () {
+                self.tweens.add({ targets: stageNumSprite, alpha: 0, duration: 100 });
+                self.tweens.add({ targets: fightSprite, alpha: 1, duration: 200 });
+                self.tweens.add({ targets: fightSprite, scaleX: 1, scaleY: 1, duration: 200 });
+            });
 
-        this.time.delayedCall(2300, function () {
-            self.tweens.add({
-                targets: bg,
-                alpha: 0,
-                duration: 200,
-                onComplete: function () {
-                    bg.destroy();
-                    stageNumSprite.destroy();
-                    fightSprite.destroy();
-                    self.startGame();
-                },
+            self.time.delayedCall(1800, function () {
+                self.playSound("voice_fight", 0.7);
+            });
+
+            self.time.delayedCall(2200, function () {
+                self.tweens.add({ targets: fightSprite, scaleX: 1.5, scaleY: 1.5, duration: 200 });
+                self.tweens.add({ targets: fightSprite, alpha: 0, duration: 200 });
+            });
+
+            self.time.delayedCall(2300, function () {
+                self.tweens.add({
+                    targets: bg,
+                    alpha: 0,
+                    duration: 200,
+                    onComplete: function () {
+                        bg.destroy();
+                        stageNumSprite.destroy();
+                        fightSprite.destroy();
+                        self.startGame();
+                    },
+                });
             });
         });
     }
@@ -710,29 +740,8 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     updateBossHpBar() {
-        if (!this.bossActive || !this.bossSprite || !this.bossSprite.active) {
-            this.bossHpBarBg.setVisible(false);
-            this.bossHpBarFg.setVisible(false);
-            return;
-        }
-
-        var barW = 120;
-        var barH = 6;
-        var barX = GCX - barW / 2;
-        var barY = 52;
-
-        this.bossHpBarBg.setVisible(true);
-        this.bossHpBarBg.clear();
-        this.bossHpBarBg.fillStyle(0x333333, 0.8);
-        this.bossHpBarBg.fillRect(barX, barY, barW, barH);
-
-        var hpRatio = Math.max(0, this.bossHp / this.bossMaxHp);
-        var color = hpRatio > 0.5 ? 0xff4444 : hpRatio > 0.25 ? 0xff8800 : 0xff0000;
-
-        this.bossHpBarFg.setVisible(true);
-        this.bossHpBarFg.clear();
-        this.bossHpBarFg.fillStyle(color, 1);
-        this.bossHpBarFg.fillRect(barX, barY, barW * hpRatio, barH);
+        this.bossHpBarBg.setVisible(false);
+        this.bossHpBarFg.setVisible(false);
     }
 
     // =================================================================
@@ -825,6 +834,15 @@ export class PhaserGameScene extends Phaser.Scene {
                 var bgMove = this.gameStarted ? (this.stageBgAmountMove || 0.7) : 0.7;
                 this.stageBg.tilePositionY -= bgMove;
             }
+            if (this.bossAppearBgFlg) {
+                var scrollAmt = this.stageBgAmountMove || 0.7;
+                this.stageBg.y += scrollAmt;
+                this.stageEndBg.y += scrollAmt;
+                this.bossAppearBgScroll = (this.bossAppearBgScroll || 0) + scrollAmt;
+                if (this.bossAppearBgScroll >= 214 || this.stageEndBg.y >= 42) {
+                    this.bossAppearBgFlg = false;
+                }
+            }
         }
 
         if (!this.gameStarted) return;
@@ -892,6 +910,10 @@ export class PhaserGameScene extends Phaser.Scene {
                 if (isBoss && this.bossEntering) continue;
 
                 if (enemy.y >= 40 && rectOverlap(eRect, bRect)) {
+                    // Tint bullet on collision (matches PIXI: TweenMax tint 16773120)
+                    pb.setTint(16773120);
+                    pb.setData("_tintTimer", 5);
+
                     var applyDamage = true;
 
                     if (this.shootMode === "big") {
@@ -977,10 +999,15 @@ export class PhaserGameScene extends Phaser.Scene {
 
             // Boss-player collision (boss damages player but doesn't die)
             if (isBoss && rectOverlap(eRect, pRect)) {
-                var now = this.time.now;
-                if (!this._lastBossContactTime || now - this._lastBossContactTime > 1000) {
-                    this._lastBossContactTime = now;
-                    this.playerDamage(1);
+                if (this.bossIsGoki) {
+                    // Goki collision: full shungokusatsu attack sequence on player
+                    _gokiPlayerAttack(this);
+                } else {
+                    var now = this.time.now;
+                    if (!this._lastBossContactTime || now - this._lastBossContactTime > 1000) {
+                        this._lastBossContactTime = now;
+                        this.playerDamage(1);
+                    }
                 }
             }
 
@@ -1007,6 +1034,19 @@ export class PhaserGameScene extends Phaser.Scene {
             var spd = eBullet.getData("speed") || 1;
             eBullet.x += rotX * spd;
             eBullet.y += rotY * spd;
+
+            // Animate multi-frame enemy bullets (smoke, etc.)
+            var ebFrames = eBullet.getData("frames");
+            if (ebFrames && ebFrames.length > 1) {
+                var ebAnimTimer = (eBullet.getData("animTimer") || 0) + step;
+                eBullet.setData("animTimer", ebAnimTimer);
+                if (ebAnimTimer > 150) {
+                    eBullet.setData("animTimer", 0);
+                    var ebAnimIdx = ((eBullet.getData("animIdx") || 0) + 1) % ebFrames.length;
+                    eBullet.setData("animIdx", ebAnimIdx);
+                    try { eBullet.setFrame(ebFrames[ebAnimIdx]); } catch (e) {}
+                }
+            }
 
             if (eBullet.y > GH + 20 || eBullet.y < -20 || eBullet.x < -20 || eBullet.x > GW + 20) {
                 eBullet.destroy();
@@ -1035,6 +1075,9 @@ export class PhaserGameScene extends Phaser.Scene {
                 if (!pb2 || !pb2.active) continue;
                 var pb2Rect = { x: pb2.x - pb2.width / 2, y: pb2.y - pb2.height / 2, w: pb2.width, h: pb2.height };
                 if (rectOverlap(pb2Rect, ebRect1)) {
+                    // Tint bullet on collision (matches PIXI: TweenMax tint 16773120)
+                    pb2.setTint(16773120);
+                    pb2.setData("_tintTimer", 5);
                     var pb2dmg = pb2.getData("damage") || 1;
                     ebHp -= pb2dmg;
                     eBullet.setData("hp", ebHp);

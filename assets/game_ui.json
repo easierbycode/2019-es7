@@ -2484,7 +2484,7 @@
 	"meta": {
 		"app": "",
 		"version": "1.0",
-		"image": "img/game_ui.png?t=201903150000",
+		"image": "img/game_ui.png",
 		"format": "RGBA8888",
 		"size": {
 			"w": 2048,

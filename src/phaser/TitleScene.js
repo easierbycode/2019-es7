@@ -7,6 +7,7 @@ import {
     getHighScoreSyncTint,
 } from "../highScoreUi.js";
 import { StaffRollPanel } from "./StaffRollPanel.js";
+import { pollGamepads } from "./GamepadInput.js";
 
 export class PhaserTitleScene extends Phaser.Scene {
     constructor() {
@@ -75,7 +76,7 @@ export class PhaserTitleScene extends Phaser.Scene {
 
         this.highScoreText = this.add.text(
             this.scoreTitleImg.x + this.scoreTitleImg.width + 3,
-            this.scoreTitleImg.y,
+            this.scoreTitleImg.y + this.scoreTitleImg.height / 2,
             String(getDisplayedHighScore()),
             {
                 fontFamily: "Arial",
@@ -86,6 +87,7 @@ export class PhaserTitleScene extends Phaser.Scene {
                 strokeThickness: 2,
             }
         );
+        this.highScoreText.setOrigin(0, 0.5);
 
         this.scoreSyncLabel = this.add.text(
             32, this.scoreTitleImg.y + 22,
@@ -130,7 +132,9 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.howtoBtn.setScale(1, 0);
         this.howtoBtn.on("pointerup", function () {
             try {
-                window.location.href = "level-editor.html";
+                if (typeof window.howtoModalOpen === "function") {
+                    window.howtoModalOpen();
+                }
             } catch (e) {}
         });
 
@@ -398,10 +402,12 @@ export class PhaserTitleScene extends Phaser.Scene {
             this.scoreSyncLabel.setColor("#" + syncTint.toString(16).padStart(6, "0"));
         }
 
-        // Keyboard start
+        // Keyboard + gamepad start
+        var gp = pollGamepads();
         if (!this.transitioning && (
             (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)) ||
-            (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey))
+            (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) ||
+            gp.sp || gp.enter
         )) {
             this.titleStart();
         }
