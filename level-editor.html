@@ -136,7 +136,12 @@
             background: #111; color: #fff; font-size: 13px; margin-bottom: 8px;
         }
 
-        canvas { image-rendering: pixelated; }
+        /* ===== PIXEL-ART RENDERING (mimics Phaser pixelArt:true) ===== */
+        img, canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+            -ms-interpolation-mode: nearest-neighbor;
+        }
 
         /* ===== DESKTOP TWEAKS ===== */
         @media (min-width: 768px) {
