@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Boss Viewer</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -11,8 +11,10 @@
 
         /* NAV */
         #nav {
-            flex-shrink: 0; height: 44px; background: #111; border-bottom: 1px solid #2a2a2a;
-            display: flex; align-items: center; padding: 0 12px; gap: 12px;
+            flex-shrink: 0; min-height: 44px; background: #111; border-bottom: 1px solid #2a2a2a;
+            display: flex; align-items: center;
+            padding: env(safe-area-inset-top, 0px) max(12px, env(safe-area-inset-right, 0px)) 0 max(12px, env(safe-area-inset-left, 0px));
+            gap: 12px;
         }
         #nav .nav-title { font-size: 14px; font-weight: 700; color: #e74c3c; letter-spacing: 1px; }
         #nav .nav-link {
@@ -24,8 +26,9 @@
 
         /* BOSS BUTTONS */
         #boss-bar {
-            flex-shrink: 0; height: 48px; background: #0f0f0f; border-bottom: 1px solid #1a1a1a;
-            display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px;
+            flex-shrink: 0; min-height: 48px; background: #0f0f0f; border-bottom: 1px solid #1a1a1a;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 0 max(8px, env(safe-area-inset-right, 0px)) 0 max(8px, env(safe-area-inset-left, 0px));
             overflow-x: auto;
         }
         .boss-btn {
@@ -43,7 +46,8 @@
         /* ANIM BUTTONS */
         #anim-bar {
             flex-shrink: 0; min-height: 48px; background: #0f0f0f; border-top: 1px solid #1a1a1a;
-            display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px 8px;
+            display: flex; align-items: center; justify-content: center; gap: 6px;
+            padding: 6px max(8px, env(safe-area-inset-right, 0px)) max(6px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px));
             flex-wrap: wrap;
         }
         .anim-btn {
