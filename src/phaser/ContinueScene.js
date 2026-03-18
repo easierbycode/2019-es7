@@ -15,6 +15,27 @@ var GH = GAME_DIMENSIONS.HEIGHT;
 var GCX = GAME_DIMENSIONS.CENTER_X;
 var GCY = GAME_DIMENSIONS.CENTER_Y;
 
+function buildTweetUrl() {
+    var score = Number(gameState.score || 0);
+    var highScore = Number(gameState.highScore || 0);
+    var url, hashtags, text;
+    if (LANG === "ja") {
+        url = encodeURIComponent("https://game.capcom.com/cfn/sfv/aprilfool/2019/?lang=ja");
+        hashtags = encodeURIComponent("シャド研,SFVAE,aprilfool,エイプリルフール");
+        text = encodeURIComponent("エイプリルフール 2019 世界大統領がSTGやってみた\n今回のSCORE:" + score + "\nHISCORE:" + highScore + "\n");
+    } else {
+        url = encodeURIComponent("https://game.capcom.com/cfn/sfv/aprilfool/2019/?lang=en");
+        hashtags = encodeURIComponent("ShadalooCRI, SFVAE, aprilfool");
+        text = encodeURIComponent("APRIL FOOL 2019 WORLD PRESIDENT CHALLENGES A STG\nSCORE:" + score + "\nBEST:" + highScore + "\n");
+    }
+    return "https://twitter.com/intent/tweet?url=" + url + "&hashtags=" + hashtags + "&text=" + text;
+}
+
+function openUrl(url) {
+    if (!url || typeof window === "undefined") return;
+    try { window.open(url, "_blank"); } catch (e) {}
+}
+
 function pickContinueComment() {
     var recipe = gameState._phaserRecipe;
     if (!recipe) return "";
@@ -218,14 +239,37 @@ export class PhaserContinueScene extends Phaser.Scene {
 
         var self = this;
 
-        this.cameras.main.shake(300, 0.02);
+        // Red flash + shake matching PIXI timeline (alternating 0x770000/0x000000)
+        this.flashRect = this.add.rectangle(GCX, GCY, GW, GH, 0x000000).setDepth(-1);
+        var shakeSteps = [
+            { dy: 10, color: 0x770000 },
+            { dy: -5, color: 0x000000 },
+            { dy: 3, color: 0x770000 },
+            { dy: 0, color: 0x000000 },
+        ];
+        var stepIndex = 0;
+        var shakeTimer = this.time.addEvent({
+            delay: 70,
+            repeat: shakeSteps.length - 1,
+            callback: function () {
+                var step = shakeSteps[stepIndex];
+                self.cameras.main.setScroll(0, -step.dy);
+                self.flashRect.setFillStyle(step.color);
+                stepIndex++;
+                if (stepIndex >= shakeSteps.length) {
+                    self.cameras.main.setScroll(0, 0);
+                }
+            },
+        });
 
         this.tweens.add({
             targets: this.gameOverTxt,
             alpha: 1,
             duration: 1000,
-            delay: 500,
+            delay: 580,
             onComplete: function () {
+                var voiceIndex = Math.floor(Math.random() * 2);
+                self.playSound("g_continue_no_voice" + String(voiceIndex), 0.7);
                 self.showGameOverPanel();
             },
         });
@@ -286,15 +330,36 @@ export class PhaserContinueScene extends Phaser.Scene {
             }
         );
 
+        // Tweet button (sprite-based, matching PIXI TwitterButton centered at GCX)
+        var self = this;
+        this.tweetBtn = this.add.sprite(GCX, 0, "game_ui", "twitterBtn0.gif");
+        this.tweetBtn.setOrigin(0.5);
+        this.tweetBtn.y = this.scoreSyncText.y + this.tweetBtn.height / 2 + 16;
+        this.tweetBtn.setInteractive({ useHandCursor: true });
+        this.tweetBtn.on("pointerover", function () {
+            self.tweetBtn.setFrame("twitterBtn1.gif");
+        });
+        this.tweetBtn.on("pointerout", function () {
+            self.tweetBtn.setFrame("twitterBtn0.gif");
+        });
+        this.tweetBtn.on("pointerdown", function () {
+            self.tweetBtn.setFrame("twitterBtn2.gif");
+        });
+        this.tweetBtn.on("pointerup", function () {
+            self.tweetBtn.setFrame("twitterBtn1.gif");
+            openUrl(buildTweetUrl());
+        });
+
+        // Go To Title button centered below Tweet button
         this.gotoTitleBtn = this.add.sprite(0, 0, "game_ui", "gotoTitleBtn0.gif");
-        this.gotoTitleBtn.setOrigin(0, 0);
-        this.gotoTitleBtn.x = GCX - this.gotoTitleBtn.width / 2;
-        this.gotoTitleBtn.y = GCY - this.gotoTitleBtn.height / 2 + 160;
+        this.gotoTitleBtn.setOrigin(0.5);
+        this.gotoTitleBtn.x = GCX;
+        this.gotoTitleBtn.y = this.tweetBtn.y + this.tweetBtn.height / 2 + this.gotoTitleBtn.height / 2 + 6;
         this.gotoTitleBtn.setInteractive({ useHandCursor: true });
 
-        var self = this;
         this.gotoTitleBtn.on("pointerover", function () {
             self.gotoTitleBtn.setFrame("gotoTitleBtn1.gif");
+            self.playSound("se_over", 0.7);
         });
         this.gotoTitleBtn.on("pointerout", function () {
             self.gotoTitleBtn.setFrame("gotoTitleBtn0.gif");
@@ -303,6 +368,8 @@ export class PhaserContinueScene extends Phaser.Scene {
             self.gotoTitleBtn.setFrame("gotoTitleBtn2.gif");
         });
         this.gotoTitleBtn.on("pointerup", function () {
+            self.gotoTitleBtn.setFrame("gotoTitleBtn0.gif");
+            self.playSound("se_correct", 0.7);
             self.gotoTitle();
         });
 
