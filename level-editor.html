@@ -1229,6 +1229,18 @@
                 };
                 const thumbs = buildFrameThumbnailsForSave();
                 if (thumbs) payload.frameThumbnails = thumbs;
+                // Save atlas image + frame data so the game can load it
+                if (atlasImage && atlasData) {
+                    try {
+                        const cv = document.createElement('canvas');
+                        cv.width = atlasImage.naturalWidth; cv.height = atlasImage.naturalHeight;
+                        cv.getContext('2d').drawImage(atlasImage, 0, 0);
+                        payload.atlasImageDataURL = cv.toDataURL('image/png');
+                        const encodedFrames = {};
+                        for (const [k, v] of Object.entries(atlasData.frames || {})) encodedFrames[fbKeyEncode(k)] = v;
+                        payload.atlasFrames = encodedFrames;
+                    } catch (e) { console.warn('Could not save atlas to Firebase:', e); }
+                }
                 await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${name}`).set(payload);
                 document.getElementById('firebase-level-name').value = name;
                 alert(`"${name}" saved!`);
@@ -1262,8 +1274,10 @@
 
         function playFirebaseLevel() {
             let name = document.getElementById('firebase-level-name').value.trim();
-            if (!name) { alert('Enter a level name first'); return; }
-            window.open(`phaser-game.html?level=${encodeURIComponent(sanitizeLevelName(name))}&stage=${getCurrentStageId()}`, '_blank');
+            if (!name) { name = prompt('Level name:'); if (!name) return; }
+            name = sanitizeLevelName(name);
+            document.getElementById('firebase-level-name').value = name;
+            window.open(`phaser-game?level=${encodeURIComponent(name)}&stage=${getCurrentStageId()}`, '_blank');
         }
 
         // ================== AUTO-LOAD FROM SERVER ==================

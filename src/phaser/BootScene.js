@@ -209,7 +209,6 @@ export class BootScene extends Phaser.Scene {
     create() {
         var self = this;
         var levelName = readLevelParam();
-
         if (levelName) {
             this._loadFirebaseLevel(levelName);
             return;
@@ -229,48 +228,112 @@ export class BootScene extends Phaser.Scene {
             var stageKey = data.stageKey || "stage0";
             baseRecipe[stageKey] = { enemylist: data.enemylist };
 
-            if (data.enemyData) {
-                // Merge Firebase enemy data, but keep local textures when Firebase
-                // textures don't exist in the loaded atlas (cross-game level support)
-                var atlas = self.textures.get("game_asset");
-                var merged = JSON.parse(JSON.stringify(data.enemyData));
-                if (atlas) {
-                    for (var ek in merged) {
-                        var fbTextures = merged[ek] && merged[ek].texture ? merged[ek].texture : [];
-                        if (fbTextures.length > 0 && !atlas.has(fbTextures[0])) {
-                            // Firebase textures not in local atlas — use local textures instead
-                            var localEnemy = localEnemyData[ek];
-                            if (localEnemy && localEnemy.texture && localEnemy.texture.length > 0) {
-                                merged[ek].texture = localEnemy.texture;
-                            }
-                            // Also fix projectile textures
-                            var projKey = merged[ek].projectileData ? "projectileData" : (merged[ek].bulletData ? "bulletData" : null);
-                            var localProjKey = localEnemy ? (localEnemy.projectileData ? "projectileData" : (localEnemy.bulletData ? "bulletData" : null)) : null;
-                            if (projKey && localProjKey && merged[ek][projKey] && merged[ek][projKey].texture) {
-                                var fbProjTex = merged[ek][projKey].texture;
-                                if (fbProjTex.length > 0 && !atlas.has(fbProjTex[0]) && localEnemy[localProjKey] && localEnemy[localProjKey].texture) {
-                                    merged[ek][projKey].texture = localEnemy[localProjKey].texture;
+            function finishLevelLoad() {
+                if (data.enemyData) {
+                    // Merge Firebase enemy data, but keep local textures when Firebase
+                    // textures don't exist in the loaded atlas (cross-game level support)
+                    var merged = JSON.parse(JSON.stringify(data.enemyData));
+                    try {
+                        var atlas = self.textures.get("game_asset");
+                        var atlasFrames = atlas && atlas.frames ? atlas.frames : null;
+                        if (atlasFrames) {
+                            for (var ek in merged) {
+                                var fbTextures = merged[ek] && merged[ek].texture ? merged[ek].texture : [];
+                                if (fbTextures.length > 0 && !atlasFrames[fbTextures[0]]) {
+                                    var localEnemy = localEnemyData[ek];
+                                    if (localEnemy && localEnemy.texture && localEnemy.texture.length > 0) {
+                                        merged[ek].texture = localEnemy.texture;
+                                    }
+                                    var projKey = merged[ek].projectileData ? "projectileData" : (merged[ek].bulletData ? "bulletData" : null);
+                                    var localProjKey = localEnemy ? (localEnemy.projectileData ? "projectileData" : (localEnemy.bulletData ? "bulletData" : null)) : null;
+                                    if (projKey && localProjKey && merged[ek][projKey] && merged[ek][projKey].texture) {
+                                        var fbProjTex = merged[ek][projKey].texture;
+                                        if (fbProjTex.length > 0 && !atlasFrames[fbProjTex[0]] && localEnemy[localProjKey] && localEnemy[localProjKey].texture) {
+                                            merged[ek][projKey].texture = localEnemy[localProjKey].texture;
+                                        }
+                                    }
                                 }
                             }
                         }
+                    } catch (texErr) {
+                        console.warn("Texture resolution failed, using Firebase enemy data as-is:", texErr);
                     }
+                    baseRecipe.enemyData = merged;
                 }
-                baseRecipe.enemyData = merged;
+
+                gameState._phaserRecipe = baseRecipe;
+
+                var stageId = stageParam != null
+                    ? parseStageId(stageParam)
+                    : parseStageId(stageKey.replace("stage", ""));
+                primeGameStateForStage(baseRecipe, stageId);
+
+                setTimeout(function () {
+                    game.scene.stop("BootScene");
+                    game.scene.start("PhaserGameScene");
+                }, 50);
             }
 
-            gameState._phaserRecipe = baseRecipe;
+            // If Firebase level includes atlas image + frames, merge with local atlas
+            // into a single combined texture so both local (player/UI) and Firebase (enemy) frames work
+            if (data.atlasImageDataURL && data.atlasFrames) {
+                var fbImg = new Image();
+                fbImg.onload = function () {
+                    try {
+                        // Get the local atlas source image
+                        var localAtlas = self.textures.get("game_asset");
+                        var localSource = localAtlas && localAtlas.source && localAtlas.source[0] ? localAtlas.source[0].image : null;
+                        var localFrames = localAtlas ? localAtlas.frames : {};
+                        if (!localSource) { finishLevelLoad(); return; }
 
-            var stageId = stageParam != null
-                ? parseStageId(stageParam)
-                : parseStageId(stageKey.replace("stage", ""));
-            primeGameStateForStage(baseRecipe, stageId);
+                        // Create merged canvas: stack local image on top, Firebase image below
+                        var mergedCanvas = document.createElement("canvas");
+                        var localW = localSource.width, localH = localSource.height;
+                        var fbW = fbImg.width, fbH = fbImg.height;
+                        mergedCanvas.width = Math.max(localW, fbW);
+                        mergedCanvas.height = localH + fbH;
+                        var mctx = mergedCanvas.getContext("2d");
+                        mctx.drawImage(localSource, 0, 0);
+                        mctx.drawImage(fbImg, 0, localH);
 
-            setTimeout(function () {
-                game.scene.stop("BootScene");
-                game.scene.start("PhaserGameScene");
-            }, 50);
+                        // Build merged frame map: local frames stay as-is, Firebase frames offset by localH
+                        var mergedFrameMap = {};
+                        for (var lk in localFrames) {
+                            if (lk === "__BASE") continue;
+                            var lf = localFrames[lk];
+                            if (lf && lf.cutX !== undefined) {
+                                mergedFrameMap[lk] = { frame: { x: lf.cutX, y: lf.cutY, w: lf.cutWidth, h: lf.cutHeight } };
+                            }
+                        }
+                        // Add Firebase frames with Y offset
+                        for (var fname in data.atlasFrames) {
+                            var decodedName = fname.replace(/\u2024/g, ".");
+                            var fd = data.atlasFrames[fname];
+                            if (fd && fd.frame) {
+                                mergedFrameMap[decodedName] = {
+                                    frame: { x: fd.frame.x, y: fd.frame.y + localH, w: fd.frame.w, h: fd.frame.h }
+                                };
+                            }
+                        }
+
+                        // Replace game_asset with merged atlas
+                        self.textures.remove("game_asset");
+                        self.textures.addAtlas("game_asset", mergedCanvas, { frames: mergedFrameMap });
+                    } catch (atlasErr) {
+                        console.warn("Failed to merge Firebase atlas:", atlasErr);
+                    }
+                    finishLevelLoad();
+                };
+                fbImg.onerror = function () {
+                    console.warn("Firebase atlas image failed to load, using local");
+                    finishLevelLoad();
+                };
+                fbImg.src = data.atlasImageDataURL;
+            } else {
+                finishLevelLoad();
+            }
         }).catch(function (err) {
-            console.warn("Firebase level load failed:", err);
+            console.warn("Firebase level load failed for '" + levelName + "':", err);
             self._finishBoot();
         });
     }
