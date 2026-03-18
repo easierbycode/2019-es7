@@ -65,6 +65,7 @@ export function createEnemy(scene, data, x, y, itemName) {
     enemy.setData("animIdx", 0);
     enemy.setData("animTimer", 0);
     enemy.setData("projData", data.bulletData || data.projectileData || null);
+    enemy.setData("enemyKey", data._enemyKey || null);
 
     // PIXI BaseUnit shadow (same sprite, tinted black, 50% alpha, Y-flipped)
     var shadowReverse = data.shadowReverse !== false;
@@ -105,6 +106,7 @@ export function enemyWave(scene) {
         var dataKey = "enemy" + enemyType;
         var enemyData = scene.recipe.enemyData ? scene.recipe.enemyData[dataKey] : null;
         if (!enemyData) continue;
+        enemyData._enemyKey = enemyType;
 
         var itemName = null;
         switch (itemCode) {
@@ -142,13 +144,17 @@ export function enemyShoot(scene, enemy) {
     bullet.setData("hp", projData.hp || 1);
     bullet.setData("score", projData.score || 0);
     bullet.setData("spgage", projData.spgage || 0);
+    bullet.setData("frames", frames);
+    bullet.setData("animIdx", 0);
+    bullet.setData("animTimer", 0);
 
     // PIXI projectileAdd default: rotX=0, rotY=1 (straight down).
     // soliderB aims at player only on secondLoop; special projectile types always aim.
     var enemyName = String(enemy.getData("name") || "").toLowerCase();
     var projName = String((projData && projData.name) || "").toLowerCase();
 
-    var isSoldierB = enemyName === "soliderb" || enemyName === "soldierb";
+    var enemyKey = String(enemy.getData("enemyKey") || "");
+    var isSoldierB = enemyName === "soliderb" || enemyName === "soldierb" || enemyKey === "B";
 
     if (isSoldierB && !gameState.secondLoop) {
         // PIXI original: soldierB shoots straight down like other enemies
@@ -230,11 +236,15 @@ export function updateEnemy(scene, enemy, step) {
     enemy.y += speed;
 
     var enemyName = enemy.getData("name");
-    if (enemyName === "soliderA") {
+    var enemyKey = enemy.getData("enemyKey");
+    // Movement patterns: match by enemyKey (A, B) or by legacy name
+    var isTypeA = enemyKey === "A" || enemyName === "soliderA";
+    var isTypeB = enemyKey === "B" || enemyName === "soliderB";
+    if (isTypeA) {
         if (enemy.y >= GH / 1.5 && scene.playerSprite) {
             enemy.x += 0.005 * (scene.playerSprite.x - enemy.x);
         }
-    } else if (enemyName === "soliderB") {
+    } else if (isTypeB) {
         if (!enemy.getData("posName")) {
             if ((enemy.getData("spawnX") || 0) >= GW / 2) {
                 enemy.x = GW;
