@@ -174,10 +174,16 @@ export class BootScene extends Phaser.Scene {
             });
         }
 
+        // Track failed audio files for retry
+        var failedAudioFiles = [];
+
         // Auto-hide audio load errors after 6.7s
         // Phaser may render "ERR:" text on canvas or add DOM elements
         this.load.on("loaderror", function (file) {
             console.warn("Load error:", file.key, file.src);
+            if (file.type === "audio") {
+                failedAudioFiles.push({ key: file.key, src: file.src || file.url });
+            }
             setTimeout(function () {
                 // Remove any Phaser-created text objects showing errors
                 if (self.children && self.children.list) {
@@ -216,6 +222,25 @@ export class BootScene extends Phaser.Scene {
             if (self.loadingBg) {
                 self.loadingBg.destroy();
                 self.loadingBg = null;
+            }
+
+            // Retry failed audio files — on iOS the AudioContext may have been
+            // suspended during the first load attempt.  By the time "complete"
+            // fires, user interaction has likely unlocked it.
+            if (failedAudioFiles.length > 0) {
+                console.log("Retrying " + failedAudioFiles.length + " failed audio file(s)…");
+
+                // Ensure the AudioContext is running before retrying
+                var actx = window.__phaserAudioContext;
+                if (actx && (actx.state === "suspended" || actx.state === "interrupted")) {
+                    actx.resume().catch(function () {});
+                }
+
+                var retryFiles = failedAudioFiles.splice(0);
+                for (var r = 0; r < retryFiles.length; r++) {
+                    self.load.audio(retryFiles[r].key, retryFiles[r].src);
+                }
+                self.load.start();
             }
 
             // Auto-hide the #loadError div after 6.7s

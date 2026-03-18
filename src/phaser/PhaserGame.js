@@ -34,7 +34,8 @@ export function createPhaserGame() {
             autoCenter: Phaser.Scale.NO_CENTER
         },
         audio: {
-            disableWebAudio: false
+            disableWebAudio: false,
+            context: window.__phaserAudioContext || undefined
         },
         scene: [
             BootScene,
