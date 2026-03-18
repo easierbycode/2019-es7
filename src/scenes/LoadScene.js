@@ -253,6 +253,27 @@ export class LoadScene extends BaseScene {
             }
         }
 
+        // Pre-create and unlock an AudioContext for Phaser while still inside
+        // the user-gesture call stack.  iOS silently blocks decodeAudioData when
+        // the context is suspended, which causes every audio file to trigger a
+        // Phaser "loaderror" if the context is first created in a Promise chain.
+        var AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtx) {
+            try {
+                var phaserCtx = new AudioCtx();
+                phaserCtx.resume();
+                // Play a tiny silent buffer to fully unlock on iOS
+                var buf = phaserCtx.createBuffer(1, 1, 22050);
+                var src = phaserCtx.createBufferSource();
+                src.buffer = buf;
+                src.connect(phaserCtx.destination);
+                src.start(0);
+                window.__phaserAudioContext = phaserCtx;
+            } catch (e) {
+                log("Could not pre-create AudioContext: " + e);
+            }
+        }
+
         this.state.lowModeFlg = false;
 
         log("Launching Phaser 4 game...");
