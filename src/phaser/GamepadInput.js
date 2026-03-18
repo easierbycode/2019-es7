@@ -13,7 +13,9 @@ var SHOULDER_L1  = 4;  // LB / L1
 var SHOULDER_R1  = 5;  // RB / R1
 var SHOULDER_L2  = 6;  // LT / L2
 var SHOULDER_R2  = 7;  // RT / R2
+var BTN_SELECT   = 8;  // Select / Back
 var BTN_START    = 9;  // Start / Options
+var BTN_R3       = 11; // Right stick click
 
 var SP_BUTTONS = [FACE_BOTTOM, FACE_RIGHT, FACE_LEFT, FACE_TOP, SHOULDER_L1, SHOULDER_R1, SHOULDER_L2, SHOULDER_R2];
 var ENTER_BUTTONS = [BTN_START];
@@ -75,6 +77,7 @@ export function pollGamepads() {
     var result = {
         sp: false,         // any face/shoulder button just pressed
         enter: false,      // start button just pressed
+        editor: false,     // R3 just pressed (or SELECT on controllers with fewer buttons)
         spDown: false,     // any face/shoulder button held
         enterDown: false,  // start button held
         left: false,
@@ -108,6 +111,16 @@ export function pollGamepads() {
             if (pressed && !wasPressed) result.enter = true;
             if (pressed) result.enterDown = true;
             _prevButtons[idx][bi] = pressed;
+        }
+
+        // Editor button: R3 if available, otherwise SELECT for controllers
+        // with fewer buttons (e.g. NES-style controllers)
+        var editorBtn = (gp.buttons.length > BTN_R3) ? BTN_R3 : BTN_SELECT;
+        if (editorBtn < gp.buttons.length) {
+            var editorPressed = isButtonPressed(gp.buttons[editorBtn]);
+            var editorWas = !!_prevButtons[idx]["_editor_" + editorBtn];
+            if (editorPressed && !editorWas) result.editor = true;
+            _prevButtons[idx]["_editor_" + editorBtn] = editorPressed;
         }
 
         // D-pad
