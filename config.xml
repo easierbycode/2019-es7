@@ -2,7 +2,7 @@
 <widget id="com.easierbycode.game2028" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>2028.ai</name>
     <description>Street Fighter browser game</description>
-    <content src="index.html" />
+    <content src="phaser-game.html?level=2028" />
 
     <access origin="*" />
     <allow-navigation href="*" />

@@ -298,13 +298,8 @@ export class BootScene extends Phaser.Scene {
 
     create() {
         var self = this;
-        var levelName = readLevelParam();
-        if (levelName) {
-            this._loadFirebaseLevel(levelName);
-            return;
-        }
-
-        this._finishBoot();
+        var levelName = readLevelParam() || "2028";
+        this._loadFirebaseLevel(levelName);
     }
 
     _loadFirebaseLevel(levelName) {
