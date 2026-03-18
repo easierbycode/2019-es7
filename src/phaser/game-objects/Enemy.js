@@ -21,8 +21,30 @@ var GH = GAME_DIMENSIONS.HEIGHT;
  * @param {string|null} itemName
  * @returns {Phaser.GameObjects.Sprite}
  */
+// Resolve a frame name against the atlas, trying alternate .gif/.png extension
+function resolveFrame(scene, atlasKey, frameName) {
+    var atlas = scene.textures.get(atlasKey);
+    if (!atlas) return frameName;
+    if (atlas.has(frameName)) return frameName;
+    // Try alternate extension
+    var alt = null;
+    if (frameName.endsWith('.gif')) alt = frameName.replace(/\.gif$/, '.png');
+    else if (frameName.endsWith('.png')) alt = frameName.replace(/\.png$/, '.gif');
+    if (alt && atlas.has(alt)) return alt;
+    return frameName; // unresolved — caller handles fallback
+}
+
+// Resolve all frame names in an array against the atlas
+function resolveFrames(scene, atlasKey, frames) {
+    var result = [];
+    for (var i = 0; i < frames.length; i++) {
+        result.push(resolveFrame(scene, atlasKey, frames[i]));
+    }
+    return result;
+}
+
 export function createEnemy(scene, data, x, y, itemName) {
-    var frames = data.texture || [];
+    var frames = resolveFrames(scene, "game_asset", data.texture || []);
     var frameKey = frames[0] || "soliderA0.gif";
 
     var enemy = scene.add.sprite(x, y, "game_asset", frameKey);
@@ -108,7 +130,7 @@ export function enemyShoot(scene, enemy) {
     var projData = enemy.getData("projData");
     if (!projData) return;
 
-    var frames = projData.texture || [];
+    var frames = resolveFrames(scene, "game_asset", projData.texture || []);
     var frameKey = frames[0] || "normalProjectile0.gif";
     var speed = projData.speed || 1;
 

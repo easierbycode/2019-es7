@@ -225,11 +225,37 @@ export class BootScene extends Phaser.Scene {
 
         fetchFirebaseLevel(levelName).then(function (data) {
             var baseRecipe = self.cache.json.get("recipe") || {};
+            var localEnemyData = baseRecipe.enemyData ? JSON.parse(JSON.stringify(baseRecipe.enemyData)) : {};
             var stageKey = data.stageKey || "stage0";
             baseRecipe[stageKey] = { enemylist: data.enemylist };
 
             if (data.enemyData) {
-                baseRecipe.enemyData = data.enemyData;
+                // Merge Firebase enemy data, but keep local textures when Firebase
+                // textures don't exist in the loaded atlas (cross-game level support)
+                var atlas = self.textures.get("game_asset");
+                var merged = JSON.parse(JSON.stringify(data.enemyData));
+                if (atlas) {
+                    for (var ek in merged) {
+                        var fbTextures = merged[ek] && merged[ek].texture ? merged[ek].texture : [];
+                        if (fbTextures.length > 0 && !atlas.has(fbTextures[0])) {
+                            // Firebase textures not in local atlas — use local textures instead
+                            var localEnemy = localEnemyData[ek];
+                            if (localEnemy && localEnemy.texture && localEnemy.texture.length > 0) {
+                                merged[ek].texture = localEnemy.texture;
+                            }
+                            // Also fix projectile textures
+                            var projKey = merged[ek].projectileData ? "projectileData" : (merged[ek].bulletData ? "bulletData" : null);
+                            var localProjKey = localEnemy ? (localEnemy.projectileData ? "projectileData" : (localEnemy.bulletData ? "bulletData" : null)) : null;
+                            if (projKey && localProjKey && merged[ek][projKey] && merged[ek][projKey].texture) {
+                                var fbProjTex = merged[ek][projKey].texture;
+                                if (fbProjTex.length > 0 && !atlas.has(fbProjTex[0]) && localEnemy[localProjKey] && localEnemy[localProjKey].texture) {
+                                    merged[ek][projKey].texture = localEnemy[localProjKey].texture;
+                                }
+                            }
+                        }
+                    }
+                }
+                baseRecipe.enemyData = merged;
             }
 
             gameState._phaserRecipe = baseRecipe;

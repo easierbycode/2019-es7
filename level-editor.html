@@ -281,17 +281,80 @@
 
         function getFrameNameForCode(code) {
             if (code === "00") return null;
-            return `solider${code}.gif`;
+            const letter = code[0];
+            // Look up enemy texture from enemyData
+            for (const k of Object.keys(enemyData)) {
+                if (getEnemyLetter(k) === letter) {
+                    const d = enemyData[k];
+                    if (d && d.texture && d.texture[0]) return d.texture[0];
+                    break;
+                }
+            }
+            // Check bossData too
+            if (gameData && gameData.bossData) {
+                for (const k of Object.keys(gameData.bossData)) {
+                    const boss = gameData.bossData[k];
+                    if (boss && boss.anim && boss.anim.idle && boss.anim.idle[0]) {
+                        // Match boss by name or key
+                    }
+                }
+            }
+            return null;
         }
 
         // ================== POWERUP DEFINITIONS ==================
         const POWERUP_TYPES = [
             { id: '0', name: 'None', frame: null, color: '#666' },
-            { id: '1', name: 'Big Shot', frame: 'powerupBig0.gif', color: '#f59e0b' },
-            { id: '2', name: '3-Way', frame: 'powerup3way0.gif', color: '#3b82f6' },
-            { id: '3', name: 'Speed Up', frame: 'speedupItem0.gif', color: '#10b981' },
-            { id: '9', name: 'Barrier', frame: 'barrierItem0.gif', color: '#8b5cf6' }
+            { id: '1', name: 'Big Shot', frame: 'powerupBig0.png', color: '#f59e0b' },
+            { id: '2', name: '3-Way', frame: 'powerup3way0.png', color: '#3b82f6' },
+            { id: '3', name: 'Speed Up', frame: 'speedupItem0.png', color: '#10b981' },
+            { id: '9', name: 'Barrier', frame: 'barrierItem0.png', color: '#8b5cf6' }
         ];
+
+        // ================== ATLAS FORMAT NORMALIZER ==================
+        // Converts Phaser multi-atlas format (textures[].frames[] array with filename keys)
+        // to the flat {frames: {key: {frame:{x,y,w,h}}}} format the editor uses internally.
+        function normalizeAtlasData(raw) {
+            if (!raw) return raw;
+            // Already flat format: { frames: { "name.png": { frame: {...} } } }
+            if (raw.frames && !Array.isArray(raw.frames) && typeof raw.frames === 'object') return raw;
+            // Phaser multi-atlas: { textures: [{ frames: [{ filename, frame, ... }] }] }
+            if (raw.textures && Array.isArray(raw.textures)) {
+                const flat = {};
+                for (const tex of raw.textures) {
+                    if (!tex.frames || !Array.isArray(tex.frames)) continue;
+                    for (const f of tex.frames) {
+                        const key = f.filename || f.name;
+                        if (!key) continue;
+                        flat[key] = {
+                            frame: f.frame,
+                            rotated: f.rotated || false,
+                            trimmed: f.trimmed || false,
+                            spriteSourceSize: f.spriteSourceSize || { x: 0, y: 0, w: f.frame.w, h: f.frame.h },
+                            sourceSize: f.sourceSize || { w: f.frame.w, h: f.frame.h }
+                        };
+                    }
+                }
+                return { frames: flat, meta: raw.meta || {} };
+            }
+            // Phaser single-texture array: { frames: [{ filename, frame, ... }] }
+            if (raw.frames && Array.isArray(raw.frames)) {
+                const flat = {};
+                for (const f of raw.frames) {
+                    const key = f.filename || f.name;
+                    if (!key) continue;
+                    flat[key] = {
+                        frame: f.frame,
+                        rotated: f.rotated || false,
+                        trimmed: f.trimmed || false,
+                        spriteSourceSize: f.spriteSourceSize || { x: 0, y: 0, w: f.frame.w, h: f.frame.h },
+                        sourceSize: f.sourceSize || { w: f.frame.w, h: f.frame.h }
+                    };
+                }
+                return { frames: flat, meta: raw.meta || {} };
+            }
+            return raw;
+        }
 
         // ================== STATE ==================
         let dirHandle = null;
@@ -343,12 +406,20 @@
             return k;
         }
 
-        // Cached dataURL lookups
+        // Cached dataURL lookups — tries exact key, then .gif/.png alternate extension
         function getThumbURL(frameKey) {
             if (!frameKey) return null;
             if (thumbDataURLs[frameKey]) return thumbDataURLs[frameKey];
             if (frameThumbs[frameKey]) {
                 thumbDataURLs[frameKey] = frameThumbs[frameKey].toDataURL();
+                return thumbDataURLs[frameKey];
+            }
+            // Try alternate extension (.gif <-> .png)
+            let alt = null;
+            if (frameKey.endsWith('.gif')) alt = frameKey.replace(/\.gif$/, '.png');
+            else if (frameKey.endsWith('.png')) alt = frameKey.replace(/\.png$/, '.gif');
+            if (alt && frameThumbs[alt]) {
+                thumbDataURLs[frameKey] = frameThumbs[alt].toDataURL();
                 return thumbDataURLs[frameKey];
             }
             return null;
@@ -442,10 +513,26 @@
             }
             gameData = JSON.parse(jsonText);
 
+            // Try to find atlas JSON + PNG in multiple locations:
+            // 1) root dir  2) assets/  3) assets/img/ for PNG
             try {
-                const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
-                atlasData = JSON.parse(await (await (await ad.getFileHandle(ATLAS_JSON)).getFile()).text());
-                const pngBlob = await (await ad.getFileHandle(ATLAS_PNG)).getFile();
+                let atlasJsonText, pngBlob;
+                // Find atlas JSON
+                try { atlasJsonText = await (await (await dirHandle.getFileHandle(ATLAS_JSON)).getFile()).text(); }
+                catch {
+                    const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                    atlasJsonText = await (await (await ad.getFileHandle(ATLAS_JSON)).getFile()).text();
+                }
+                atlasData = normalizeAtlasData(JSON.parse(atlasJsonText));
+                // Find atlas PNG: try root, then assets/, then assets/img/
+                try { pngBlob = await (await dirHandle.getFileHandle(ATLAS_PNG)).getFile(); }
+                catch {
+                    try {
+                        const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                        try { pngBlob = await (await ad.getFileHandle(ATLAS_PNG)).getFile(); }
+                        catch { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle(ATLAS_PNG)).getFile(); }
+                    } catch { throw new Error("Atlas PNG not found"); }
+                }
                 atlasImage = new Image();
                 atlasImage.src = URL.createObjectURL(pngBlob);
                 atlasImage.onload = () => { buildFrameThumbs(); renderAll(); };
@@ -1079,6 +1166,56 @@
 
         function sanitizeLevelName(n) { return n.replace(/[.#$/\[\]]/g, '_').trim(); }
 
+        // Firebase keys can't contain ".", "#", "$", "/", "[", "]"
+        function fbKeyEncode(k) { return k.replace(/\./g, '\u2024'); }
+        function fbKeyDecode(k) { return k.replace(/\u2024/g, '.'); }
+
+        // Collect dataURL thumbnails for all frames referenced by enemies + powerups
+        function buildFrameThumbnailsForSave() {
+            const thumbs = {};
+            // Enemy textures
+            for (const k of Object.keys(enemyData)) {
+                const d = enemyData[k];
+                if (d && d.texture) {
+                    for (const tex of d.texture) {
+                        if (frameThumbs[tex]) thumbs[fbKeyEncode(tex)] = frameThumbs[tex].toDataURL('image/png');
+                    }
+                }
+            }
+            // Powerup frames
+            for (const pt of POWERUP_TYPES) {
+                if (pt.frame && frameThumbs[pt.frame]) thumbs[fbKeyEncode(pt.frame)] = frameThumbs[pt.frame].toDataURL('image/png');
+            }
+            return Object.keys(thumbs).length ? thumbs : null;
+        }
+
+        // Restore frameThumbs from saved dataURL thumbnails
+        function restoreFrameThumbnails(thumbs) {
+            if (!thumbs || typeof thumbs !== 'object') return;
+            // Decode Firebase-safe keys back to original frame names
+            const decoded = {};
+            for (const [k, v] of Object.entries(thumbs)) decoded[fbKeyDecode(k)] = v;
+            const entries = Object.entries(decoded).filter(([key]) => !frameThumbs[key]);
+            if (!entries.length) return;
+            let remaining = entries.length;
+            function onThumbReady() {
+                remaining--;
+                if (remaining <= 0) { renderGrid(); renderPreview(); updateToolUI(); }
+            }
+            for (const [key, dataURL] of entries) {
+                const img = new Image();
+                img.onload = () => {
+                    const cv = document.createElement('canvas');
+                    cv.width = 64; cv.height = 64;
+                    cv.getContext('2d').drawImage(img, 0, 0, 64, 64);
+                    frameThumbs[key] = cv;
+                    thumbDataURLs[key] = dataURL;
+                    onThumbReady();
+                };
+                img.src = dataURL;
+            }
+        }
+
         async function saveToFirebase() {
             initFirebase();
             if (!firebaseDb) { alert('Firebase not available'); return; }
@@ -1086,10 +1223,13 @@
             if (!name) { name = prompt('Level name:'); if (!name) return; }
             name = sanitizeLevelName(name);
             try {
-                await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${name}`).set({
+                const payload = {
                     name, stageKey: currentStageKey, enemylist: normalizeGrid(currentGrid),
                     enemyData: enemyData || {}, width: 8, savedAt: firebase.database.ServerValue.TIMESTAMP
-                });
+                };
+                const thumbs = buildFrameThumbnailsForSave();
+                if (thumbs) payload.frameThumbnails = thumbs;
+                await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${name}`).set(payload);
                 document.getElementById('firebase-level-name').value = name;
                 alert(`"${name}" saved!`);
             } catch (e) { alert('Save failed: ' + e.message); }
@@ -1108,6 +1248,8 @@
                 if (d.stageKey) currentStageKey = d.stageKey;
                 document.getElementById('firebase-level-name').value = name;
                 document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Firebase: ${name}</span>`;
+                // Restore sprite thumbnails from Firebase data
+                if (d.frameThumbnails) restoreFrameThumbnails(d.frameThumbnails);
                 renderGrid(); renderPreview(); updateToolUI();
                 return true;
             } catch (e) { alert('Load failed: ' + e.message); return false; }
@@ -1149,7 +1291,7 @@
                     fetch('assets/img/game_asset.png')
                 ]);
                 if (atlasResp.ok && imgResp.ok) {
-                    atlasData = await atlasResp.json();
+                    atlasData = normalizeAtlasData(await atlasResp.json());
                     const blob = await imgResp.blob();
                     atlasImage = new Image();
                     atlasImage.src = URL.createObjectURL(blob);
