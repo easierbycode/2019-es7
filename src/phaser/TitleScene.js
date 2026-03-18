@@ -355,6 +355,12 @@ export class PhaserTitleScene extends Phaser.Scene {
         });
     }
 
+    launchLevelEditor() {
+        try {
+            window.open("level-editor.html", "_blank");
+        } catch (e) {}
+    }
+
     goToAdvScene() {
         var recipe = gameState._phaserRecipe;
         if (recipe && recipe.playerData) {
@@ -404,12 +410,16 @@ export class PhaserTitleScene extends Phaser.Scene {
 
         // Keyboard + gamepad start
         var gp = pollGamepads();
-        if (!this.transitioning && (
-            (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)) ||
-            (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) ||
-            gp.sp || gp.enter
-        )) {
-            this.titleStart();
+        if (!this.transitioning) {
+            if (gp.editor) {
+                this.launchLevelEditor();
+            } else if (
+                (this.enterKey && Phaser.Input.Keyboard.JustDown(this.enterKey)) ||
+                (this.spaceKey && Phaser.Input.Keyboard.JustDown(this.spaceKey)) ||
+                gp.sp || gp.enter
+            ) {
+                this.titleStart();
+            }
         }
     }
 }
