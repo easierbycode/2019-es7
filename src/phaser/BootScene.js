@@ -275,9 +275,23 @@ export class BootScene extends Phaser.Scene {
         this.load.json("recipe", "assets/game.json");
 
         this.load.image("title_bg", "assets/img/title_bg.jpg");
+        var stageLoopPaths = [
+            "assets/img/stage/stage_loop3.png",
+            "assets/img/stage/stage_loop3.png",
+            "assets/img/stage/stage_loop3.png",
+            "assets/img/stage/stage_loop3.png",
+            "assets/img/stage/stage_loop4.png",
+        ];
+        var stageEndPaths = [
+            "assets/img/stage/stage_end3.png",
+            "assets/img/stage/stage_end3.png",
+            "assets/img/stage/stage_end3.png",
+            "assets/img/stage/stage_end3.png",
+            "assets/img/stage/stage_end4.png",
+        ];
         for (var i = 0; i < 5; i++) {
-            this.load.image("stage_loop" + i, "assets/img/stage/stage_loop" + i + ".png");
-            this.load.image("stage_end" + i, "assets/img/stage/stage_end" + i + ".png");
+            this.load.image("stage_loop" + i, stageLoopPaths[i]);
+            this.load.image("stage_end" + i, stageEndPaths[i]);
         }
 
         this.load.image("loading_bg", "assets/img/loading/loading_bg.png");
