@@ -1270,7 +1270,7 @@
 if (!name) { name = prompt('Level name:'); if (!name) return; }
             name = sanitizeLevelName(name);
             document.getElementById('firebase-level-name').value = name;
-            window.open(`phaser-game?level=${encodeURIComponent(name)}&stage=${getCurrentStageId()}`, '_blank');
+            window.open(`phaser-game.html?level=${encodeURIComponent(name)}&stage=${getCurrentStageId()}`, '_blank');
         }
 
         // ================== AUTO-LOAD FROM SERVER ==================
