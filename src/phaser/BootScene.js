@@ -270,6 +270,7 @@ export class BootScene extends Phaser.Scene {
         this.load.atlas("title_ui", "assets/img/title_ui.png", "assets/title_ui.json");
         this.load.atlas("game_ui", "assets/img/game_ui.png", "assets/game_ui.json");
         this.load.atlas("game_asset", "assets/img/game_asset.png", "assets/game_asset.json");
+        this.load.spritesheet("cyber-liberty", "https://easierbycode.com/assets/spritesheets/cyber-liberty.png", { frameWidth: 32, frameHeight: 32 });
 
         this.load.json("recipe", "assets/game.json");
 

@@ -16,8 +16,8 @@
  * @param {number} shadowOffsetY              - vertical offset (pixels above shadow base)
  * @returns {Phaser.GameObjects.Sprite}
  */
-export function createShadow(scene, sprite, frameKey, shadowReverse, shadowOffsetY) {
-    var shadow = scene.add.sprite(sprite.x, sprite.y, "game_asset", frameKey);
+export function createShadow(scene, sprite, frameKey, shadowReverse, shadowOffsetY, textureKey) {
+    var shadow = scene.add.sprite(sprite.x, sprite.y, textureKey || "game_asset", frameKey);
     shadow.setOrigin(0.5);
     shadow.setTintFill(0x000000);
     shadow.setAlpha(0.5);

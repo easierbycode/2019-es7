@@ -34,7 +34,7 @@ export function shootBullets(scene) {
 
     if (scene.shootMode === "3way") {
         for (var a = -1; a <= 1; a++) {
-            var b = scene.add.sprite(scene.playerSprite.x + a * 10, scene.playerSprite.y - 20, "game_asset", frameKey);
+            var b = scene.add.sprite(scene.playerSprite.x + a * 10, scene.playerSprite.y - 16, "game_asset", frameKey);
             b.setOrigin(0.5);
             b.setDepth(50);
             b.setData("damage", shootData.damage);
@@ -45,7 +45,7 @@ export function shootBullets(scene) {
             scene.playerBullets.push(b);
         }
     } else {
-        var bullet = scene.add.sprite(scene.playerSprite.x, scene.playerSprite.y - 20, "game_asset", frameKey);
+        var bullet = scene.add.sprite(scene.playerSprite.x, scene.playerSprite.y - 16, "game_asset", frameKey);
         bullet.setOrigin(0.5);
         bullet.setDepth(50);
         bullet.setData("damage", shootData.damage);

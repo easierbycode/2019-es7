@@ -31,10 +31,11 @@ function pointerId(pointer) {
  */
 export function createPlayer(scene) {
     var pd = scene.recipe.playerData;
-    var frames = pd.texture || [];
-    var frameKey = frames[0] || "player00.gif";
 
-    scene.playerSprite = scene.add.sprite(GCX, GH - 80, "game_asset", frameKey);
+    // Cyber Liberty: 32x32 sprite, aligned so its top matches where G's top was
+    // G was 32x64 centered at GH-80 → top at GH-112
+    // Cyber Liberty 32x32 centered at GH-96 → top at GH-112
+    scene.playerSprite = scene.add.sprite(GCX, GH - 96, "cyber-liberty", 0);
     scene.playerSprite.setOrigin(0.5);
     scene.playerSprite.setDepth(50);
 
@@ -48,30 +49,20 @@ export function createPlayer(scene) {
     scene.playerHp = gameState.playerHp || pd.maxHp;
     scene.playerMaxHp = gameState.playerMaxHp || pd.maxHp;
 
-    scene.playerAnimFrames = frames;
-    scene.playerAnimIdx = 0;
-    scene.playerAnimTimer = 0;
-
-    if (frames.length > 1) {
-        if (!scene.anims.exists("player_walk")) {
-            scene.anims.create({
-                key: "player_walk",
-                frames: scene.anims.generateFrameNames("game_asset", {
-                    prefix: "player",
-                    start: 0,
-                    end: frames.length - 1,
-                    zeroPad: 2,
-                    suffix: ".gif",
-                }),
-                frameRate: 42,
-                repeat: -1,
-            });
-        }
-        scene.playerSprite.play("player_walk");
+    if (!scene.anims.exists("cyber-liberty-idle")) {
+        scene.anims.create({
+            key: "cyber-liberty-idle",
+            frames: [
+                { key: "cyber-liberty", frame: 0, duration: 250 },
+                { key: "cyber-liberty", frame: 1, duration: 100 },
+            ],
+            repeat: -1,
+        });
     }
+    scene.playerSprite.play("cyber-liberty-idle");
 
     // PIXI player shadow: shadowOffsetY=5 (app-original.js line 589)
-    scene.playerShadow = createShadow(scene, scene.playerSprite, frameKey, true, 5);
+    scene.playerShadow = createShadow(scene, scene.playerSprite, 0, true, 5, "cyber-liberty");
     updateShadowPosition(scene.playerShadow, scene.playerSprite);
 
     scene.barrierActive = false;
