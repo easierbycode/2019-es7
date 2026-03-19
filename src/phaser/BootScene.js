@@ -298,6 +298,14 @@ export class BootScene extends Phaser.Scene {
 
     create() {
         var self = this;
+
+        // Editor play requests use localStorage recipe, skip Firebase
+        var editorPlay = readEditorPlayRequest();
+        if (editorPlay) {
+            this._finishBoot();
+            return;
+        }
+
         var levelName = readLevelParam() || "2028";
         this._loadFirebaseLevel(levelName);
     }
