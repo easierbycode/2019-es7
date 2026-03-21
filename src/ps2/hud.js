@@ -9,10 +9,10 @@ var hudState = {
     comboTimeCnt: 0,
     spgageCount: 0,
     spgageMax: 100,
-    spFireFlg: false,
-    spBtnActive: false,
+    spFireFlg: 0,
+    spBtnActive: 0,
     hpPercent: 1.0,
-    bossTimerVisible: false,
+    bossTimerVisible: 0,
     bossTimerCount: 99,
 };
 
@@ -22,10 +22,10 @@ function hudReset() {
     hudState.maxCombo = 0;
     hudState.comboTimeCnt = 0;
     hudState.spgageCount = 0;
-    hudState.spFireFlg = false;
-    hudState.spBtnActive = false;
+    hudState.spFireFlg = 0;
+    hudState.spBtnActive = 0;
     hudState.hpPercent = 1.0;
-    hudState.bossTimerVisible = false;
+    hudState.bossTimerVisible = 0;
     hudState.bossTimerCount = 99;
 }
 

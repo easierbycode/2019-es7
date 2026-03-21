@@ -66,7 +66,7 @@ function continueSelectYes() {
 function continueSelectNo() {
     var cs = continueState;
     cs.selection = 1;
-    cs.gameOverShown = true;
+    cs.gameOverShown = 1;
     cs.gameOverTimer = 0;
 
     playSound("voice_gameover");

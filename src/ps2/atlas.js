@@ -53,7 +53,7 @@ function getFrame(atlasName, frameName) {
 
 function hasFrame(atlasName, frameName) {
     var atlas = atlases[atlasName];
-    if (!atlas) return false;
+    if (!atlas) return 0;
     return !!atlas.frames[frameName];
 }
 

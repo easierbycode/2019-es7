@@ -25,22 +25,22 @@ function createEnemy(data) {
         projectileData: data.projectileData || null,
         itemName: data.itemName || null,
         itemTexture: data.itemTexture || null,
-        dead: false,
-        deadFlg: false,
-        shootFlg: true,
-        hardleFlg: false,
+        dead: 0,
+        deadFlg: 0,
+        shootFlg: 1,
+        hardleFlg: 0,
         bulletFrameCnt: 0,
         posName: "",
         // Shadow
-        shadowReverse: data.shadowReverse !== undefined ? data.shadowReverse : true,
+        shadowReverse: data.shadowReverse !== undefined ? data.shadowReverse : 1,
         shadowOffsetY: data.shadowOffsetY || 0,
-        shadowVisible: true,
+        shadowVisible: 1,
         // Explosion
-        explosionPlaying: false,
+        explosionPlaying: 0,
         explosionFrame: 0,
         explosionTimer: 0,
         // Visual
-        visible: true,
+        visible: 1,
         alpha: 1.0,
         tintFlash: 0,
         tintTimer: 0,
@@ -48,13 +48,13 @@ function createEnemy(data) {
         bulletTracking: {},
     };
 
-    if (e.interval <= -1) e.hardleFlg = true;
+    if (e.interval <= -1) e.hardleFlg = 1;
 
     // Adjust hit area per enemy type
     switch (data.name) {
     case "baraA":
     case "baraB":
-        e.shadowVisible = false;
+        e.shadowVisible = 0;
         break;
     case "drum":
         e.hitX = 7;
@@ -87,7 +87,7 @@ function createEnemy(data) {
 }
 
 function enemyLoop(e, playerRef) {
-    if (e.dead) return false; // signal to remove
+    if (e.dead) return 0; // signal to remove
 
     e.bulletFrameCnt++;
 
@@ -134,17 +134,17 @@ function enemyLoop(e, playerRef) {
     }
 
     // Shooting
-    var shouldShoot = false;
+    var shouldShoot = 0;
     if (e.shootFlg && !e.hardleFlg && e.interval > 0 && e.bulletFrameCnt % e.interval === 0) {
-        shouldShoot = true;
+        shouldShoot = 1;
     }
 
     // Off-screen check
     if (e.x <= -50 || e.x >= GW + 33 || e.y <= -33 || e.y >= GH) {
-        return false; // remove
+        return 0; // remove
     }
 
-    return shouldShoot ? "shoot" : true;
+    return shouldShoot ? "shoot" : 1;
 }
 
 function enemyOnDamage(e, damage) {
@@ -166,9 +166,9 @@ function enemyOnDamage(e, damage) {
 
 function enemyDead(e) {
     if (e.hp === "infinity") return;
-    e.deadFlg = true;
-    e.shootFlg = false;
-    e.explosionPlaying = true;
+    e.deadFlg = 1;
+    e.shootFlg = 0;
+    e.explosionPlaying = 1;
     e.explosionFrame = 0;
     e.explosionTimer = 0;
     playSfx("se_explosion");
@@ -182,8 +182,8 @@ function enemyDraw(e) {
         e.explosionTimer++;
         if (e.explosionTimer % 3 === 0) e.explosionFrame++;
         if (e.explosionFrame > 6) {
-            e.explosionPlaying = false;
-            e.dead = true;
+            e.explosionPlaying = 0;
+            e.dead = 1;
         }
         drawFrame("game_asset", resolveFrameName("game_asset", expFrame),
             toScreenX(e.x + e.width / 2), toScreenY(e.y + e.height / 2),

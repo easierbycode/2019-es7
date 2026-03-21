@@ -16,15 +16,15 @@ function createSprite(atlasName, frameName) {
         scaleY: 1.0,
         alpha: 1.0,
         rotation: 0,
-        visible: true,
+        visible: 1,
         tint: null,
         // Animation
         frames: null,
         animFrame: 0,
         animSpeed: 0.15,
         animCounter: 0,
-        animLoop: true,
-        animPlaying: false,
+        animLoop: 1,
+        animPlaying: 0,
         // Hit area (relative to sprite position)
         hitX: 0,
         hitY: 0,
@@ -36,7 +36,7 @@ function createSprite(atlasName, frameName) {
 function createAnimSprite(atlasName, frameNames) {
     var spr = createSprite(atlasName, frameNames[0]);
     spr.frames = frameNames;
-    spr.animPlaying = true;
+    spr.animPlaying = 1;
     // Set default hit area from first frame
     var size = getFrameSize(atlasName, frameNames[0]);
     spr.hitW = size.w;
@@ -55,7 +55,7 @@ function updateSpriteAnim(spr) {
                 spr.animFrame = 0;
             } else {
                 spr.animFrame = spr.frames.length - 1;
-                spr.animPlaying = false;
+                spr.animPlaying = 0;
             }
         }
         spr.frame = spr.frames[spr.animFrame];

@@ -12,7 +12,7 @@ function updateGameScene() {
             if (p.explosionPlaying) {
                 p.explosionTimer++;
                 if (p.explosionTimer % 3 === 0) p.explosionFrame++;
-                if (p.explosionFrame > 6) p.explosionPlaying = false;
+                if (p.explosionFrame > 6) p.explosionPlaying = 0;
             }
             if (gs.resultTimer > 90) {
                 gameState.score = hudState.scoreCount;
@@ -78,7 +78,7 @@ function updateGameScene() {
             if (gs.waveCount >= gs.stageEnemyList.length) {
                 // Boss time
                 spawnBoss(gs);
-                gs.enemyWaveFlg = false;
+                gs.enemyWaveFlg = 0;
             } else {
                 spawnEnemyWave(gs);
                 gs.waveCount++;
@@ -91,7 +91,7 @@ function updateGameScene() {
         var e = gs.enemies[i];
         var result = enemyLoop(e, p);
 
-        if (result === false) {
+        if (result === 0) {
             // Remove enemy
             gs.enemies.splice(i, 1);
             continue;
@@ -183,10 +183,10 @@ function updateGameScene() {
                     playSfx("se_damage");
                     if (gs.boss.deadFlg) {
                         hudOnEnemyKill(gs.boss.score, gs.boss.spgage);
-                        gs.theWorldFlg = true;
+                        gs.theWorldFlg = 1;
                         gs.resultTimer = 0;
-                        p.shootOn = false;
-                        hudState.spBtnActive = false;
+                        p.shootOn = 0;
+                        hudState.spBtnActive = 0;
                         playSound("voice_ko");
                     }
                 }
@@ -209,7 +209,7 @@ function updateGameScene() {
                 gs.bossTimerCountDown--;
                 hudState.bossTimerCount = gs.bossTimerCountDown;
                 if (gs.bossTimerCountDown <= 0) {
-                    gs.bossTimerStartFlg = false;
+                    gs.bossTimerStartFlg = 0;
                     // Time over — player loses
                     gamePlayerDamage(gs, 9999);
                 }
@@ -231,8 +231,8 @@ function updateGameScene() {
                 if (hitTestAABB(proj.x - proj.width / 2, proj.y - proj.height / 2,
                     proj.width, proj.height,
                     p.x + p.hitX, p.y - 15, p.hitW + 10, p.hitH + 20)) {
-                    proj.deadFlg = true;
-                    proj.dead = true;
+                    proj.deadFlg = 1;
+                    proj.dead = 1;
                     gs.projectiles.splice(i, 1);
                     playSfx("se_guard");
                 }
@@ -240,8 +240,8 @@ function updateGameScene() {
                 proj.width, proj.height,
                 p.x + p.hitX, p.y + p.hitY, p.hitW, p.hitH)) {
                 gamePlayerDamage(gs, proj.damage);
-                proj.deadFlg = true;
-                proj.dead = true;
+                proj.deadFlg = 1;
+                proj.dead = 1;
                 gs.projectiles.splice(i, 1);
             }
         }
@@ -452,14 +452,14 @@ function spawnBoss(gs) {
 
     // Start boss timer after entry
     delayedCall(6000, function() {
-        gs.bossTimerStartFlg = true;
+        gs.bossTimerStartFlg = 1;
         gs.bossTimerCountDown = 99;
         gs.bossTimerFrameCnt = 0;
-        hudState.bossTimerVisible = true;
+        hudState.bossTimerVisible = 1;
         hudState.bossTimerCount = 99;
     });
 
-    hudState.spBtnActive = true;
+    hudState.spBtnActive = 1;
     playSound("voice_another_fighter");
 }
 
@@ -470,25 +470,25 @@ function gamePlayerDamage(gs, amount) {
     playerOnDamage(gs.player, amount);
     hudState.hpPercent = gs.player.percent;
     if (gs.player.dead) {
-        gs.theWorldFlg = true;
+        gs.theWorldFlg = 1;
         gs.resultTimer = 0;
         gameState.score = hudState.scoreCount;
-        hudState.spBtnActive = false;
-        if (gs.boss) gs.boss.theWorld = true;
+        hudState.spBtnActive = 0;
+        if (gs.boss) gs.boss.theWorld = 1;
     }
 }
 
 // --- SP fire ---
 
 function startSpFire(gs) {
-    gs.spFireActive = true;
+    gs.spFireActive = 1;
     gs.spFireTimer = 0;
     gs.spLineH = 0;
-    gs.theWorldFlg = true;
-    hudState.spFireFlg = true;
+    gs.theWorldFlg = 1;
+    hudState.spFireFlg = 1;
     hudState.spgageCount = 0;
-    hudState.spBtnActive = false;
-    if (gs.boss) gs.boss.theWorld = true;
+    hudState.spBtnActive = 0;
+    if (gs.boss) gs.boss.theWorld = 1;
     playSound("g_sp_voice");
     playSound("se_sp");
 }
@@ -530,12 +530,12 @@ function updateSpFire(gs) {
     }
     // Phase 4: end (120)
     else if (gs.spFireTimer >= 120) {
-        gs.spFireActive = false;
+        gs.spFireActive = 0;
         gs.spLineH = 0;
-        hudState.spFireFlg = false;
+        hudState.spFireFlg = 0;
         if (gs.boss && !gs.boss.deadFlg) {
-            gs.theWorldFlg = false;
-            gs.boss.theWorld = false;
+            gs.theWorldFlg = 0;
+            gs.boss.theWorld = 0;
         }
     }
 }

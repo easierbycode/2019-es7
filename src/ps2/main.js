@@ -231,7 +231,7 @@ function showProgress(step, msg) {
 function main() {
     console.log("[Main] PS2 STG - AthenaEnv Port");
 
-    Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);
+    Screen.setParam(Screen.DEPTH_TEST_ENABLE, 0);
     gameFont.scale = 1.0;
 
     showProgress(1, "initInput...");
@@ -252,7 +252,7 @@ function main() {
     var frameTime = 1000 / FPS;
     var clearColor = Color.new(0, 0, 0);
 
-    while (true) {
+    while (1) {
         Screen.clear(clearColor);
 
         updateInput();

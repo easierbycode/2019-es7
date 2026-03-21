@@ -41,13 +41,13 @@ function addTween(opts) {
         delay: opts.delay || 0,
         elapsed: 0,
         ease: getEase(opts.ease || "Linear"),
-        yoyo: opts.yoyo || false,
+        yoyo: opts.yoyo || 0,
         repeat: opts.repeat || 0,
         repeatCount: 0,
-        forward: true,
+        forward: 1,
         onComplete: opts.onComplete || null,
         onUpdate: opts.onUpdate || null,
-        active: true,
+        active: 1,
         hold: opts.hold || 0,
         holdElapsed: 0,
     };
@@ -104,21 +104,21 @@ function updateTweens(dt) {
                     tw.holdElapsed += dt;
                     continue;
                 }
-                tw.forward = false;
+                tw.forward = 0;
                 tw.elapsed = 0;
                 tw.holdElapsed = 0;
             } else if (tw.repeat !== 0) {
                 tw.repeatCount++;
                 if (tw.repeat === -1 || tw.repeatCount <= tw.repeat) {
-                    tw.forward = true;
+                    tw.forward = 1;
                     tw.elapsed = 0;
                     tw.holdElapsed = 0;
                 } else {
-                    tw.active = false;
+                    tw.active = 0;
                     if (tw.onComplete) tw.onComplete(tw.target);
                 }
             } else {
-                tw.active = false;
+                tw.active = 0;
                 if (tw.onComplete) tw.onComplete(tw.target);
             }
         }
@@ -128,7 +128,7 @@ function updateTweens(dt) {
 function killTween(id) {
     for (var i = 0; i < tweens.length; i++) {
         if (tweens[i].id === id) {
-            tweens[i].active = false;
+            tweens[i].active = 0;
             break;
         }
     }

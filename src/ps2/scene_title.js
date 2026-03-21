@@ -7,8 +7,8 @@ function updateTitleScene() {
     if (!ts.introDone) {
         ts.introTimer++;
         if (ts.introTimer >= 120) {
-            ts.introDone = true;
-            ts.startBtnVisible = true;
+            ts.introDone = 1;
+            ts.startBtnVisible = 1;
             playSound("voice_titlecall");
         }
     }

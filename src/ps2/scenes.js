@@ -10,14 +10,14 @@ var SCENE_ENDING = "ending";
 var currentScene = "";
 var sceneTimer = 0;
 var sceneFadeAlpha = 0;
-var sceneFading = false;
+var sceneFading = 0;
 var sceneNextScene = "";
 
 // Title scene state
 var titleState = {
     introTimer: 0,
-    introDone: false,
-    startBtnVisible: false,
+    introDone: 0,
+    startBtnVisible: 0,
     bgScrollX: 0,
 };
 
@@ -33,14 +33,14 @@ var gameSceneState = {
     waveInterval: 80,
     waveCount: 0,
     frameCnt: 0,
-    enemyWaveFlg: false,
-    theWorldFlg: false,
+    enemyWaveFlg: 0,
+    theWorldFlg: 0,
     enemies: [],
     projectiles: [],
     items: [],
     player: null,
     boss: null,
-    bossTimerStartFlg: false,
+    bossTimerStartFlg: 0,
     bossTimerCountDown: 99,
     bossTimerFrameCnt: 0,
     stageEnemyList: [],
@@ -49,7 +49,7 @@ var gameSceneState = {
     sceneSwitch: 0,
     // SP fire
     spLineH: 0,
-    spFireActive: false,
+    spFireActive: 0,
     spFireTimer: 0,
     // Stage clear / game over
     resultTimer: 0,
@@ -61,14 +61,14 @@ var continueState = {
     countDownTimer: 0,
     selection: -1, // -1 = none, 0 = yes, 1 = no
     cursorPos: 0,
-    gameOverShown: false,
+    gameOverShown: 0,
     gameOverTimer: 0,
 };
 
 // --- Scene transitions ---
 
 function switchScene(sceneName) {
-    sceneFading = true;
+    sceneFading = 1;
     sceneNextScene = sceneName;
     sceneFadeAlpha = 0;
 }
@@ -76,7 +76,7 @@ function switchScene(sceneName) {
 function switchSceneImmediate(sceneName) {
     currentScene = sceneName;
     sceneTimer = 0;
-    sceneFading = false;
+    sceneFading = 0;
     sceneFadeAlpha = 0;
     initScene(sceneName);
 }
@@ -90,7 +90,7 @@ function updateSceneTransition() {
         currentScene = sceneNextScene;
         sceneTimer = 0;
         initScene(currentScene);
-        sceneFading = false;
+        sceneFading = 0;
     }
 }
 
@@ -129,8 +129,8 @@ function initScene(name) {
 
 function initTitleScene() {
     titleState.introTimer = 0;
-    titleState.introDone = false;
-    titleState.startBtnVisible = false;
+    titleState.introDone = 0;
+    titleState.startBtnVisible = 0;
     titleState.bgScrollX = 0;
     stopAllSounds();
 }
@@ -147,18 +147,18 @@ function initGameScene() {
     var gs = gameSceneState;
     gs.waveCount = 0;
     gs.frameCnt = 0;
-    gs.enemyWaveFlg = false;
-    gs.theWorldFlg = false;
+    gs.enemyWaveFlg = 0;
+    gs.theWorldFlg = 0;
     gs.enemies = [];
     gs.projectiles = [];
     gs.items = [];
     gs.boss = null;
-    gs.bossTimerStartFlg = false;
+    gs.bossTimerStartFlg = 0;
     gs.bossTimerCountDown = 99;
     gs.bossTimerFrameCnt = 0;
     gs.stageBgScrollY = 0;
     gs.sceneSwitch = 0;
-    gs.spFireActive = false;
+    gs.spFireActive = 0;
     gs.spFireTimer = 0;
     gs.spLineH = 0;
     gs.resultTimer = 0;
@@ -202,8 +202,8 @@ function initGameScene() {
 
     // Start wave spawning after intro delay
     delayedCall(2600, function() {
-        gs.enemyWaveFlg = true;
-        if (gs.player) gs.player.shootOn = true;
+        gs.enemyWaveFlg = 1;
+        if (gs.player) gs.player.shootOn = 1;
         playSound("g_stage_voice_" + String(gameState.stageId));
     });
 
@@ -216,7 +216,7 @@ function initContinueScene() {
     continueState.countDownTimer = 0;
     continueState.selection = -1;
     continueState.cursorPos = 0;
-    continueState.gameOverShown = false;
+    continueState.gameOverShown = 0;
     continueState.gameOverTimer = 0;
     stopAllSounds();
     playBgm("bgm_continue");

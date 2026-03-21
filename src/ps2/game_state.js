@@ -13,8 +13,8 @@ var gameState = {
     playerMaxHp: 0,
     shootMode: "normal",
     shootSpeed: "speed_normal",
-    shortFlg: false,
-    secondLoop: false,
+    shortFlg: 0,
+    secondLoop: 0,
     recipe: null,
 };
 
@@ -26,7 +26,7 @@ function resetGameState() {
     gameState.stageId = 0;
     gameState.continueCnt = 0;
     gameState.akebonoCnt = 0;
-    gameState.shortFlg = false;
+    gameState.shortFlg = 0;
 }
 
 function saveHighScore() {

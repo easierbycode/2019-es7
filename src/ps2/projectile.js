@@ -17,8 +17,8 @@ function createProjectile(data) {
         animCounter: 0,
         width: data.width || 8,
         height: data.height || 8,
-        dead: false,
-        deadFlg: false,
+        dead: 0,
+        deadFlg: 0,
         // For meka-type homing
         cont: 0,
         start: data.start || 0,
@@ -27,7 +27,7 @@ function createProjectile(data) {
 }
 
 function projectileLoop(proj, playerRef) {
-    if (proj.deadFlg) return false;
+    if (proj.deadFlg) return 0;
 
     if (proj.rotX !== 0 || proj.name !== "meka") {
         proj.x += proj.rotX * proj.speed;
@@ -54,18 +54,18 @@ function projectileLoop(proj, playerRef) {
 
     // Off-screen removal
     if (proj.x < -30 || proj.x > GW + 30 || proj.y < -30 || proj.y > GH + 30) {
-        return false;
+        return 0;
     }
 
-    return true;
+    return 1;
 }
 
 function projectileOnDamage(proj, damage) {
     if (proj.deadFlg) return;
     proj.hp -= damage;
     if (proj.hp <= 0) {
-        proj.deadFlg = true;
-        proj.dead = true;
+        proj.deadFlg = 1;
+        proj.dead = 1;
     }
 }
 

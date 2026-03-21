@@ -5,7 +5,7 @@ var sounds = {};
 var streams = {};
 var currentBgm = null;
 var currentBgmKey = "";
-var soundEnabled = false;
+var soundEnabled = 0;
 
 function initSound() {
     // No-op until sound files are deployed

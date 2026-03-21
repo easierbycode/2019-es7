@@ -14,7 +14,7 @@ function delayedCall(delayMs, callback) {
         repeat: 0,
         repeatCount: 0,
         interval: 0,
-        active: true,
+        active: 1,
     });
     return id;
 }
@@ -29,7 +29,7 @@ function addTimerEvent(delayMs, repeatCount, callback) {
         repeat: repeatCount,
         repeatCount: 0,
         interval: delayMs,
-        active: true,
+        active: 1,
     });
     return id;
 }
@@ -41,7 +41,7 @@ function addLoopTimer(delayMs, callback) {
 function removeTimer(id) {
     for (var i = 0; i < timers.length; i++) {
         if (timers[i].id === id) {
-            timers[i].active = false;
+            timers[i].active = 0;
             break;
         }
     }
@@ -62,14 +62,14 @@ function updateTimers(dt) {
 
             if (t.repeat === 0) {
                 // One-shot
-                t.active = false;
+                t.active = 0;
                 timers.splice(i, 1);
             } else if (t.repeat === -1 || t.repeatCount <= t.repeat) {
                 // Repeating
                 t.elapsed -= t.delay;
             } else {
                 // Done repeating
-                t.active = false;
+                t.active = 0;
                 timers.splice(i, 1);
             }
         }

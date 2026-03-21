@@ -28,23 +28,23 @@ function createBoss(data, stageId) {
         projectileDataA: data.projectileDataA || null,
         projectileDataB: data.projectileDataB || null,
         projectileDataC: data.projectileDataC || null,
-        shootFlg: false,
+        shootFlg: 0,
         patternTimer: 0,
         patternPhase: 0,
         attackCooldown: 0,
         // State
-        dead: false,
-        deadFlg: false,
-        theWorld: false,
-        visible: true,
+        dead: 0,
+        deadFlg: 0,
+        theWorld: 0,
+        visible: 1,
         alpha: 1.0,
-        toujouFlg: false,
+        toujouFlg: 0,
         // Shadow
-        shadowReverse: true,
+        shadowReverse: 1,
         shadowOffsetY: 0,
-        shadowVisible: true,
+        shadowVisible: 1,
         // Explosion
-        explosionPlaying: false,
+        explosionPlaying: 0,
         explosionFrame: 0,
         explosionTimer: 0,
         explosionCount: 0,
@@ -52,7 +52,7 @@ function createBoss(data, stageId) {
         tintFlash: 0,
         tintTimer: 0,
         // Entry animation
-        entryDone: false,
+        entryDone: 0,
         entryTimer: 0,
         entryStartY: -64,
         entryEndY: 60,
@@ -63,8 +63,8 @@ function createBoss(data, stageId) {
         moveTargetX: 0,
         movePhase: 0,
         // Goki special
-        gokiFlg: data.gokiFlg || false,
-        akebonoFlg: false,
+        gokiFlg: data.gokiFlg || 0,
+        akebonoFlg: 0,
     };
 
     // Set dimensions from first frame
@@ -82,7 +82,7 @@ function createBoss(data, stageId) {
 }
 
 function bossEntry(b) {
-    b.entryDone = false;
+    b.entryDone = 0;
     b.entryTimer = 0;
     b.y = b.entryStartY;
     playSfx("boss_" + b.name + "_voice_add");
@@ -98,8 +98,8 @@ function bossLoop(b) {
         var eased = 1 - Math.pow(1 - t, 5); // quint ease out
         b.y = b.entryStartY + (b.entryEndY - b.entryStartY) * eased;
         if (t >= 1.0) {
-            b.entryDone = true;
-            b.shootFlg = true;
+            b.entryDone = 1;
+            b.shootFlg = 1;
         }
         return;
     }
@@ -287,9 +287,9 @@ function bossOnDamage(b, damage) {
 }
 
 function bossDead(b) {
-    b.deadFlg = true;
-    b.shootFlg = false;
-    b.explosionPlaying = true;
+    b.deadFlg = 1;
+    b.shootFlg = 0;
+    b.explosionPlaying = 1;
     b.explosionFrame = 0;
     b.explosionTimer = 0;
     b.explosionCount = 0;
@@ -298,19 +298,19 @@ function bossDead(b) {
 }
 
 function bossExplosionUpdate(b) {
-    if (!b.explosionPlaying) return false;
+    if (!b.explosionPlaying) return 0;
 
     b.explosionTimer++;
     if (b.explosionTimer % 8 === 0) {
         b.explosionCount++;
         if (b.explosionCount > 5) {
-            b.explosionPlaying = false;
-            b.dead = true;
-            return true; // dead complete
+            b.explosionPlaying = 0;
+            b.dead = 1;
+            return 1; // dead complete
         }
         playSfx("se_explosion");
     }
-    return false;
+    return 0;
 }
 
 function bossDraw(b) {

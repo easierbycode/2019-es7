@@ -23,7 +23,7 @@ function createPlayer(data) {
         maxHp: data.maxHp || 100,
         percent: 1.0,
         // Shoot
-        shootOn: false,
+        shootOn: 0,
         shootMode: "normal",
         shootSpeed: 0,
         shootInterval: 20,
@@ -35,7 +35,7 @@ function createPlayer(data) {
         shootBigData: data.shootBig || {},
         shoot3wayData: data.shoot3way || {},
         // Barrier
-        barrierFlg: false,
+        barrierFlg: 0,
         barrierAlpha: 0,
         barrierTimer: 0,
         barrierMaxTime: 600, // ~10 seconds at 60fps (scaled to 30fps = 300 frames)
@@ -43,8 +43,8 @@ function createPlayer(data) {
         barrierAnimFrame: 0,
         // Visual
         alpha: 1.0,
-        visible: true,
-        damageAnimFlg: false,
+        visible: 1,
+        damageAnimFlg: 0,
         damageAnimTimer: 0,
         tintFlash: 0,
         // Dimensions
@@ -57,8 +57,8 @@ function createPlayer(data) {
         // Shadow
         shadowOffsetY: 5,
         // State
-        dead: false,
-        explosionPlaying: false,
+        dead: 0,
+        explosionPlaying: 0,
         explosionFrame: 0,
         explosionTimer: 0,
         // Name
@@ -77,11 +77,11 @@ function playerSetUp(p, hp, shootMode, shootSpeed) {
     p.hp = hp;
     p.percent = p.hp / p.maxHp;
     p.shootMode = shootMode;
-    p.dead = false;
-    p.explosionPlaying = false;
-    p.visible = true;
+    p.dead = 0;
+    p.explosionPlaying = 0;
+    p.visible = 1;
     p.alpha = 1.0;
-    p.damageAnimFlg = false;
+    p.damageAnimFlg = 0;
 
     switch (shootMode) {
     case "normal":
@@ -150,7 +150,7 @@ function playerLoop(p) {
             p.alpha = 1.0;
         }
         if (p.damageAnimTimer > 30) {
-            p.damageAnimFlg = false;
+            p.damageAnimFlg = 0;
             p.damageAnimTimer = 0;
             p.tintFlash = 0;
             p.alpha = 1.0;
@@ -167,7 +167,7 @@ function playerLoop(p) {
             p.barrierAlpha = 1.0;
         }
         if (p.barrierTimer >= p.barrierMaxTime) {
-            p.barrierFlg = false;
+            p.barrierFlg = 0;
             p.barrierAlpha = 0;
             p.barrierTimer = 0;
             playSfx("se_barrier_end");
@@ -228,7 +228,7 @@ function createPlayerBullet(p, rotation, offsetX, offsetY) {
         damage: 1,
         hp: 1,
         name: "normal",
-        dead: false,
+        dead: 0,
     };
 }
 
@@ -240,15 +240,15 @@ function playerOnDamage(p, amount) {
     p.percent = p.hp / p.maxHp;
 
     if (p.hp <= 0) {
-        p.dead = true;
-        p.explosionPlaying = true;
+        p.dead = 1;
+        p.explosionPlaying = 1;
         p.explosionFrame = 0;
         p.explosionTimer = 0;
-        p.shootOn = false;
+        p.shootOn = 0;
         playSfx("se_explosion");
         playSfx("g_continue_no_voice0");
     } else {
-        p.damageAnimFlg = true;
+        p.damageAnimFlg = 1;
         p.damageAnimTimer = 0;
         playSfx("g_damage_voice");
         playSfx("se_damage");
@@ -284,7 +284,7 @@ function playerShootSpeedChange(p, speed) {
 }
 
 function playerBarrierStart(p) {
-    p.barrierFlg = true;
+    p.barrierFlg = 1;
     p.barrierAlpha = 1.0;
     p.barrierTimer = 0;
     playSfx("se_barrier_start");
@@ -299,7 +299,7 @@ function playerDraw(p) {
         p.explosionTimer++;
         if (p.explosionTimer % 3 === 0) p.explosionFrame++;
         if (p.explosionFrame > 6) {
-            p.explosionPlaying = false;
+            p.explosionPlaying = 0;
         }
         drawFrame("game_asset", resolveFrameName("game_asset", expFrame),
             toScreenX(p.x + p.width / 2), toScreenY(p.y + p.height / 2),
