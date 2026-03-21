@@ -246,7 +246,7 @@ jobs:
 
       - name: Create PS2 ISO
         run: |
-          genisoimage -udf -o ps2.iso iso_root/
+          genisoimage -udf -l -allow-lowercase -allow-multidot -o ps2.iso iso_root/
           ls -lh ps2.iso
 
       - name: Upload PS2 ISO artifact
