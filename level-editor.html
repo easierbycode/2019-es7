@@ -1104,9 +1104,10 @@
                 if (replacedFrames[k]) {
                     all.push(replacedFrames[k]);
                 } else {
-                    tc.width = f.w; tc.height = f.h;
-                    tx.drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
-                    all.push({ key: k, canvas: tc.cloneNode(true), w: f.w, h: f.h });
+                    const fc = document.createElement('canvas');
+                    fc.width = f.w; fc.height = f.h;
+                    fc.getContext('2d').drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+                    all.push({ key: k, canvas: fc, w: f.w, h: f.h });
                 }
             }
             all.push(...extraSprites);
