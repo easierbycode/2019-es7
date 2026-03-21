@@ -36,7 +36,7 @@
 // These are loaded in order; each file adds to the global scope
 
 (function() {
-    var BASE = "src/ps2/";
+    var BASE = "";
 
     var modules = [
         "constants.js",
