@@ -35,18 +35,18 @@ function drawEndingScene() {
     var ca = Math.floor(congAlpha * 128);
     var congColor = Color.new(255, 255, 0, ca);
 
-    Font.print(Font.default, toScreenX(GCX - 60), toScreenY(40), "CONGRATULATIONS!", congColor);
+    fontPrint(toScreenX(GCX - 60), toScreenY(40), "CONGRATULATIONS!", congColor);
 
     // Score summary
     if (endingState.timer > 60) {
-        Font.print(Font.default, toScreenX(40), toScreenY(100), "FINAL SCORE", white);
-        Font.print(Font.default, toScreenX(40), toScreenY(120), String(gameState.score), yellow);
+        fontPrint(toScreenX(40), toScreenY(100), "FINAL SCORE", white);
+        fontPrint(toScreenX(40), toScreenY(120), String(gameState.score), yellow);
 
-        Font.print(Font.default, toScreenX(40), toScreenY(150), "MAX COMBO", white);
-        Font.print(Font.default, toScreenX(40), toScreenY(170), String(hudState.maxCombo), yellow);
+        fontPrint(toScreenX(40), toScreenY(150), "MAX COMBO", white);
+        fontPrint(toScreenX(40), toScreenY(170), String(hudState.maxCombo), yellow);
 
-        Font.print(Font.default, toScreenX(40), toScreenY(200), "CONTINUES", white);
-        Font.print(Font.default, toScreenX(40), toScreenY(220), String(gameState.continueCnt), yellow);
+        fontPrint(toScreenX(40), toScreenY(200), "CONTINUES", white);
+        fontPrint(toScreenX(40), toScreenY(220), String(gameState.continueCnt), yellow);
     }
 
     // Credits scroll
@@ -69,7 +69,7 @@ function drawEndingScene() {
         for (var i = 0; i < credits.length; i++) {
             var cy = toScreenY(credY + i * 20);
             if (cy > 0 && cy < SCREEN_H) {
-                Font.print(Font.default, toScreenX(GCX - 50), cy, credits[i], white);
+                fontPrint(toScreenX(GCX - 50), cy, credits[i], white);
             }
         }
     }
@@ -77,7 +77,7 @@ function drawEndingScene() {
     // Press start to continue
     if (endingState.timer > 600) {
         if (sceneTimer % 40 < 30) {
-            Font.print(Font.default, toScreenX(GCX - 50), toScreenY(GH - 40),
+            fontPrint(toScreenX(GCX - 50), toScreenY(GH - 40),
                 "PRESS START", white);
         }
     }

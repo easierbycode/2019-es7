@@ -94,21 +94,21 @@ function drawContinueScene() {
 
     if (cs.gameOverShown) {
         // Game Over screen
-        Font.print(Font.default, toScreenX(GCX - 40), toScreenY(GCY - 60),
+        fontPrint(toScreenX(GCX - 40), toScreenY(GCY - 60),
             "GAME OVER", red);
 
-        Font.print(Font.default, toScreenX(40), toScreenY(GCY), "SCORE", white);
-        Font.print(Font.default, toScreenX(100), toScreenY(GCY), String(gameState.score), yellow);
+        fontPrint(toScreenX(40), toScreenY(GCY), "SCORE", white);
+        fontPrint(toScreenX(100), toScreenY(GCY), String(gameState.score), yellow);
 
-        Font.print(Font.default, toScreenX(40), toScreenY(GCY + 20), "HI-SCORE", white);
-        Font.print(Font.default, toScreenX(120), toScreenY(GCY + 20), String(gameState.highScore), yellow);
+        fontPrint(toScreenX(40), toScreenY(GCY + 20), "HI-SCORE", white);
+        fontPrint(toScreenX(120), toScreenY(GCY + 20), String(gameState.highScore), yellow);
 
-        Font.print(Font.default, toScreenX(40), toScreenY(GCY + 40), "MAX COMBO", white);
-        Font.print(Font.default, toScreenX(130), toScreenY(GCY + 40), String(hudState.maxCombo), yellow);
+        fontPrint(toScreenX(40), toScreenY(GCY + 40), "MAX COMBO", white);
+        fontPrint(toScreenX(130), toScreenY(GCY + 40), String(hudState.maxCombo), yellow);
 
         if (cs.gameOverTimer > 90) {
             if (sceneTimer % 40 < 30) {
-                Font.print(Font.default, toScreenX(GCX - 50), toScreenY(GH - 60),
+                fontPrint(toScreenX(GCX - 50), toScreenY(GH - 60),
                     "PRESS START", white);
             }
         }
@@ -121,7 +121,7 @@ function drawContinueScene() {
         drawFrame("game_ui", resolveFrameName("game_ui", "continueTitle.gif"),
             toScreenX(GCX), toScreenY(90), SCALE, SCALE, 1.0, null);
     } else {
-        Font.print(Font.default, toScreenX(GCX - 40), toScreenY(70), "CONTINUE?", white);
+        fontPrint(toScreenX(GCX - 40), toScreenY(70), "CONTINUE?", white);
     }
 
     // Face
@@ -133,17 +133,17 @@ function drawContinueScene() {
 
     // Countdown
     var countStr = cs.countDown >= 0 ? String(cs.countDown) : "0";
-    Font.print(Font.default, toScreenX(160), toScreenY(160), countStr,
+    fontPrint(toScreenX(160), toScreenY(160), countStr,
         cs.countDown <= 3 ? red : yellow);
 
     // Yes / No buttons
     var yesColor = cs.cursorPos === 0 ? yellow : gray;
     var noColor = cs.cursorPos === 1 ? yellow : gray;
 
-    Font.print(Font.default, toScreenX(GCX - 60), toScreenY(GCY + 50), "YES", yesColor);
-    Font.print(Font.default, toScreenX(GCX + 30), toScreenY(GCY + 50), "NO", noColor);
+    fontPrint(toScreenX(GCX - 60), toScreenY(GCY + 50), "YES", yesColor);
+    fontPrint(toScreenX(GCX + 30), toScreenY(GCY + 50), "NO", noColor);
 
     // Cursor indicator
     var cursorX = cs.cursorPos === 0 ? (GCX - 70) : (GCX + 20);
-    Font.print(Font.default, toScreenX(cursorX), toScreenY(GCY + 50), ">", white);
+    fontPrint(toScreenX(cursorX), toScreenY(GCY + 50), ">", white);
 }

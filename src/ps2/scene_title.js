@@ -62,17 +62,17 @@ function drawTitleScene() {
     Draw.rect(toScreenX(0), toScreenY(GH - 120), toScreenW(GW), toScreenH(120), black);
 
     // High score
-    Font.print(Font.default, toScreenX(32), toScreenY(GH - 100), "HI-SCORE", white);
-    Font.print(Font.default, toScreenX(110), toScreenY(GH - 100), String(gameState.highScore || 0), yellow);
+    fontPrint(toScreenX(32), toScreenY(GH - 100), "HI-SCORE", white);
+    fontPrint(toScreenX(110), toScreenY(GH - 100), String(gameState.highScore || 0), yellow);
 
     // Start button (flashing)
     if (ts.startBtnVisible) {
         if (sceneTimer % 40 < 30) {
-            Font.print(Font.default, toScreenX(GCX - 45), toScreenY(GH - 60), "PRESS START", white);
+            fontPrint(toScreenX(GCX - 45), toScreenY(GH - 60), "PRESS START", white);
         }
     }
 
     // Copyright
-    Font.print(Font.default, toScreenX(10), toScreenY(GH - 20),
+    fontPrint(toScreenX(10), toScreenY(GH - 20),
         "(C)CAPCOM", Color.new(128, 128, 128));
 }

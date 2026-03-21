@@ -69,12 +69,12 @@ function hudDraw() {
     var topY = toScreenY(4);
 
     // Score
-    Font.print(Font.default, lx, topY, "SCORE", white);
-    Font.print(Font.default, lx + 50, topY, String(hudState.scoreCount), yellow);
+    fontPrint(lx, topY, "SCORE", white);
+    fontPrint(lx + 50, topY, String(hudState.scoreCount), yellow);
 
     // High Score
-    Font.print(Font.default, lx, topY + 14, "HI", white);
-    Font.print(Font.default, lx + 20, topY + 14, String(hudState.highScore), white);
+    fontPrint(lx, topY + 14, "HI", white);
+    fontPrint(lx + 20, topY + 14, String(hudState.highScore), white);
 
     // HP Bar
     var barX = toScreenX(4);
@@ -102,17 +102,17 @@ function hudDraw() {
 
     // SP ready indicator
     if (hudState.spgageCount >= hudState.spgageMax && hudState.spBtnActive) {
-        Font.print(Font.default, toScreenX(GCX - 20), toScreenY(GH - 28), "SP READY!", cyan);
+        fontPrint(toScreenX(GCX - 20), toScreenY(GH - 28), "SP READY!", cyan);
     }
 
     // Combo
     if (hudState.comboCount > 1) {
-        Font.print(Font.default, toScreenX(GCX - 20), toScreenY(50), String(hudState.comboCount) + " COMBO!", yellow);
+        fontPrint(toScreenX(GCX - 20), toScreenY(50), String(hudState.comboCount) + " COMBO!", yellow);
     }
 
     // Boss timer
     if (hudState.bossTimerVisible) {
-        Font.print(Font.default, toScreenX(GCX - 10), toScreenY(58), "TIME", white);
-        Font.print(Font.default, toScreenX(GCX + 15), toScreenY(58), String(hudState.bossTimerCount), yellow);
+        fontPrint(toScreenX(GCX - 10), toScreenY(58), "TIME", white);
+        fontPrint(toScreenX(GCX + 15), toScreenY(58), String(hudState.bossTimerCount), yellow);
     }
 }

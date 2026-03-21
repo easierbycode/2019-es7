@@ -56,21 +56,30 @@ function drawLetterbox() {
     }
 }
 
+// Global font instance
+var gameFont = new Font("default");
+
+// Print text at screen coordinates (replaces Font.print(Font.default, ...))
+function fontPrint(x, y, text, color) {
+    if (color) {
+        gameFont.color = color;
+    }
+    gameFont.print(x, y, text);
+}
+
 // Draw text at game coordinates using the built-in font
 function drawText(gx, gy, text, color, size) {
-    var sx = toScreenX(gx);
-    var sy = toScreenY(gy);
-    var s = size || 1.0;
-    Font.print(Font.default, sx, sy, text, color);
+    fontPrint(toScreenX(gx), toScreenY(gy), text, color);
 }
 
 // Set clipping to game area
 function setGameClip() {
-    Screen.setClipping(OFFSET_X, OFFSET_Y,
+    Screen.setParam(Screen.SCISSOR_BOUNDS,
+        OFFSET_X, OFFSET_Y,
         OFFSET_X + Math.ceil(256 * SCALE),
         OFFSET_Y + Math.ceil(480 * SCALE));
 }
 
 function clearGameClip() {
-    Screen.setClipping(0, 0, SCREEN_W, SCREEN_H);
+    Screen.setParam(Screen.SCISSOR_BOUNDS, 0, 0, SCREEN_W, SCREEN_H);
 }

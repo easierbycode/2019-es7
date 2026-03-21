@@ -343,26 +343,26 @@ function drawGameScene() {
         var titleAlpha = sceneTimer < 60 ? 1.0 : (1.0 - (sceneTimer - 60) / 30);
         var ta = Math.floor(titleAlpha * 128);
         var titleColor = Color.new(255, 255, 255, ta);
-        Font.print(Font.default, toScreenX(GCX - 30), toScreenY(GCY - 40),
+        fontPrint(toScreenX(GCX - 30), toScreenY(GCY - 40),
             "ROUND " + String(gameState.stageId + 1), titleColor);
     }
     if (sceneTimer >= 40 && sceneTimer < 100) {
         var fightAlpha = sceneTimer < 80 ? 1.0 : (1.0 - (sceneTimer - 80) / 20);
         var fa = Math.floor(fightAlpha * 128);
         var fightColor = Color.new(255, 200, 0, fa);
-        Font.print(Font.default, toScreenX(GCX - 20), toScreenY(GCY),
+        fontPrint(toScreenX(GCX - 20), toScreenY(GCY),
             "FIGHT!", fightColor);
     }
 
     // Game over text
     if (gs.player && gs.player.dead && gs.resultTimer > 30) {
-        Font.print(Font.default, toScreenX(GCX - 20), toScreenY(GCY - 10),
+        fontPrint(toScreenX(GCX - 20), toScreenY(GCY - 10),
             "K.O.", Color.new(255, 60, 60));
     }
 
     // Stage clear text
     if (gs.boss && gs.boss.dead && gs.resultTimer > 20) {
-        Font.print(Font.default, toScreenX(GCX - 35), toScreenY(GCY - 10),
+        fontPrint(toScreenX(GCX - 35), toScreenY(GCY - 10),
             "STAGE CLEAR!", Color.new(255, 255, 0));
     }
 }

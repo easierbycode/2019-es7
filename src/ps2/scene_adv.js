@@ -32,9 +32,9 @@ function drawAdvScene() {
     var a = Math.floor(as.textAlpha * 128);
     var textColor = Color.new(255, 255, 255, a);
 
-    Font.print(Font.default, toScreenX(GCX - 60), toScreenY(GCY - 20),
+    fontPrint(toScreenX(GCX - 60), toScreenY(GCY - 20),
         "STAGE " + String(gameState.stageId + 1), textColor);
 
-    Font.print(Font.default, toScreenX(GCX - 50), toScreenY(GCY + 10),
+    fontPrint(toScreenX(GCX - 50), toScreenY(GCY + 10),
         "GET READY!", textColor);
 }

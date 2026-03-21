@@ -201,7 +201,14 @@ function main() {
     console.log("[Main] Initializing...");
 
     // Initialize subsystems
-    Screen.setMode(SCREEN_W, SCREEN_H, Screen.NTSC, Screen.INTERLACED);
+    var canvas = Screen.getMode();
+    canvas.width = SCREEN_W;
+    canvas.height = SCREEN_H;
+    canvas.double_buffering = true;
+    canvas.zbuffering = false;
+    Screen.setMode(canvas);
+    Screen.setFrameCounter(true);
+    Screen.setVSync(true);
     initInput();
     initSound();
 
@@ -213,13 +220,10 @@ function main() {
 
     console.log("[Main] Starting game loop");
 
-    // Main loop
-    var running = true;
+    // Main loop using os.setInterval
     var frameTime = 1000 / FPS;
 
-    while (running) {
-        var frameStart = Timer.getTime();
-
+    os.setInterval(function() {
         // Input
         updateInput();
 
@@ -253,14 +257,7 @@ function main() {
 
         // Flip
         Screen.flip();
-
-        // Frame timing
-        var elapsed = Timer.getTime() - frameStart;
-        var sleepMs = frameTime - elapsed;
-        if (sleepMs > 0) {
-            Timer.sleep(Math.floor(sleepMs));
-        }
-    }
+    }, 0);
 }
 
 // --- Entry Point ---
