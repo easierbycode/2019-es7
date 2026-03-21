@@ -20,6 +20,4 @@ function stopBgm() {}
 function stopAllSounds() {}
 function playSound(key, volume) {}
 
-function saveHighScore() {
-    // TODO: persist high score to memory card
-}
+// saveHighScore() is defined in game_state.js
