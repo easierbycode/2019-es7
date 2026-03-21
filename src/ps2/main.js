@@ -212,41 +212,16 @@ function createFallbackRecipe() {
 
 // --- Main Game Loop ---
 
-// Visual progress helper — draw a colored bar and flip to show progress
-function showProgress(step, msg) {
-    Screen.clear(Color.new(0, 0, 0));
-    // Progress bar
-    Draw.rect(20, 200, step * 50, 20, Color.new(0, 255, 0));
-    // Step indicator squares
-    for (var i = 0; i < step; i++) {
-        Draw.rect(20 + i * 55, 230, 40, 40, Color.new(255, 255, 0));
-    }
-    // Label
-    gameFont.color = Color.new(128, 128, 128);
-    gameFont.scale = 1.0;
-    gameFont.print(20, 170, msg);
-    Screen.flip();
-}
-
 function main() {
     console.log("[Main] PS2 STG - AthenaEnv Port");
 
     Screen.setParam(Screen.DEPTH_TEST_ENABLE, 0);
     gameFont.scale = 1.0;
 
-    showProgress(1, "initInput...");
     initInput();
-
-    showProgress(2, "initSound...");
-    try { initSound(); } catch(e) { console.log("initSound error: " + e); }
-
-    showProgress(3, "loadAllAssets...");
-    try { loadMinimalAssets(); } catch(e) { console.log("loadAssets error: " + e); }
-
-    showProgress(4, "switchScene...");
+    initSound();
+    loadMinimalAssets();
     switchSceneImmediate(SCENE_TITLE);
-
-    showProgress(5, "Starting loop...");
 
     // Main loop
     var frameTime = 1000 / FPS;
@@ -267,9 +242,6 @@ function main() {
         drawCurrentScene();
         drawSceneFade();
         drawLetterbox();
-
-        // Debug: show that loop is running
-        Draw.rect(0, 0, 10, 10, Color.new(255, 0, 0));
 
         Screen.flip();
     }
