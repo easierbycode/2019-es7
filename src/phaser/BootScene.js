@@ -381,7 +381,7 @@ export class BootScene extends Phaser.Scene {
 
                 setTimeout(function () {
                     game.scene.stop("BootScene");
-                    game.scene.start("PhaserGameScene");
+                    game.scene.start("PhaserTitleScene");
                 }, 50);
             }
 
