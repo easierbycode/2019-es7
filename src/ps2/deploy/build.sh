@@ -102,6 +102,8 @@ echo "[2/5] Processing texture atlases..."
 # Target 512x512 max (~1MB RGBA per texture).
 PS2_MAX_TEX=512
 
+PS2_ASSETS="$PS2_SRC/assets"
+
 for atlas in game_ui game_asset; do
     JSON_SRC="$WEB_ASSETS/${atlas}.json"
     PNG_SRC="$WEB_ASSETS/img/${atlas}.png"
@@ -194,6 +196,105 @@ with open(json_dst, "w") as f:
 print(f"  Wrote {json_dst.split('/')[-1]} (scaled coords, displayScale={1.0/scale:.2f}x)")
 PYEOF
 done
+
+# Process level_2028 atlas (same downscaling as above)
+for atlas in level_2028_atlas; do
+    JSON_SRC="$PS2_ASSETS/${atlas}.json"
+    PNG_SRC="$PS2_ASSETS/${atlas}.png"
+    JSON_DST="$BUILD_DIR/assets/${atlas}.json"
+    PNG_DST="$BUILD_DIR/assets/${atlas}.png"
+
+    if [ ! -f "$JSON_SRC" ] || [ ! -f "$PNG_SRC" ]; then
+        echo "  WARN: $atlas source files not found in $PS2_ASSETS, skipping"
+    else
+        python3 - "$PNG_SRC" "$JSON_SRC" "$PNG_DST" "$JSON_DST" "$PS2_MAX_TEX" << 'PYEOF'
+import sys, json
+from PIL import Image
+
+png_src, json_src, png_dst, json_dst, max_tex = sys.argv[1:6]
+max_tex = int(max_tex)
+
+img = Image.open(png_src)
+orig_w, orig_h = img.size
+
+scale = min(1.0, max_tex / orig_w, max_tex / orig_h)
+
+if scale < 1.0:
+    new_w = int(orig_w * scale)
+    new_h = int(orig_h * scale)
+    img = img.resize((new_w, new_h), Image.LANCZOS)
+    print(f"  Downscaled {png_src.split('/')[-1]}: {orig_w}x{orig_h} -> {new_w}x{new_h} (scale={scale:.3f})")
+else:
+    print(f"  {png_src.split('/')[-1]}: {orig_w}x{orig_h} (no resize needed)")
+
+img.save(png_dst, "PNG")
+
+with open(json_src) as f:
+    data = json.load(f)
+
+if scale < 1.0:
+    if isinstance(data.get("frames"), list):
+        for fr in data["frames"]:
+            r = fr["frame"]
+            r["x"] = round(r["x"] * scale)
+            r["y"] = round(r["y"] * scale)
+            r["w"] = max(1, round(r["w"] * scale))
+            r["h"] = max(1, round(r["h"] * scale))
+            if "spriteSourceSize" in fr:
+                s = fr["spriteSourceSize"]
+                s["x"] = round(s["x"] * scale)
+                s["y"] = round(s["y"] * scale)
+                s["w"] = max(1, round(s["w"] * scale))
+                s["h"] = max(1, round(s["h"] * scale))
+            if "sourceSize" in fr:
+                ss = fr["sourceSize"]
+                ss["w"] = max(1, round(ss["w"] * scale))
+                ss["h"] = max(1, round(ss["h"] * scale))
+    elif isinstance(data.get("frames"), dict):
+        for key, val in data["frames"].items():
+            r = val["frame"]
+            r["x"] = round(r["x"] * scale)
+            r["y"] = round(r["y"] * scale)
+            r["w"] = max(1, round(r["w"] * scale))
+            r["h"] = max(1, round(r["h"] * scale))
+            if "spriteSourceSize" in val:
+                s = val["spriteSourceSize"]
+                s["x"] = round(s["x"] * scale)
+                s["y"] = round(s["y"] * scale)
+                s["w"] = max(1, round(s["w"] * scale))
+                s["h"] = max(1, round(s["h"] * scale))
+            if "sourceSize" in val:
+                ss = val["sourceSize"]
+                ss["w"] = max(1, round(ss["w"] * scale))
+                ss["h"] = max(1, round(ss["h"] * scale))
+
+    if "meta" in data and "size" in data["meta"]:
+        data["meta"]["size"]["w"] = round(data["meta"]["size"]["w"] * scale)
+        data["meta"]["size"]["h"] = round(data["meta"]["size"]["h"] * scale)
+
+    if "meta" not in data:
+        data["meta"] = {}
+    data["meta"]["ps2DisplayScale"] = round(1.0 / scale, 4)
+
+with open(json_dst, "w") as f:
+    json.dump(data, f)
+
+print(f"  Wrote {json_dst.split('/')[-1]} (scaled coords, displayScale={1.0/scale:.2f}x)")
+PYEOF
+    fi
+done
+
+# Copy level_2028 Firebase level data
+if [ -f "$PS2_ASSETS/level_2028.json" ]; then
+    cp "$PS2_ASSETS/level_2028.json" "$BUILD_DIR/assets/level_2028.json"
+    echo "  Copied level_2028.json"
+fi
+
+# Copy cyber-liberty player spritesheet (small enough, no downscale needed)
+if [ -f "$PS2_ASSETS/cyber-liberty.png" ]; then
+    cp "$PS2_ASSETS/cyber-liberty.png" "$BUILD_DIR/assets/cyber-liberty.png"
+    echo "  Copied cyber-liberty.png"
+fi
 
 # Copy game recipe
 if [ -f "$WEB_ASSETS/game.json" ]; then
