@@ -1193,7 +1193,7 @@
             let remaining = entries.length;
             function onThumbReady() {
                 remaining--;
-                if (remaining <= 0) { renderGrid(); renderPreview(); updateToolUI(); }
+                if (remaining <= 0) { renderGrid(); renderAtlas(); updateToolUI(); }
             }
             for (const [key, dataURL] of entries) {
                 const img = new Image();
