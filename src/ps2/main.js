@@ -199,12 +199,10 @@ function createFallbackRecipe() {
 function main() {
     console.log("[Main] PS2 STG - AthenaEnv Port");
 
-    // Minimal init — just screen
+    // Minimal init
     Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);
 
     var font = new Font("default");
-    font.color = Color.new(128, 128, 128);
-    font.scale = 1.0;
     var pad = Pads.get();
 
     var testPhase = 0;
@@ -216,17 +214,28 @@ function main() {
         // Test 1: bright rectangle
         Draw.rect(100, 100, 200, 100, Color.new(255, 0, 0));
 
-        // Test 2: text at various positions with explicit scale
+        // Test 2: text — try multiple approaches
+        // Approach A: mimic hello.js exactly
         font.color = Color.new(128, 128, 128);
-        font.scale = 2.0;
-        font.print(10, 10, "AthenaEnv STG Test");
         font.scale = 1.0;
-        font.print(10, 50, "Phase: " + String(testPhase));
-        font.print(10, 70, "Font test 123");
+        font.print(10, 10, "Hello World!");
 
-        // Test 3: smaller shapes
+        // Approach B: large scale, bright color
+        font.color = Color.new(128, 0, 0);
+        font.scale = 4.0;
+        font.print(150, 250, "BIG TEXT");
+
+        // Approach C: use gameFont from draw.js
+        gameFont.color = Color.new(128, 128, 128);
+        gameFont.scale = 2.0;
+        gameFont.print(10, 350, "gameFont test");
+
+        // Test 3: shapes (these work)
         Draw.rect(350, 200, 50, 50, Color.new(0, 255, 0));
         Draw.rect(420, 200, 50, 50, Color.new(0, 0, 255));
+
+        // Draw a white rect where text should be to verify position
+        Draw.rect(10, 10, 100, 12, Color.new(255, 255, 255));
 
         testPhase++;
 
