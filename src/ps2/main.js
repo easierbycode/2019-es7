@@ -204,6 +204,7 @@ function main() {
 
     var font = new Font("default");
     font.color = Color.new(128, 128, 128);
+    font.scale = 1.0;
     var pad = Pads.get();
 
     var testPhase = 0;
@@ -215,9 +216,13 @@ function main() {
         // Test 1: bright rectangle
         Draw.rect(100, 100, 200, 100, Color.new(255, 0, 0));
 
-        // Test 2: text
+        // Test 2: text at various positions with explicit scale
+        font.color = Color.new(128, 128, 128);
+        font.scale = 2.0;
         font.print(10, 10, "AthenaEnv STG Test");
-        font.print(10, 30, "Phase: " + String(testPhase));
+        font.scale = 1.0;
+        font.print(10, 50, "Phase: " + String(testPhase));
+        font.print(10, 70, "Font test 123");
 
         // Test 3: smaller shapes
         Draw.rect(350, 200, 50, 50, Color.new(0, 255, 0));
