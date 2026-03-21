@@ -267,7 +267,13 @@
     <!-- ATLAS MANAGER MODAL -->
     <div id="atlas-modal" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
         <div class="picker-panel" style="max-height:80vh">
-            <div class="picker-title">ATLAS MANAGER (<span id="frame-count">0</span> frames)</div>
+            <div class="picker-title">ATLAS MANAGER (<span id="frame-count">0</span> frames)
+                <select id="atlas-select" onchange="switchAtlas(this.value)" style="margin-left:12px;background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:2px 8px;font-size:12px;cursor:pointer;">
+                    <option value="game_asset">game_asset</option>
+                    <option value="game_ui">game_ui</option>
+                    <option value="title_ui">title_ui</option>
+                </select>
+            </div>
             <div style="display:flex;gap:8px;margin-bottom:12px;">
                 <label class="menu-btn" style="flex:1;justify-content:center;">
                     <input type="file" id="upload-sprites" multiple accept="image/*" style="display:none" onchange="handleSpriteUpload(event)">
@@ -283,6 +289,12 @@
         // ================== CONFIG ==================
         const ATLAS_DIR = "assets";
         const GAME_JSON_NAME = "game.json";
+        const ATLAS_CONFIGS = {
+            game_asset: { png: "game_asset.png", json: "game_asset.json" },
+            game_ui:    { png: "game_ui.png",    json: "game_ui.json" },
+            title_ui:   { png: "title_ui.png",   json: "title_ui.json" },
+        };
+        let currentAtlasKey = "game_asset";
         const ATLAS_PNG = "game_asset.png";
         const ATLAS_JSON = "game_asset.json";
         const EDITOR_PLAY_RECIPE_KEY = "__editorPhaserRecipe__";
@@ -499,8 +511,39 @@
         }
         function showAtlasManager() {
             closeMenu();
+            document.getElementById('atlas-select').value = currentAtlasKey;
             renderAtlas();
             document.getElementById('atlas-modal').classList.remove('hidden');
+        }
+
+        async function switchAtlas(key) {
+            currentAtlasKey = key;
+            const cfg = ATLAS_CONFIGS[key];
+            if (!dirHandle) return;
+            extraSprites = [];
+            replacedFrames = {};
+            try {
+                let atlasJsonText, pngBlob;
+                // Find atlas JSON
+                try { atlasJsonText = await (await (await dirHandle.getFileHandle(cfg.json)).getFile()).text(); }
+                catch {
+                    const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                    atlasJsonText = await (await (await ad.getFileHandle(cfg.json)).getFile()).text();
+                }
+                atlasData = normalizeAtlasData(JSON.parse(atlasJsonText));
+                // Find atlas PNG: try root, then assets/, then assets/img/
+                try { pngBlob = await (await dirHandle.getFileHandle(cfg.png)).getFile(); }
+                catch {
+                    try {
+                        const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                        try { pngBlob = await (await ad.getFileHandle(cfg.png)).getFile(); }
+                        catch { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle(cfg.png)).getFile(); }
+                    } catch { throw new Error("Atlas PNG not found: " + cfg.png); }
+                }
+                atlasImage = new Image();
+                atlasImage.src = URL.createObjectURL(pngBlob);
+                atlasImage.onload = () => { buildFrameThumbs(); renderAtlas(); };
+            } catch (e) { console.warn("Atlas load failed for " + key, e); alert("Failed to load atlas: " + key); }
         }
 
         // ================== FILE SYSTEM ==================
@@ -1069,15 +1112,17 @@
                 nf[s.key] = { frame: { x: p.x, y: p.y, w: s.w, h: s.h }, rotated: false, trimmed: false,
                     spriteSourceSize: { x: 0, y: 0, w: s.w, h: s.h }, sourceSize: { w: s.w, h: s.h } };
             });
-            saveAtlasFiles(na, { frames: nf, meta: { ...(atlasData.meta || {}), image: ATLAS_PNG, size: { w: MW, h: fh } } });
+            const cfg = ATLAS_CONFIGS[currentAtlasKey];
+            saveAtlasFiles(na, { frames: nf, meta: { ...(atlasData.meta || {}), image: cfg.png, size: { w: MW, h: fh } } });
         }
 
         async function saveAtlasFiles(canvas, json) {
+            const cfg = ATLAS_CONFIGS[currentAtlasKey];
             try {
                 const ah = await dirHandle.getDirectoryHandle(ATLAS_DIR, { create: true });
-                const pw = await (await ah.getFileHandle(ATLAS_PNG, { create: true })).createWritable();
+                const pw = await (await ah.getFileHandle(cfg.png, { create: true })).createWritable();
                 await pw.write(await new Promise(r => canvas.toBlob(r, 'image/png'))); await pw.close();
-                const jw = await (await ah.getFileHandle(ATLAS_JSON, { create: true })).createWritable();
+                const jw = await (await ah.getFileHandle(cfg.json, { create: true })).createWritable();
                 await jw.write(JSON.stringify(json, null, 2)); await jw.close();
                 alert('Atlas updated!'); extraSprites = []; replacedFrames = {}; await loadGameFiles();
             } catch (e) { alert('Atlas write failed: ' + e.message); }
