@@ -321,66 +321,30 @@ fi
 # --- Step 5: Create AthenaEnv boot config ---
 echo "[5/5] Creating boot configuration..."
 
-cat > "$BUILD_DIR/system.cnf" << 'EOF'
-BOOT2 = cdrom0:\MAIN.JS;1
+# SYSTEM.CNF — PS2 boot descriptor (ATHA_000.01 = athena.elf renamed for ISO 8.3)
+cat > "$BUILD_DIR/SYSTEM.CNF" << 'EOF'
+BOOT2 = cdrom0:\ATHA_000.01;1
 VER = 1.00
 VMODE = NTSC
 EOF
 
-cat > "$BUILD_DIR/README.txt" << 'EOF'
-PS2 STG - AthenaEnv Port
-========================
-
-A port of the Capcom April Fool 2019 STG game to PlayStation 2
-using the AthenaEnv v4 JavaScript runtime.
-
-Requirements:
-- PlayStation 2 console (or PCSX2 emulator)
-- AthenaEnv v4 runtime installed on memory card
-
-Controls:
-- D-pad / Left Stick: Move player
-- Cross (X): Confirm / Start game
-- Circle: Back
-- Triangle / R1: SP attack (when gauge is full)
-- Start: Pause / Start
-
-Installation:
-1. Copy the entire build directory to your PS2 memory card
-2. Launch AthenaEnv and select main.js
-3. Or burn to DVD as a bootable ISO
-
-Original game (C) CAPCOM
-Port engine: AthenaEnv v4
-EOF
-
-# --- Optional: Create ISO ---
-if [ "$BUILD_ISO" = true ]; then
-    echo "Creating ISO image..."
-    if command -v mkisofs &>/dev/null; then
-        mkisofs -o "$SCRIPT_DIR/ps2_stg.iso" \
-            -V "PS2STG" \
-            -sysid "PLAYSTATION" \
-            -publisher "HOMEBREW" \
-            -no-emul-boot \
-            "$BUILD_DIR"
-        echo "ISO created: $SCRIPT_DIR/ps2_stg.iso"
-    elif command -v genisoimage &>/dev/null; then
-        genisoimage -o "$SCRIPT_DIR/ps2_stg.iso" \
-            -V "PS2STG" \
-            -sysid "PLAYSTATION" \
-            "$BUILD_DIR"
-        echo "ISO created: $SCRIPT_DIR/ps2_stg.iso"
-    else
-        echo "WARNING: mkisofs/genisoimage not found, skipping ISO creation"
-    fi
+# ATHA_000.01 — copy of athena.elf with PS2 ISO naming convention
+if [ -f "$BUILD_DIR/athena.elf" ]; then
+    cp "$BUILD_DIR/athena.elf" "$BUILD_DIR/ATHA_000.01"
+    echo "  Created ATHA_000.01"
 fi
+
+# athena.ini — AthenaEnv v4 configuration
+cat > "$BUILD_DIR/athena.ini" << 'EOF'
+boot_logo = false
+dark_mode = true
+default_script = "main.js"
+
+# IOP module loading
+audsrv = true
+EOF
 
 echo ""
 echo "=== Build Complete ==="
 echo "Output: $BUILD_DIR/"
 echo "Files: $(find "$BUILD_DIR" -type f | wc -l)"
-echo ""
-echo "To test on PCSX2:"
-echo "  1. Install AthenaEnv v4 ELF on virtual memory card"
-echo "  2. Point AthenaEnv to: $BUILD_DIR/main.js"

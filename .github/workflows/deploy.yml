@@ -209,8 +209,54 @@ jobs:
           name: electron-appimage
           path: electron/dist/*.AppImage
 
+  ps2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install Pillow
+          sudo apt-get install -y genisoimage
+
+      - name: Build PS2 assets
+        run: |
+          cd src/ps2/deploy
+          bash build.sh
+
+      - name: Prepare ISO root
+        run: |
+          mkdir -p iso_root
+          # Copy build output
+          cp src/ps2/deploy/build/main.js iso_root/main.js
+          cp -r src/ps2/deploy/build/assets iso_root/assets
+
+          # ATHA_000.01 is athena.elf renamed for PS2 ISO 8.3 naming
+          cp src/ps2/deploy/build/athena.elf iso_root/ATHA_000.01
+
+          # SYSTEM.CNF — PS2 boot descriptor
+          printf 'BOOT2 = cdrom0:\\ATHA_000.01;1\nVER = 1.00\nVMODE = NTSC\n' > iso_root/SYSTEM.CNF
+
+          # athena.ini — AthenaEnv v4 configuration
+          printf 'boot_logo = false\ndark_mode = true\ndefault_script = "main.js"\n\n# IOP module loading\naudsrv = true\n' > iso_root/athena.ini
+
+      - name: Create PS2 ISO
+        run: |
+          genisoimage -udf -o ps2.iso iso_root/
+          ls -lh ps2.iso
+
+      - name: Upload PS2 ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps2-iso
+          path: ./ps2.iso
+
   web:
-    needs: [cordova, electron]
+    needs: [cordova, electron, ps2]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -254,14 +300,21 @@ jobs:
           name: electron-appimage
           path: ./appimage-tmp
 
-      - name: Copy APKs and AppImage to dist
+      - name: Download PS2 ISO artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ps2-iso
+          path: ./ps2-tmp
+
+      - name: Copy APKs, AppImage, and PS2 ISO to dist
         run: |
           cp apk-tmp/*.apk dist/game.apk
           cp phaser-apk-tmp/*.apk dist/phaser-game.apk
           cp appimage-tmp/*.AppImage dist/phaser-game.AppImage
           cp phaser-game.desktop dist/phaser-game.desktop
-          ls -l dist/game.apk dist/phaser-game.apk dist/phaser-game.AppImage dist/phaser-game.desktop
-          rm -rf apk-tmp phaser-apk-tmp appimage-tmp
+          cp ps2-tmp/ps2.iso dist/ps2.iso
+          ls -l dist/game.apk dist/phaser-game.apk dist/phaser-game.AppImage dist/phaser-game.desktop dist/ps2.iso
+          rm -rf apk-tmp phaser-apk-tmp appimage-tmp ps2-tmp
 
       - name: Create downloadable zip of built site
         run: |
