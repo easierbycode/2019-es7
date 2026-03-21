@@ -10,7 +10,7 @@ var currentBgmKey = "";
 var masterVolume = 80;
 
 function initSound() {
-    Sound.setVolume(masterVolume);
+    // Sound.setVolume not available in all AthenaEnv builds
 }
 
 // Load a sound effect (ADPCM .adp or WAV)
