@@ -5,11 +5,11 @@ var pad = null;
 var padPrevBtns = {};
 
 function initInput() {
-    // No initialization needed — Pads module is ready immediately
+    // Get pad once — reuse each frame
+    pad = Pads.get();
 }
 
 function updateInput() {
-    pad = Pads.get();
     if (pad) {
         pad.update();
     }
