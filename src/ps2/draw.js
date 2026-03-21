@@ -56,16 +56,17 @@ function drawLetterbox() {
     }
 }
 
-// Global font instance
+// Global font instance — only one Font("default") can exist
 var gameFont = new Font("default");
 gameFont.color = Color.new(128, 128, 128);
+gameFont.scale = 1.0;
 
 // Print text at screen coordinates
-// Note: AthenaEnv font colors use 0-128 range, but we accept 0-255 from game code
 function fontPrint(x, y, text, color) {
     if (color) {
         gameFont.color = color;
     }
+    gameFont.scale = SCALE;
     gameFont.print(x, y, text);
 }
 
