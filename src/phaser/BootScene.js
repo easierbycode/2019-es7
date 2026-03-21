@@ -321,11 +321,12 @@ export class BootScene extends Phaser.Scene {
             return;
         }
 
-        var levelName = readLevelParam() || "2028";
-        this._loadFirebaseLevel(levelName);
+        var explicitLevel = readLevelParam();
+        var levelName = explicitLevel || "2028";
+        this._loadFirebaseLevel(levelName, !explicitLevel);
     }
 
-    _loadFirebaseLevel(levelName) {
+    _loadFirebaseLevel(levelName, showTitle) {
         var self = this;
         var game = this.game;
         var stageParam = readStageParam();
@@ -379,9 +380,10 @@ export class BootScene extends Phaser.Scene {
                     gameState.shortFlg = true;
                 }
 
+                var nextScene = showTitle ? "PhaserTitleScene" : "PhaserGameScene";
                 setTimeout(function () {
                     game.scene.stop("BootScene");
-                    game.scene.start("PhaserTitleScene");
+                    game.scene.start(nextScene);
                 }, 50);
             }
 
