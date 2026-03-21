@@ -198,62 +198,65 @@ function createFallbackRecipe() {
 
 function main() {
     console.log("[Main] PS2 STG - AthenaEnv Port");
-    console.log("[Main] Initializing...");
 
-    // Initialize subsystems
-    var canvas = Screen.getMode();
-    canvas.width = SCREEN_W;
-    canvas.height = SCREEN_H;
-    canvas.double_buffering = true;
-    canvas.zbuffering = false;
-    Screen.setMode(canvas);
-    Screen.setFrameCounter(true);
-    Screen.setVSync(true);
+    // Minimal init — just screen
     Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);
-    initInput();
-    initSound();
 
-    // Load assets
-    loadAllAssets();
+    var font = new Font("default");
+    font.color = Color.new(128, 128, 128);
+    var pad = Pads.get();
 
-    // Start at title scene
-    switchSceneImmediate(SCENE_TITLE);
-
-    console.log("[Main] Starting game loop");
-
-    // Main loop
-    var frameTime = 1000 / FPS;
-    var clearColor = Color.new(0, 0, 0);
+    var testPhase = 0;
 
     while (true) {
-        // Input
-        updateInput();
+        Screen.clear(Color.new(0, 0, 40));
+        pad.update();
 
-        // Update timers and tweens
+        // Test 1: bright rectangle
+        Draw.rect(100, 100, 200, 100, Color.new(255, 0, 0));
+
+        // Test 2: text
+        font.print(10, 10, "AthenaEnv STG Test");
+        font.print(10, 30, "Phase: " + String(testPhase));
+
+        // Test 3: smaller shapes
+        Draw.rect(350, 200, 50, 50, Color.new(0, 255, 0));
+        Draw.rect(420, 200, 50, 50, Color.new(0, 0, 255));
+
+        testPhase++;
+
+        if (pad.justPressed(Pads.CROSS)) {
+            break;
+        }
+
+        Screen.flip();
+    }
+
+    // If X is pressed, proceed to full game init
+    initInput();
+    initSound();
+    loadAllAssets();
+    switchSceneImmediate(SCENE_TITLE);
+
+    var frameTime = 1000 / FPS;
+
+    while (true) {
+        Screen.clear(Color.new(0, 0, 0));
+        pad.update();
+
+        updateInput();
         updateTimers(frameTime);
         updateTweens(frameTime);
-
-        // Scene transition
         updateSceneTransition();
 
-        // Update current scene
         if (!sceneFading) {
             updateCurrentScene();
         }
 
-        // --- Render ---
-        Screen.clear(clearColor);
-
-        // Draw current scene
         drawCurrentScene();
-
-        // Draw scene fade overlay
         drawSceneFade();
-
-        // Draw letterbox bars
         drawLetterbox();
 
-        // Flip
         Screen.flip();
     }
 }
