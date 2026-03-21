@@ -267,9 +267,17 @@ export class BootScene extends Phaser.Scene {
             }
         });
 
-        this.load.atlas("title_ui", "assets/img/title_ui.png", "assets/title_ui.json");
-        this.load.atlas("game_ui", "assets/img/game_ui.png", "assets/game_ui.json");
-        this.load.atlas("game_asset", "assets/img/game_asset.png", "assets/game_asset.json");
+        // Use editor-repacked atlas files (_ prefix) when available, otherwise originals
+        var ea = window.__editorAtlases || {};
+        this.load.atlas("title_ui",
+            ea.title_ui ? "assets/img/_title_ui.png" : "assets/img/title_ui.png",
+            ea.title_ui ? "assets/_title_ui.json" : "assets/title_ui.json");
+        this.load.atlas("game_ui",
+            ea.game_ui ? "assets/img/_game_ui.png" : "assets/img/game_ui.png",
+            ea.game_ui ? "assets/_game_ui.json" : "assets/game_ui.json");
+        this.load.atlas("game_asset",
+            ea.game_asset ? "assets/img/_game_asset.png" : "assets/img/game_asset.png",
+            ea.game_asset ? "assets/_game_asset.json" : "assets/game_asset.json");
         this.load.spritesheet("cyber-liberty", "https://easierbycode.com/assets/spritesheets/cyber-liberty.png", { frameWidth: 32, frameHeight: 32 });
 
         this.load.json("recipe", "assets/game.json");

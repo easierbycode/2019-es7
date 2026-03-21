@@ -491,10 +491,27 @@
             gameState.lowModeFlg = true;
         }
 
+        // Check for editor-repacked atlas files (Phaser-only, _ prefixed)
+        function checkEditorAtlases() {
+            var keys = ["game_ui", "game_asset", "title_ui"];
+            var checks = keys.map(function (k) {
+                return fetch("assets/_" + k + ".json", { method: "HEAD" })
+                    .then(function (r) { return r.ok ? k : null; })
+                    .catch(function () { return null; });
+            });
+            return Promise.all(checks).then(function (results) {
+                var found = {};
+                results.forEach(function (k) { if (k) found[k] = true; });
+                window.__editorAtlases = found;
+            });
+        }
+
         Promise.race([
             initializeFirebaseScores().catch(function () {}),
             waitFor(1500),
         ]).then(function () {
+            return checkEditorAtlases();
+        }).then(function () {
             createPhaserGame();
             fitCanvas();
         });

@@ -1135,23 +1135,29 @@
 
         async function saveAtlasFiles(canvas, json) {
             const cfg = ATLAS_CONFIGS[currentAtlasKey];
+            // Save with _ prefix so only Phaser picks up repacked atlases (PIXI keeps originals)
+            const editorPng = "_" + cfg.png;
+            const editorJson = "_" + cfg.json;
             if (dirHandle) {
                 try {
                     const ah = await dirHandle.getDirectoryHandle(ATLAS_DIR, { create: true });
-                    const pw = await (await ah.getFileHandle(cfg.png, { create: true })).createWritable();
+                    // Save PNG to assets/img/
+                    const imgDir = await ah.getDirectoryHandle('img', { create: true });
+                    const pw = await (await imgDir.getFileHandle(editorPng, { create: true })).createWritable();
                     await pw.write(await new Promise(r => canvas.toBlob(r, 'image/png'))); await pw.close();
-                    const jw = await (await ah.getFileHandle(cfg.json, { create: true })).createWritable();
+                    // Save JSON to assets/
+                    const jw = await (await ah.getFileHandle(editorJson, { create: true })).createWritable();
                     await jw.write(JSON.stringify(json, null, 2)); await jw.close();
-                    alert('Atlas updated!'); extraSprites = []; replacedFrames = {}; await loadGameFiles();
+                    alert('Atlas saved (Phaser-only)!'); extraSprites = []; replacedFrames = {}; await loadGameFiles();
                 } catch (e) { alert('Atlas write failed: ' + e.message); }
             } else {
-                // No dirHandle — download files and update in-memory
+                // No dirHandle — download files with _ prefix and update in-memory
                 const a = document.createElement('a');
-                a.download = cfg.png;
+                a.download = editorPng;
                 a.href = canvas.toDataURL('image/png');
                 a.click();
                 const b = document.createElement('a');
-                b.download = cfg.json;
+                b.download = editorJson;
                 b.href = URL.createObjectURL(new Blob([JSON.stringify(json, null, 2)], { type: 'application/json' }));
                 b.click();
                 // Update in-memory state so editor reflects changes
