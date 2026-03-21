@@ -115,6 +115,7 @@ function updateGameScene() {
                 hp: e.projectileData.hp || 1,
                 name: e.projectileData.name || "bullet",
                 frames: e.projectileData.texture || [],
+                atlas: e.projectileData.atlas || e.atlas || "game_asset",
             });
             gs.projectiles.push(proj);
             playSfx("se_shoot");
@@ -323,8 +324,10 @@ function drawGameScene() {
         var item = gs.items[i];
         if (item.frames && item.frames.length > 0) {
             var fi = Math.floor(item.animCounter) % item.frames.length;
-            var fname = resolveFrameName("game_asset", item.frames[fi]);
-            drawFrame("game_asset", fname,
+            // Check level_atlas first, then game_asset for item sprites
+            var itemAtlas = hasFrame("level_atlas", resolveFrameName("level_atlas", item.frames[fi])) ? "level_atlas" : "game_asset";
+            var fname = resolveFrameName(itemAtlas, item.frames[fi]);
+            drawFrame(itemAtlas, fname,
                 toScreenX(item.x + 8), toScreenY(item.y + 8),
                 SCALE, SCALE, 1.0, null);
         } else {

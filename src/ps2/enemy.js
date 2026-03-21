@@ -4,7 +4,7 @@
 function createEnemy(data) {
     var e = {
         name: data.name || "",
-        atlas: "game_asset",
+        atlas: data.atlas || "game_asset",
         frames: data.texture || [],
         animFrame: 0,
         animSpeed: 0.15,
@@ -72,7 +72,7 @@ function createEnemy(data) {
 
     // Set dimensions from first frame if possible
     if (e.frames.length > 0) {
-        var size = getFrameSize("game_asset", resolveFrameName("game_asset", e.frames[0]));
+        var size = getFrameSize(e.atlas, resolveFrameName(e.atlas, e.frames[0]));
         if (size.w > 0) {
             e.width = size.w;
             e.height = size.h;
@@ -176,16 +176,19 @@ function enemyDead(e) {
 
 function enemyDraw(e) {
     if (!e.visible || e.alpha <= 0) return;
+    var ea = e.atlas || "game_asset";
 
     if (e.explosionPlaying) {
+        // Explosions are always in the level atlas if available, else game_asset
         var expFrame = "explosion0" + String(Math.min(e.explosionFrame, 6)) + ".gif";
+        var expAtlas = hasFrame(ea, resolveFrameName(ea, expFrame)) ? ea : "game_asset";
         e.explosionTimer++;
         if (e.explosionTimer % 3 === 0) e.explosionFrame++;
         if (e.explosionFrame > 6) {
             e.explosionPlaying = 0;
             e.dead = 1;
         }
-        drawFrame("game_asset", resolveFrameName("game_asset", expFrame),
+        drawFrame(expAtlas, resolveFrameName(expAtlas, expFrame),
             toScreenX(e.x + e.width / 2), toScreenY(e.y + e.height / 2),
             SCALE, SCALE, 1.0, null);
         return;
@@ -195,22 +198,22 @@ function enemyDraw(e) {
 
     // Draw shadow
     if (e.shadowVisible && e.frames.length > 0) {
-        var frame = resolveFrameName("game_asset", e.frames[e.animFrame]);
+        var frame = resolveFrameName(ea, e.frames[e.animFrame]);
         var shadowColor = Color.new(30, 30, 30, 60);
         var shadowY = e.shadowReverse ? (e.y + e.height / 2 - e.shadowOffsetY) : (e.y + e.height / 2 + e.shadowOffsetY);
-        drawFrame("game_asset", frame,
+        drawFrame(ea, frame,
             toScreenX(e.x + e.width / 2), toScreenY(shadowY),
             SCALE, e.shadowReverse ? -SCALE : SCALE, 0.3, shadowColor);
     }
 
     // Draw enemy
     if (e.frames.length > 0) {
-        var frame = resolveFrameName("game_asset", e.frames[e.animFrame]);
+        var frame = resolveFrameName(ea, e.frames[e.animFrame]);
         var tint = null;
         if (e.tintFlash) {
             tint = Color.new(128, 40, 40, 128);
         }
-        drawFrame("game_asset", frame,
+        drawFrame(ea, frame,
             toScreenX(e.x + e.width / 2), toScreenY(e.y + e.height / 2),
             SCALE, SCALE, e.alpha, tint);
     }

@@ -141,6 +141,40 @@ function drawFrameTL(atlasName, frameName, x, y, scaleX, scaleY, alpha) {
     img.draw(x, y);
 }
 
+// Load a grid-based spritesheet (uniform frame size, no JSON metadata)
+function loadSpritesheet(name, pngPath, frameWidth, frameHeight) {
+    var img = new Image(pngPath);
+    var imgW = img.width;
+    var imgH = img.height;
+    var cols = Math.floor(imgW / frameWidth);
+    var rows = Math.floor(imgH / frameHeight);
+    var frames = {};
+
+    for (var r = 0; r < rows; r++) {
+        for (var c = 0; c < cols; c++) {
+            var idx = r * cols + c;
+            frames[String(idx)] = {
+                x: c * frameWidth,
+                y: r * frameHeight,
+                w: frameWidth,
+                h: frameHeight,
+                dw: frameWidth,
+                dh: frameHeight,
+            };
+        }
+    }
+
+    atlases[name] = {
+        image: img,
+        frames: frames,
+        displayScale: 1,
+        texWidth: imgW,
+        texHeight: imgH,
+    };
+    console.log("[Atlas] Loaded spritesheet " + name + " (" + cols + "x" + rows +
+        " = " + (cols * rows) + " frames, " + frameWidth + "x" + frameHeight + ")");
+}
+
 // Get frame dimensions (original display size, not texture size)
 function getFrameSize(atlasName, frameName) {
     var frame = getFrame(atlasName, frameName);

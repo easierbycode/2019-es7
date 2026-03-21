@@ -176,15 +176,15 @@ function initGameScene() {
         }
     }
 
-    // Create player
+    // Create player (cyber-liberty: 32x32, centered at GCX, GH-96)
     var playerData = recipe ? recipe.playerData : null;
     if (playerData) {
         gs.player = createPlayer(playerData);
         playerSetUp(gs.player, gameState.playerMaxHp || playerData.maxHp,
             gameState.shootMode || "normal", gameState.shootSpeed || "speed_normal");
-        gs.player.x = GW / 2 - gs.player.width / 2;
-        gs.player.y = GH - gs.player.height - 30;
-        gs.player.targetX = GW / 2;
+        gs.player.x = GCX - gs.player.width / 2;
+        gs.player.y = GH - 96 - gs.player.height / 2;
+        gs.player.targetX = GCX;
         gs.player.targetY = gs.player.y;
     }
 

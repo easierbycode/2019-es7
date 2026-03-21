@@ -140,6 +140,55 @@ function normalizeRecipe(recipe) {
     console.log("[Main] Recipe normalized");
 }
 
+// Load a pre-exported Firebase level file and merge it into the base recipe.
+// Mirrors the Phaser BootScene._loadFirebaseLevel() merge logic.
+// The level file is a JSON export of a Firebase levels/{name} entry containing
+// at minimum: { enemylist: [...], stageKey?: "stageN", enemyData?: {...} }
+function loadFirebaseLevel(recipe, levelPath) {
+    var levelText = std.loadFile(levelPath);
+    if (!levelText) {
+        console.log("[Main] Firebase level file not found: " + levelPath);
+        return;
+    }
+
+    var data = JSON.parse(levelText);
+    if (!data || !data.enemylist) {
+        console.log("[Main] Firebase level missing enemylist, skipping");
+        return;
+    }
+
+    // Merge enemylist into recipe at the appropriate stageKey
+    var stageKey = data.stageKey || "stage0";
+    recipe[stageKey] = { enemylist: data.enemylist };
+    console.log("[Main] Firebase level merged into " + stageKey +
+        " (" + data.enemylist.length + " waves)");
+
+    // Merge enemyData: use Firebase values, textures come from level_atlas
+    // Tag each enemy with its atlas source so rendering knows where to look
+    if (data.enemyData) {
+        var merged = JSON.parse(JSON.stringify(data.enemyData));
+
+        for (var ek in merged) {
+            // Mark that this enemy's textures are in the level atlas
+            merged[ek].atlas = "level_atlas";
+            // Tag projectile atlas too
+            var projKey = merged[ek].projectileData ? "projectileData" : (merged[ek].bulletData ? "bulletData" : null);
+            if (projKey && merged[ek][projKey]) {
+                merged[ek][projKey].atlas = "level_atlas";
+            }
+        }
+
+        recipe.enemyData = merged;
+        console.log("[Main] Firebase enemyData merged (level_atlas)");
+    }
+
+    // Parse stageId from stageKey and set in gameState
+    var stageId = parseInt(stageKey.replace("stage", ""), 10);
+    if (isNaN(stageId) || stageId < 0) stageId = 0;
+    if (stageId > 4) stageId = 4;
+    gameState.stageId = stageId;
+}
+
 function loadAllAssets() {
     console.log("[Main] Loading assets...");
 
@@ -148,6 +197,12 @@ function loadAllAssets() {
     // These need to be pre-converted from the web format to PNG + JSON
     loadAtlas("game_ui", "assets/game_ui.png", "assets/game_ui.json");
     loadAtlas("game_asset", "assets/game_asset.png", "assets/game_asset.json");
+
+    // Load cyber-liberty player spritesheet (32x32 frames)
+    loadSpritesheet("cyber-liberty", "assets/cyber-liberty.png", 32, 32);
+
+    // Load 2028 level custom enemy atlas (pre-exported from Firebase)
+    loadAtlas("level_atlas", "assets/level_2028_atlas.png", "assets/level_2028_atlas.json");
 
     // Load game recipe (level data)
     var recipeText = std.loadFile("assets/game.json");
@@ -161,6 +216,10 @@ function loadAllAssets() {
 
     // Normalize recipe: map web format -> PS2 format
     normalizeRecipe(gameState.recipe);
+
+    // Load and merge the pre-exported Firebase 2028 level
+    // This file is a JSON export of the Firebase levels/2028 entry
+    loadFirebaseLevel(gameState.recipe, "assets/level_2028.json");
 
     // Initialize player data defaults from recipe
     if (gameState.recipe && gameState.recipe.playerData) {

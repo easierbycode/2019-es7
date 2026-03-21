@@ -11,7 +11,7 @@ function createProjectile(data) {
         damage: data.damage || 1,
         hp: data.hp || 1,
         name: data.name || "bullet",
-        atlas: "game_asset",
+        atlas: data.atlas || "game_asset",
         frames: data.frames || [],
         animFrame: 0,
         animCounter: 0,
@@ -71,14 +71,15 @@ function projectileOnDamage(proj, damage) {
 
 function projectileDraw(proj) {
     if (proj.deadFlg || proj.dead) return;
+    var pa = proj.atlas || "game_asset";
 
     var frame = null;
     if (proj.frames && proj.frames.length > 0) {
-        frame = resolveFrameName("game_asset", proj.frames[proj.animFrame]);
+        frame = resolveFrameName(pa, proj.frames[proj.animFrame]);
     }
 
     if (frame) {
-        drawFrame("game_asset", frame,
+        drawFrame(pa, frame,
             toScreenX(proj.x), toScreenY(proj.y),
             SCALE, SCALE, 1.0, null);
     } else {

@@ -12,11 +12,11 @@ function createPlayer(data) {
         // Target position for smooth movement
         targetX: 0,
         targetY: 0,
-        // Sprite frames
-        atlas: "game_asset",
-        frames: data.texture || [],
+        // Sprite frames — cyber-liberty spritesheet (32x32, 2-frame idle)
+        atlas: "cyber-liberty",
+        frames: ["0", "1"],
         animFrame: 0,
-        animSpeed: 0.35,
+        animSpeed: 0.15, // slower cycle matching Phaser: 250ms + 100ms
         animCounter: 0,
         // Stats
         hp: data.hp || 100,
@@ -47,11 +47,11 @@ function createPlayer(data) {
         damageAnimFlg: 0,
         damageAnimTimer: 0,
         tintFlash: 0,
-        // Dimensions
-        width: 28,
-        height: 48,
-        hitX: 7,
-        hitY: 20,
+        // Dimensions (cyber-liberty: 32x32)
+        width: 32,
+        height: 32,
+        hitX: 9,
+        hitY: 12,
         hitW: 14,
         hitH: 8,
         // Shadow
@@ -310,24 +310,25 @@ function playerDraw(p) {
     if (p.dead) return;
 
     // Draw shadow
-    var shadowFrame = p.frames.length > 0 ? resolveFrameName("game_asset", p.frames[p.animFrame]) : null;
+    var playerAtlas = p.atlas || "game_asset";
+    var shadowFrame = p.frames.length > 0 ? resolveFrameName(playerAtlas, p.frames[p.animFrame]) : null;
     if (shadowFrame) {
         var shadowColor = Color.new(30, 30, 30, 60);
-        drawFrame("game_asset", shadowFrame,
+        drawFrame(playerAtlas, shadowFrame,
             toScreenX(p.x + p.width / 2), toScreenY(p.y + p.height / 2 + p.shadowOffsetY),
             SCALE, SCALE, 0.3, shadowColor);
     }
 
     // Draw player
     if (p.frames.length > 0) {
-        var frame = resolveFrameName("game_asset", p.frames[p.animFrame]);
+        var frame = resolveFrameName(playerAtlas, p.frames[p.animFrame]);
         var tint = null;
         if (p.tintFlash) {
             tint = Color.new(128, 40, 40, Math.floor(p.alpha * 128));
         } else if (p.alpha < 1.0) {
             tint = Color.new(128, 128, 128, Math.floor(p.alpha * 128));
         }
-        drawFrame("game_asset", frame,
+        drawFrame(playerAtlas, frame,
             toScreenX(p.x + p.width / 2), toScreenY(p.y + p.height / 2),
             SCALE, SCALE, p.alpha, tint);
     }
