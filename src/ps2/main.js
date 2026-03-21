@@ -68,6 +68,22 @@
 
 // --- Asset Loading ---
 
+// Minimal loader — no file I/O, just fallback recipe
+function loadMinimalAssets() {
+    console.log("[Main] Loading minimal assets (no files)...");
+    gameState.recipe = createFallbackRecipe();
+
+    if (gameState.recipe && gameState.recipe.playerData) {
+        var pd = gameState.recipe.playerData;
+        gameState.playerMaxHp = pd.maxHp || 100;
+        gameState.playerHp = pd.maxHp || 100;
+        gameState.spDamage = pd.spDamage || 50;
+        gameState.shootMode = pd.defaultShootName || "normal";
+        gameState.shootSpeed = pd.defaultShootSpeed || "speed_normal";
+    }
+    console.log("[Main] Minimal assets ready");
+}
+
 function loadAllAssets() {
     console.log("[Main] Loading assets...");
 
@@ -225,7 +241,7 @@ function main() {
     try { initSound(); } catch(e) { console.log("initSound error: " + e); }
 
     showProgress(3, "loadAllAssets...");
-    try { loadAllAssets(); } catch(e) { console.log("loadAllAssets error: " + e); }
+    try { loadMinimalAssets(); } catch(e) { console.log("loadAssets error: " + e); }
 
     showProgress(4, "switchScene...");
     switchSceneImmediate(SCENE_TITLE);
