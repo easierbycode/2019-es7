@@ -5,6 +5,12 @@ function updateGameScene() {
     var p = gs.player;
     if (!p) return;
 
+    // Pause toggle
+    if (isStartPressed()) {
+        gameState.paused = gameState.paused ? 0 : 1;
+    }
+    if (gameState.paused) return;
+
     if (gs.theWorldFlg) {
         // Check for stage clear / game over completion
         if (p.dead) {
@@ -23,8 +29,8 @@ function updateGameScene() {
 
         // Boss dead sequence
         if (gs.boss && gs.boss.deadFlg) {
-            var done = bossExplosionUpdate(gs.boss);
-            if (done) {
+            bossExplosionUpdate(gs.boss);
+            if (gs.boss.dead) {
                 gs.resultTimer++;
             }
             if (gs.resultTimer > 75) {
@@ -247,6 +253,26 @@ function updateGameScene() {
         }
     }
 
+    // --- Player bullets vs enemy projectiles ---
+    for (var i = gs.projectiles.length - 1; i >= 0; i--) {
+        var proj = gs.projectiles[i];
+        for (var j = p.bullets.length - 1; j >= 0; j--) {
+            var b = p.bullets[j];
+            if (hitTestAABB(proj.x - proj.width / 2, proj.y - proj.height / 2,
+                proj.width, proj.height, b.x, b.y, b.width, b.height)) {
+                proj.hp = (proj.hp || 1) - b.damage;
+                b.hp -= 1;
+                if (b.hp <= 0) {
+                    p.bullets.splice(j, 1);
+                }
+                if (proj.hp <= 0) {
+                    gs.projectiles.splice(i, 1);
+                    break;
+                }
+            }
+        }
+    }
+
     // --- Update items ---
     for (var i = gs.items.length - 1; i >= 0; i--) {
         var item = gs.items[i];
@@ -364,6 +390,13 @@ function drawGameScene() {
     if (gs.boss && gs.boss.dead && gs.resultTimer > 20) {
         fontPrint(toScreenX(GCX - 35), toScreenY(GCY - 10),
             "STAGE CLEAR!", Color.new(255, 255, 0));
+    }
+
+    // Pause overlay
+    if (gameState.paused) {
+        Draw.rect(0, 0, SCREEN_W, SCREEN_H, Color.new(0, 0, 0, 64));
+        fontPrint(toScreenX(GCX - 25), toScreenY(GCY - 10),
+            "PAUSE", Color.new(255, 255, 255));
     }
 }
 

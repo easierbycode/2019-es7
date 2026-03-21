@@ -84,6 +84,62 @@ function loadMinimalAssets() {
     console.log("[Main] Minimal assets ready");
 }
 
+// Normalize recipe: convert web game.json format to PS2 expected format
+// Web bosses use anim.idle/anim.attack; PS2 expects flat texture array
+// Web bosses use bulletData; PS2 expects projectileData
+function normalizeRecipe(recipe) {
+    if (!recipe || !recipe.bossData) return;
+
+    var bossKeys = Object.keys(recipe.bossData);
+    for (var i = 0; i < bossKeys.length; i++) {
+        var boss = recipe.bossData[bossKeys[i]];
+
+        // Map anim.idle -> texture (for sprite animation)
+        if ((!boss.texture || boss.texture.length === 0) && boss.anim) {
+            boss.texture = boss.anim.idle || [];
+            boss.attackTexture = boss.anim.attack || [];
+        }
+
+        // Map bulletData -> projectileData
+        if (!boss.projectileData && boss.bulletData && boss.bulletData.texture) {
+            boss.projectileData = {
+                texture: boss.bulletData.texture || [],
+                speed: boss.bulletData.speed || 2,
+                damage: boss.bulletData.damage || 1,
+                hp: boss.bulletData.hp || 1,
+                name: "bullet",
+            };
+        }
+
+        // Ensure projectileData exists (some bosses have no bullets)
+        if (!boss.projectileData) {
+            boss.projectileData = { texture: [], speed: 2, damage: 1, hp: 1, name: "bullet" };
+        }
+
+        // Ensure speed exists
+        if (!boss.speed) boss.speed = 1;
+    }
+    // Normalize enemy data: map bulletData -> projectileData
+    if (recipe.enemyData) {
+        var enemyKeys = Object.keys(recipe.enemyData);
+        for (var j = 0; j < enemyKeys.length; j++) {
+            var enemy = recipe.enemyData[enemyKeys[j]];
+            if (!enemy.projectileData && enemy.bulletData && enemy.bulletData.texture) {
+                enemy.projectileData = {
+                    texture: enemy.bulletData.texture || [],
+                    speed: enemy.bulletData.speed || 2,
+                    damage: enemy.bulletData.damage || 1,
+                    hp: enemy.bulletData.hp || 1,
+                    name: "bullet",
+                    interval: enemy.bulletData.interval || 120,
+                };
+            }
+        }
+    }
+
+    console.log("[Main] Recipe normalized");
+}
+
 function loadAllAssets() {
     console.log("[Main] Loading assets...");
 
@@ -102,6 +158,9 @@ function loadAllAssets() {
         console.log("[Main] WARNING: game.json not found, using fallback");
         gameState.recipe = createFallbackRecipe();
     }
+
+    // Normalize recipe: map web format -> PS2 format
+    normalizeRecipe(gameState.recipe);
 
     // Initialize player data defaults from recipe
     if (gameState.recipe && gameState.recipe.playerData) {
@@ -220,7 +279,7 @@ function main() {
 
     initInput();
     initSound();
-    loadMinimalAssets();
+    loadAllAssets();
     switchSceneImmediate(SCENE_TITLE);
 
     // Main loop

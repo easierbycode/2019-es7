@@ -16,6 +16,7 @@ var gameState = {
     shortFlg: 0,
     secondLoop: 0,
     recipe: null,
+    paused: 0,
 };
 
 function resetGameState() {

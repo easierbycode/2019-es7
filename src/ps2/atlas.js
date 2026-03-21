@@ -12,10 +12,12 @@ function loadAtlas(name, pngPath, jsonPath) {
     var data = JSON.parse(jsonText);
     var img = new Image(pngPath);
 
+    // Display scale: if atlas was downscaled for PS2, this restores original sizes
+    var ds = (data.meta && data.meta.ps2DisplayScale) ? data.meta.ps2DisplayScale : 1;
+
     var frames = {};
     if (data.frames) {
         if (Array.isArray(data.frames)) {
-            // Array format: [{filename, frame: {x,y,w,h}}, ...]
             for (var i = 0; i < data.frames.length; i++) {
                 var f = data.frames[i];
                 frames[f.filename] = {
@@ -23,15 +25,23 @@ function loadAtlas(name, pngPath, jsonPath) {
                     y: f.frame.y,
                     w: f.frame.w,
                     h: f.frame.h,
+                    dw: f.frame.w * ds,
+                    dh: f.frame.h * ds,
                 };
             }
         } else {
-            // Object format: {name: {frame: {x,y,w,h}}, ...}
             var keys = Object.keys(data.frames);
             for (var k = 0; k < keys.length; k++) {
                 var key = keys[k];
                 var fr = data.frames[key].frame;
-                frames[key] = { x: fr.x, y: fr.y, w: fr.w, h: fr.h };
+                frames[key] = {
+                    x: fr.x,
+                    y: fr.y,
+                    w: fr.w,
+                    h: fr.h,
+                    dw: fr.w * ds,
+                    dh: fr.h * ds,
+                };
             }
         }
     }
@@ -39,10 +49,12 @@ function loadAtlas(name, pngPath, jsonPath) {
     atlases[name] = {
         image: img,
         frames: frames,
+        displayScale: ds,
         texWidth: img.texWidth || img.width,
         texHeight: img.texHeight || img.height,
     };
-    console.log("[Atlas] Loaded " + name + " with " + Object.keys(frames).length + " frames");
+    console.log("[Atlas] Loaded " + name + " with " + Object.keys(frames).length +
+        " frames (displayScale=" + ds + ")");
 }
 
 function getFrame(atlasName, frameName) {
@@ -78,15 +90,17 @@ function drawFrame(atlasName, frameName, x, y, scaleX, scaleY, alpha, tintColor)
     var sx = scaleX || 1.0;
     var sy = scaleY || 1.0;
 
-    // Set sub-region
+    // Set sub-region (texture coordinates)
     img.startx = frame.x;
     img.starty = frame.y;
     img.endx = frame.x + frame.w;
     img.endy = frame.y + frame.h;
 
-    // Set display size (scaled)
-    img.width = frame.w * sx;
-    img.height = frame.h * sy;
+    // Set display size using original dimensions (dw/dh)
+    var displayW = frame.dw * sx;
+    var displayH = frame.dh * sy;
+    img.width = displayW;
+    img.height = displayH;
 
     // Apply tint/alpha via color
     if (tintColor) {
@@ -98,10 +112,8 @@ function drawFrame(atlasName, frameName, x, y, scaleX, scaleY, alpha, tintColor)
         img.color = Color.new(128, 128, 128, 128);
     }
 
-    // Draw centered at (x, y) — offset by half display size
-    var drawX = x - (img.width / 2);
-    var drawY = y - (img.height / 2);
-    img.draw(drawX, drawY);
+    // Draw centered at (x, y)
+    img.draw(x - (displayW / 2), y - (displayH / 2));
 }
 
 // Draw atlas frame with top-left origin (no centering)
@@ -116,8 +128,8 @@ function drawFrameTL(atlasName, frameName, x, y, scaleX, scaleY, alpha) {
     img.starty = frame.y;
     img.endx = frame.x + frame.w;
     img.endy = frame.y + frame.h;
-    img.width = frame.w * (scaleX || 1.0);
-    img.height = frame.h * (scaleY || 1.0);
+    img.width = frame.dw * (scaleX || 1.0);
+    img.height = frame.dh * (scaleY || 1.0);
 
     if (alpha !== undefined && alpha < 1.0) {
         var a = Math.floor(alpha * 128);
@@ -129,9 +141,9 @@ function drawFrameTL(atlasName, frameName, x, y, scaleX, scaleY, alpha) {
     img.draw(x, y);
 }
 
-// Get frame dimensions
+// Get frame dimensions (original display size, not texture size)
 function getFrameSize(atlasName, frameName) {
     var frame = getFrame(atlasName, frameName);
     if (!frame) return { w: 0, h: 0 };
-    return { w: frame.w, h: frame.h };
+    return { w: frame.dw, h: frame.dh };
 }

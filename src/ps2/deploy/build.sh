@@ -41,6 +41,14 @@ mkdir -p "$BUILD_DIR/assets/sounds/scene_game"
 mkdir -p "$BUILD_DIR/assets/img/stage"
 mkdir -p "$BUILD_DIR/src/ps2"
 
+# Copy AthenaEnv ELF
+if [ -f "$PS2_SRC/athena.elf" ]; then
+    cp "$PS2_SRC/athena.elf" "$BUILD_DIR/athena.elf"
+    echo "  Copied athena.elf"
+else
+    echo "  WARN: athena.elf not found at $PS2_SRC/athena.elf"
+fi
+
 # --- Step 1: Bundle JS files ---
 echo "[1/5] Bundling JavaScript..."
 
@@ -86,34 +94,105 @@ sed -n '/^\/\/ --- Asset Loading ---$/,$p' "$PS2_SRC/main.js" >> "$BUNDLE"
 
 echo "  Bundled $(wc -l < "$BUNDLE") lines"
 
-# --- Step 2: Copy/convert texture atlases ---
+# --- Step 2: Process texture atlases (downscale for PS2 memory) ---
 echo "[2/5] Processing texture atlases..."
 
-# Copy atlas JSON files
-if [ -f "$WEB_ASSETS/game_ui.json" ]; then
-    cp "$WEB_ASSETS/game_ui.json" "$BUILD_DIR/assets/game_ui.json"
-    echo "  Copied game_ui.json"
-fi
+# PS2 has only 4MB GS VRAM shared with framebuffers.
+# Textures must be small enough to fit alongside the display buffers.
+# Target 512x512 max (~1MB RGBA per texture).
+PS2_MAX_TEX=512
 
-if [ -f "$WEB_ASSETS/game_asset.json" ]; then
-    cp "$WEB_ASSETS/game_asset.json" "$BUILD_DIR/assets/game_asset.json"
-    echo "  Copied game_asset.json"
-fi
-
-# Copy atlas PNG images (or convert if they're in another format)
 for atlas in game_ui game_asset; do
-    if [ -f "$WEB_ASSETS/${atlas}.png" ]; then
-        cp "$WEB_ASSETS/${atlas}.png" "$BUILD_DIR/assets/${atlas}.png"
-        echo "  Copied ${atlas}.png"
-    elif [ -f "$WEB_ASSETS/${atlas}.jpg" ]; then
-        if command -v convert &>/dev/null; then
-            convert "$WEB_ASSETS/${atlas}.jpg" "$BUILD_DIR/assets/${atlas}.png"
-            echo "  Converted ${atlas}.jpg -> png"
-        else
-            cp "$WEB_ASSETS/${atlas}.jpg" "$BUILD_DIR/assets/${atlas}.png"
-            echo "  Copied ${atlas}.jpg (needs manual conversion)"
-        fi
+    JSON_SRC="$WEB_ASSETS/${atlas}.json"
+    PNG_SRC="$WEB_ASSETS/img/${atlas}.png"
+    JSON_DST="$BUILD_DIR/assets/${atlas}.json"
+    PNG_DST="$BUILD_DIR/assets/${atlas}.png"
+
+    if [ ! -f "$JSON_SRC" ]; then
+        echo "  WARN: $JSON_SRC not found, skipping"
+        continue
     fi
+
+    if [ ! -f "$PNG_SRC" ]; then
+        echo "  WARN: $PNG_SRC not found, skipping"
+        continue
+    fi
+
+    python3 - "$PNG_SRC" "$JSON_SRC" "$PNG_DST" "$JSON_DST" "$PS2_MAX_TEX" << 'PYEOF'
+import sys, json
+from PIL import Image
+
+png_src, json_src, png_dst, json_dst, max_tex = sys.argv[1:6]
+max_tex = int(max_tex)
+
+img = Image.open(png_src)
+orig_w, orig_h = img.size
+
+scale = min(1.0, max_tex / orig_w, max_tex / orig_h)
+
+if scale < 1.0:
+    new_w = int(orig_w * scale)
+    new_h = int(orig_h * scale)
+    img = img.resize((new_w, new_h), Image.LANCZOS)
+    print(f"  Downscaled {png_src.split('/')[-1]}: {orig_w}x{orig_h} -> {new_w}x{new_h} (scale={scale:.3f})")
+else:
+    print(f"  {png_src.split('/')[-1]}: {orig_w}x{orig_h} (no resize needed)")
+
+img.save(png_dst, "PNG")
+
+with open(json_src) as f:
+    data = json.load(f)
+
+if scale < 1.0:
+    if isinstance(data.get("frames"), list):
+        for fr in data["frames"]:
+            r = fr["frame"]
+            r["x"] = round(r["x"] * scale)
+            r["y"] = round(r["y"] * scale)
+            r["w"] = max(1, round(r["w"] * scale))
+            r["h"] = max(1, round(r["h"] * scale))
+            if "spriteSourceSize" in fr:
+                s = fr["spriteSourceSize"]
+                s["x"] = round(s["x"] * scale)
+                s["y"] = round(s["y"] * scale)
+                s["w"] = max(1, round(s["w"] * scale))
+                s["h"] = max(1, round(s["h"] * scale))
+            if "sourceSize" in fr:
+                ss = fr["sourceSize"]
+                ss["w"] = max(1, round(ss["w"] * scale))
+                ss["h"] = max(1, round(ss["h"] * scale))
+    elif isinstance(data.get("frames"), dict):
+        for key, val in data["frames"].items():
+            r = val["frame"]
+            r["x"] = round(r["x"] * scale)
+            r["y"] = round(r["y"] * scale)
+            r["w"] = max(1, round(r["w"] * scale))
+            r["h"] = max(1, round(r["h"] * scale))
+            if "spriteSourceSize" in val:
+                s = val["spriteSourceSize"]
+                s["x"] = round(s["x"] * scale)
+                s["y"] = round(s["y"] * scale)
+                s["w"] = max(1, round(s["w"] * scale))
+                s["h"] = max(1, round(s["h"] * scale))
+            if "sourceSize" in val:
+                ss = val["sourceSize"]
+                ss["w"] = max(1, round(ss["w"] * scale))
+                ss["h"] = max(1, round(ss["h"] * scale))
+
+    if "meta" in data and "size" in data["meta"]:
+        data["meta"]["size"]["w"] = round(data["meta"]["size"]["w"] * scale)
+        data["meta"]["size"]["h"] = round(data["meta"]["size"]["h"] * scale)
+
+    # Store inverse scale so runtime can restore original display sizes
+    if "meta" not in data:
+        data["meta"] = {}
+    data["meta"]["ps2DisplayScale"] = round(1.0 / scale, 4)
+
+with open(json_dst, "w") as f:
+    json.dump(data, f)
+
+print(f"  Wrote {json_dst.split('/')[-1]} (scaled coords, displayScale={1.0/scale:.2f}x)")
+PYEOF
 done
 
 # Copy game recipe
