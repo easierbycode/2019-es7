@@ -58,8 +58,10 @@ function drawLetterbox() {
 
 // Global font instance
 var gameFont = new Font("default");
+gameFont.color = Color.new(128, 128, 128);
 
-// Print text at screen coordinates (replaces Font.print(Font.default, ...))
+// Print text at screen coordinates
+// Note: AthenaEnv font colors use 0-128 range, but we accept 0-255 from game code
 function fontPrint(x, y, text, color) {
     if (color) {
         gameFont.color = color;
@@ -72,14 +74,6 @@ function drawText(gx, gy, text, color, size) {
     fontPrint(toScreenX(gx), toScreenY(gy), text, color);
 }
 
-// Set clipping to game area
-function setGameClip() {
-    Screen.setParam(Screen.SCISSOR_BOUNDS,
-        OFFSET_X, OFFSET_Y,
-        OFFSET_X + Math.ceil(256 * SCALE),
-        OFFSET_Y + Math.ceil(480 * SCALE));
-}
-
-function clearGameClip() {
-    Screen.setParam(Screen.SCISSOR_BOUNDS, 0, 0, SCREEN_W, SCREEN_H);
-}
+// Clipping stubs (scissor not standard in AthenaEnv)
+function setGameClip() {}
+function clearGameClip() {}

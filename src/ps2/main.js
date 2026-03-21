@@ -209,6 +209,7 @@ function main() {
     Screen.setMode(canvas);
     Screen.setFrameCounter(true);
     Screen.setVSync(true);
+    Screen.setParam(Screen.DEPTH_TEST_ENABLE, false);
     initInput();
     initSound();
 
@@ -220,10 +221,11 @@ function main() {
 
     console.log("[Main] Starting game loop");
 
-    // Main loop using os.setInterval
+    // Main loop
     var frameTime = 1000 / FPS;
+    var clearColor = Color.new(0, 0, 0);
 
-    os.setInterval(function() {
+    while (true) {
         // Input
         updateInput();
 
@@ -240,10 +242,7 @@ function main() {
         }
 
         // --- Render ---
-        Screen.clear();
-
-        // Set clip to game area
-        setGameClip();
+        Screen.clear(clearColor);
 
         // Draw current scene
         drawCurrentScene();
@@ -252,12 +251,11 @@ function main() {
         drawSceneFade();
 
         // Draw letterbox bars
-        clearGameClip();
         drawLetterbox();
 
         // Flip
         Screen.flip();
-    }, 0);
+    }
 }
 
 // --- Entry Point ---
