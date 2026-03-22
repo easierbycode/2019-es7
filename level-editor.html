@@ -115,6 +115,18 @@
         .picker-opt .opt-name { font-size: 10px; margin-top: 4px; text-align: center; color: #ccc; line-height: 1.2; }
         .picker-opt .opt-code { font-size: 8px; color: #666; font-family: monospace; }
 
+        /* ===== FIREBASE LEVEL LIST ===== */
+        .fb-level-item {
+            display: flex; align-items: center; gap: 12px; padding: 10px 12px;
+            border-radius: 8px; cursor: pointer; transition: background 0.1s;
+            border: 1px solid #333; margin-bottom: 4px;
+        }
+        .fb-level-item:hover { background: #2a2a2a; }
+        .fb-level-item:active { background: #333; transform: scale(0.98); }
+        .fb-level-item .fb-name { font-size: 14px; font-weight: 600; color: #e2e8f0; }
+        .fb-level-item .fb-date { font-size: 10px; color: #666; }
+        .fb-level-loading { text-align: center; color: #666; padding: 24px; font-size: 13px; }
+
         /* ===== MENU DRAWER ===== */
         .menu-backdrop { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.5); animation: fadeIn 0.15s; }
         .menu-panel {
@@ -261,6 +273,14 @@
             <input id="enemy-key" type="text" placeholder="Key (e.g. enemyA)" class="menu-input">
             <textarea id="enemy-json" rows="12" class="menu-input" style="font-family:monospace;font-size:11px;resize:vertical;"></textarea>
             <button onclick="saveCurrentEnemy()" class="menu-btn" style="background:#84cc16;color:#000;font-weight:700;">Save Enemy</button>
+        </div>
+    </div>
+
+    <!-- FIREBASE LEVEL BROWSER -->
+    <div id="firebase-browser" class="picker-overlay hidden" onclick="if(event.target===this)closeFirebaseBrowser()">
+        <div class="picker-panel" style="max-height:80vh">
+            <div class="picker-title">FIREBASE LEVELS</div>
+            <div id="firebase-level-list" style="padding:0 4px;"></div>
         </div>
     </div>
 
@@ -1377,9 +1397,32 @@
             } catch (e) { alert('Load failed: ' + e.message); return false; }
         }
 
-        function loadFromFirebasePrompt() {
-            const n = prompt('Level name:');
-            if (n) loadFromFirebase(n);
+        async function loadFromFirebasePrompt() {
+            initFirebase();
+            if (!firebaseDb) { alert('Firebase not available'); return; }
+            const list = document.getElementById('firebase-level-list');
+            list.innerHTML = '<div class="fb-level-loading">Loading levels...</div>';
+            document.getElementById('firebase-browser').classList.remove('hidden');
+            closeMenu();
+            try {
+                const snap = await firebaseDb.ref(FIREBASE_LEVELS_PATH).once('value');
+                const data = snap.val();
+                if (!data) { list.innerHTML = '<div class="fb-level-loading">No levels found</div>'; return; }
+                const levels = Object.entries(data).sort((a, b) => (b[1].savedAt || 0) - (a[1].savedAt || 0));
+                list.innerHTML = '';
+                for (const [key, val] of levels) {
+                    const item = document.createElement('div');
+                    item.className = 'fb-level-item';
+                    const date = val.savedAt ? new Date(val.savedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                    item.innerHTML = `<div><div class="fb-name">${key}</div>${date ? `<div class="fb-date">${date}</div>` : ''}</div>`;
+                    item.onclick = () => { closeFirebaseBrowser(); loadFromFirebase(key); };
+                    list.appendChild(item);
+                }
+            } catch (e) { list.innerHTML = `<div class="fb-level-loading">Error: ${e.message}</div>`; }
+        }
+
+        function closeFirebaseBrowser() {
+            document.getElementById('firebase-browser').classList.add('hidden');
         }
 
         function playFirebaseLevel() {
