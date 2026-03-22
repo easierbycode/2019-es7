@@ -519,24 +519,39 @@
         async function switchAtlas(key) {
             currentAtlasKey = key;
             const cfg = ATLAS_CONFIGS[key];
+            const editorJson = "_" + cfg.json;
+            const editorPng = "_" + cfg.png;
             extraSprites = [];
             replacedFrames = {};
             if (dirHandle) {
                 try {
                     let atlasJsonText, pngBlob;
-                    try { atlasJsonText = await (await (await dirHandle.getFileHandle(cfg.json)).getFile()).text(); }
-                    catch {
+                    // Try editor-repacked (_) JSON first, then original
+                    try {
                         const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
-                        atlasJsonText = await (await (await ad.getFileHandle(cfg.json)).getFile()).text();
+                        atlasJsonText = await (await (await ad.getFileHandle(editorJson)).getFile()).text();
+                    } catch {
+                        try { atlasJsonText = await (await (await dirHandle.getFileHandle(cfg.json)).getFile()).text(); }
+                        catch {
+                            const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                            atlasJsonText = await (await (await ad.getFileHandle(cfg.json)).getFile()).text();
+                        }
                     }
                     atlasData = normalizeAtlasData(JSON.parse(atlasJsonText));
-                    try { pngBlob = await (await dirHandle.getFileHandle(cfg.png)).getFile(); }
-                    catch {
-                        try {
-                            const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
-                            try { pngBlob = await (await ad.getFileHandle(cfg.png)).getFile(); }
-                            catch { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle(cfg.png)).getFile(); }
-                        } catch { throw new Error("Atlas PNG not found: " + cfg.png); }
+                    // Try editor-repacked (_) PNG first, then original
+                    try {
+                        const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                        const imgDir = await ad.getDirectoryHandle('img');
+                        pngBlob = await (await imgDir.getFileHandle(editorPng)).getFile();
+                    } catch {
+                        try { pngBlob = await (await dirHandle.getFileHandle(cfg.png)).getFile(); }
+                        catch {
+                            try {
+                                const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                                try { pngBlob = await (await ad.getFileHandle(cfg.png)).getFile(); }
+                                catch { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle(cfg.png)).getFile(); }
+                            } catch { throw new Error("Atlas PNG not found: " + cfg.png); }
+                        }
                     }
                     atlasImage = new Image();
                     atlasImage.src = URL.createObjectURL(pngBlob);
@@ -544,10 +559,15 @@
                 } catch (e) { console.warn("Atlas load failed for " + key, e); alert("Failed to load atlas: " + key); }
             } else {
                 try {
-                    const [atlasResp, imgResp] = await Promise.all([
-                        fetch('assets/' + cfg.json),
-                        fetch('assets/img/' + cfg.png)
-                    ]);
+                    // Try editor-repacked (_) files first, fall back to originals
+                    let atlasResp = await fetch('assets/' + editorJson);
+                    let imgResp = await fetch('assets/img/' + editorPng);
+                    if (!atlasResp.ok || !imgResp.ok) {
+                        [atlasResp, imgResp] = await Promise.all([
+                            fetch('assets/' + cfg.json),
+                            fetch('assets/img/' + cfg.png)
+                        ]);
+                    }
                     if (!atlasResp.ok || !imgResp.ok) throw new Error("Atlas fetch failed for " + key);
                     atlasData = normalizeAtlasData(await atlasResp.json());
                     atlasImage = new Image();
@@ -587,25 +607,37 @@
             }
             gameData = JSON.parse(jsonText);
 
-            // Try to find atlas JSON + PNG in multiple locations:
-            // 1) root dir  2) assets/  3) assets/img/ for PNG
+            // Try to find atlas JSON + PNG — prefer editor-repacked (_) versions
             try {
                 let atlasJsonText, pngBlob;
-                // Find atlas JSON
-                try { atlasJsonText = await (await (await dirHandle.getFileHandle(ATLAS_JSON)).getFile()).text(); }
-                catch {
+                const editorJson = "_" + ATLAS_JSON;
+                const editorPng = "_" + ATLAS_PNG;
+                // Try editor-repacked JSON first, then original
+                try {
                     const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
-                    atlasJsonText = await (await (await ad.getFileHandle(ATLAS_JSON)).getFile()).text();
+                    atlasJsonText = await (await (await ad.getFileHandle(editorJson)).getFile()).text();
+                } catch {
+                    try { atlasJsonText = await (await (await dirHandle.getFileHandle(ATLAS_JSON)).getFile()).text(); }
+                    catch {
+                        const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                        atlasJsonText = await (await (await ad.getFileHandle(ATLAS_JSON)).getFile()).text();
+                    }
                 }
                 atlasData = normalizeAtlasData(JSON.parse(atlasJsonText));
-                // Find atlas PNG: try root, then assets/, then assets/img/
-                try { pngBlob = await (await dirHandle.getFileHandle(ATLAS_PNG)).getFile(); }
-                catch {
-                    try {
-                        const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
-                        try { pngBlob = await (await ad.getFileHandle(ATLAS_PNG)).getFile(); }
-                        catch { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle(ATLAS_PNG)).getFile(); }
-                    } catch { throw new Error("Atlas PNG not found"); }
+                // Try editor-repacked PNG first, then original
+                try {
+                    const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                    const imgDir = await ad.getDirectoryHandle('img');
+                    pngBlob = await (await imgDir.getFileHandle(editorPng)).getFile();
+                } catch {
+                    try { pngBlob = await (await dirHandle.getFileHandle(ATLAS_PNG)).getFile(); }
+                    catch {
+                        try {
+                            const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                            try { pngBlob = await (await ad.getFileHandle(ATLAS_PNG)).getFile(); }
+                            catch { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle(ATLAS_PNG)).getFile(); }
+                        } catch { throw new Error("Atlas PNG not found"); }
+                    }
                 }
                 atlasImage = new Image();
                 atlasImage.src = URL.createObjectURL(pngBlob);
