@@ -620,8 +620,12 @@ export function syncBossVisuals(scene) {
 export function bossDie(scene, boss) {
     if (scene.stageCleared) return;
 
-    // Destroy boss shadow
-    if (scene.bossShadow && scene.bossShadow.active) {
+    // PIXI: when akebonoFlg (SP finish), boss unit + shadow + dengerousBalloon
+    // all stay visible during the KO finish sequence.
+    var isAkebono = !!scene.spFired;
+
+    // Destroy boss shadow only when NOT akebono (PIXI keeps shadow during KO finish)
+    if (!isAkebono && scene.bossShadow && scene.bossShadow.active) {
         scene.bossShadow.destroy();
         scene.bossShadow = null;
     }
@@ -684,16 +688,19 @@ export function bossDie(scene, boss) {
             });
         })(shakeOffsets[si], cumDelay);
     }
-    // PIXI boss.dead(): fade out unit after shake (1s fade with 0.5s delay)
-    scene.tweens.add({
-        targets: boss,
-        alpha: 0,
-        duration: 1000,
-        delay: cumDelay + 500,
-        onComplete: function () {
-            if (boss && boss.active) boss.destroy();
-        },
-    });
+    // PIXI boss.dead(): when akebonoFlg (SP finish), boss stays visible;
+    // otherwise fade out unit after shake (1s fade with 0.5s delay)
+    if (!isAkebono) {
+        scene.tweens.add({
+            targets: boss,
+            alpha: 0,
+            duration: 1000,
+            delay: cumDelay + 500,
+            onComplete: function () {
+                if (boss && boss.active) boss.destroy();
+            },
+        });
+    }
 
     var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
     var stageId = gameState.stageId || 0;
@@ -703,11 +710,14 @@ export function bossDie(scene, boss) {
     scene.playSound(voiceKey, 0.9);
     scene.playSound("se_finish_akebono", 0.9);
 
-    if (scene.spFired) {
+    if (isAkebono) {
         scene.showAkebonoFinish();
     }
 
-    if (boss.dangerBalloon && boss.dangerBalloon.active) {
+    // PIXI: when akebonoFlg, dengerousBalloon stays visible and keeps
+    // playing its animation during the KO finish sequence.
+    // Only destroy if NOT akebono finish.
+    if (!isAkebono && boss.dangerBalloon && boss.dangerBalloon.active) {
         boss.dangerBalloon.destroy();
     }
 
