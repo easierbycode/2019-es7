@@ -11,7 +11,21 @@ function updateGameScene() {
     }
     if (gameState.paused) return;
 
+    // Turbo mode toggle: SELECT + DPAD_DOWN
+    if (!gs.turboEffectActive && isTurboToggle()) {
+        if (gameState.turboMode) {
+            gameState.turboMode = 0;
+        } else {
+            startTurboEffect(gs);
+        }
+    }
+
     if (gs.theWorldFlg) {
+        // Turbo activation effect
+        if (gs.turboEffectActive) {
+            updateTurboEffect(gs);
+            return;
+        }
         // Check for stage clear / game over completion
         if (p.dead) {
             gs.resultTimer++;
@@ -79,7 +93,7 @@ function updateGameScene() {
 
     // --- Enemy waves ---
     if (gs.enemyWaveFlg) {
-        gs.frameCnt++;
+        gs.frameCnt += gameState.turboMode ? 2 : 1;
         if (gs.frameCnt % gs.waveInterval === 0) {
             if (gs.waveCount >= gs.stageEnemyList.length) {
                 // Boss time
@@ -275,9 +289,10 @@ function updateGameScene() {
     }
 
     // --- Update items ---
+    var tMul = gameState.turboMode ? 2 : 1;
     for (var i = gs.items.length - 1; i >= 0; i--) {
         var item = gs.items[i];
-        item.y += 1;
+        item.y += 1 * tMul;
         item.animCounter += 0.08;
 
         // Hit test: item vs player
@@ -310,7 +325,7 @@ function updateGameScene() {
     }
 
     // --- Stage background scroll ---
-    gs.stageBgScrollY += 0.7;
+    gs.stageBgScrollY += 0.7 * tMul;
 }
 
 function drawGameScene() {
@@ -393,6 +408,18 @@ function drawGameScene() {
     if (gs.boss && gs.boss.dead && gs.resultTimer > 20) {
         fontPrint(toScreenX(GCX - 35), toScreenY(GCY - 10),
             "STAGE CLEAR!", Color.new(255, 255, 0));
+    }
+
+    // Turbo mode indicator
+    if (gameState.turboMode && !gs.turboEffectActive) {
+        var turboFlicker = (sceneTimer % 20 < 14) ? 1.0 : 0.5;
+        var tc = Color.new(255, 100, 0, Math.floor(turboFlicker * 128));
+        fontPrint(toScreenX(GW - 52), toScreenY(GH - 18), "TURBO", tc);
+    }
+
+    // Turbo activation effect overlay
+    if (gs.turboEffectActive || gs.turboBlackoutAlpha > 0) {
+        drawTurboEffect(gs);
     }
 
     // Pause overlay
@@ -573,6 +600,86 @@ function updateSpFire(gs) {
             gs.theWorldFlg = 0;
             gs.boss.theWorld = 0;
         }
+    }
+}
+
+// --- Turbo mode activation effect ---
+
+function startTurboEffect(gs) {
+    gs.turboEffectActive = 1;
+    gs.turboImpacts = [];
+    gs.turboFlashAlpha = 0;
+    gs.turboBlackoutAlpha = 0.8;
+    gs.theWorldFlg = 1;
+    if (gs.boss) gs.boss.theWorld = 1;
+
+    playSfx("se_sp");
+
+    // Schedule 10 hit impacts at 50ms intervals (matches goki enter)
+    for (var i = 0; i < 10; i++) {
+        (function(idx) {
+            delayedCall(50 + 50 * idx, function() {
+                var ix = Math.random() * (GW - 60) + 30;
+                var iy = Math.random() * (GH - 200) + 80;
+                gs.turboImpacts.push({
+                    x: ix, y: iy,
+                    frame: 0, timer: 0,
+                });
+                gs.turboFlashAlpha = 0.2;
+                playSfx("se_damage");
+            });
+            delayedCall(50 + 50 * idx + 60, function() {
+                gs.turboFlashAlpha = 0;
+            });
+        })(i);
+    }
+
+    // End effect after all impacts
+    delayedCall(700, function() {
+        gs.turboBlackoutAlpha = 0;
+        gs.turboFlashAlpha = 0;
+        gs.turboEffectActive = 0;
+        gs.theWorldFlg = 0;
+        if (gs.boss) gs.boss.theWorld = 0;
+        gameState.turboMode = 1;
+    });
+}
+
+function updateTurboEffect(gs) {
+    // Update impact animations (5 frames at ~48fps = advance every ~2 game frames)
+    for (var i = gs.turboImpacts.length - 1; i >= 0; i--) {
+        var imp = gs.turboImpacts[i];
+        imp.timer++;
+        if (imp.timer % 2 === 0) imp.frame++;
+        if (imp.frame > 4) {
+            gs.turboImpacts.splice(i, 1);
+        }
+    }
+}
+
+function drawTurboEffect(gs) {
+    // Blackout overlay
+    if (gs.turboBlackoutAlpha > 0) {
+        var ba = Math.floor(gs.turboBlackoutAlpha * 128);
+        Draw.rect(0, 0, SCREEN_W, SCREEN_H, Color.new(0, 0, 0, ba));
+    }
+
+    // Hit impact sprites
+    for (var i = 0; i < gs.turboImpacts.length; i++) {
+        var imp = gs.turboImpacts[i];
+        var hitFrame = "hit" + String(Math.min(imp.frame, 4)) + ".gif";
+        var fname = resolveFrameName("game_asset", hitFrame);
+        if (hasFrame("game_asset", fname)) {
+            drawFrame("game_asset", fname,
+                toScreenX(imp.x), toScreenY(imp.y),
+                SCALE * 1.5, SCALE * 1.5, 1.0, null);
+        }
+    }
+
+    // White flash overlay
+    if (gs.turboFlashAlpha > 0) {
+        var fa = Math.floor(gs.turboFlashAlpha * 128);
+        Draw.rect(0, 0, SCREEN_W, SCREEN_H, Color.new(255, 255, 255, fa));
     }
 }
 

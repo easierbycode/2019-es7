@@ -17,6 +17,7 @@ var gameState = {
     secondLoop: 0,
     recipe: null,
     paused: 0,
+    turboMode: 0,
 };
 
 function resetGameState() {
@@ -28,6 +29,7 @@ function resetGameState() {
     gameState.continueCnt = 0;
     gameState.akebonoCnt = 0;
     gameState.shortFlg = 0;
+    gameState.turboMode = 0;
 }
 
 function saveHighScore() {

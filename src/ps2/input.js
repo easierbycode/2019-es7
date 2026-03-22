@@ -81,3 +81,8 @@ function isYesPressed() {
 function isNoPressed() {
     return isPressed(Pads.CIRCLE);
 }
+
+function isTurboToggle() {
+    return (isDown(Pads.SELECT) && isPressed(Pads.DOWN)) ||
+           (isPressed(Pads.SELECT) && isDown(Pads.DOWN));
+}

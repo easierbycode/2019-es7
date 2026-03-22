@@ -112,7 +112,8 @@ function bossLoop(b) {
     }
 
     // Movement pattern — side-to-side
-    b.moveTimer++;
+    var bMul = gameState.turboMode ? 2 : 1;
+    b.moveTimer += bMul;
     if (b.moveTimer % 120 === 0) {
         b.movePhase = (b.movePhase + 1) % 3;
         switch (b.movePhase) {
@@ -121,12 +122,12 @@ function bossLoop(b) {
         case 2: b.moveTargetX = GW * 0.6; break;
         }
     }
-    b.x += 0.03 * (b.moveTargetX - b.x);
+    b.x += 0.03 * bMul * (b.moveTargetX - b.x);
 
     // Attack pattern
     if (b.shootFlg) {
         b.patternTimer++;
-        b.attackCooldown--;
+        b.attackCooldown -= bMul;
 
         if (b.attackCooldown <= 0) {
             bossAttack(b);

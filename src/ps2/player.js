@@ -122,6 +122,7 @@ function playerLoop(p) {
     // Shooting
     p.bulletFrameCnt++;
     var interval = p.shootInterval - p.shootSpeed;
+    if (gameState.turboMode) interval = Math.floor(interval / 2);
     if (interval < 1) interval = 1;
 
     if (p.shootOn && p.bulletFrameCnt % interval === 0) {
@@ -129,10 +130,11 @@ function playerLoop(p) {
     }
 
     // Update bullets
+    var bulletMul = gameState.turboMode ? 2 : 1;
     for (var i = p.bullets.length - 1; i >= 0; i--) {
         var b = p.bullets[i];
-        b.x += 3.5 * Math.cos(b.rotation);
-        b.y += 3.5 * Math.sin(b.rotation);
+        b.x += 3.5 * bulletMul * Math.cos(b.rotation);
+        b.y += 3.5 * bulletMul * Math.sin(b.rotation);
 
         if (b.y <= 40 || b.x <= -b.width || b.x >= GW) {
             p.bullets.splice(i, 1);

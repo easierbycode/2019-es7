@@ -29,9 +29,10 @@ function createProjectile(data) {
 function projectileLoop(proj, playerRef) {
     if (proj.deadFlg) return 0;
 
+    var pMul = gameState.turboMode ? 2 : 1;
     if (proj.rotX !== 0 || proj.name !== "meka") {
-        proj.x += proj.rotX * proj.speed;
-        proj.y += proj.rotY * proj.speed;
+        proj.x += proj.rotX * proj.speed * pMul;
+        proj.y += proj.rotY * proj.speed * pMul;
     } else if (proj.name === "meka") {
         proj.cont++;
         if (proj.cont >= proj.start) {
@@ -39,9 +40,9 @@ function projectileLoop(proj, playerRef) {
                 proj.targetX = playerRef.x;
             }
             if (proj.targetX) {
-                proj.x += 0.009 * (proj.targetX - proj.x);
+                proj.x += 0.009 * pMul * (proj.targetX - proj.x);
             }
-            proj.y += Math.cos(proj.cont / 5) + 2.5 * proj.speed;
+            proj.y += (Math.cos(proj.cont / 5) + 2.5 * proj.speed) * pMul;
         }
     }
 

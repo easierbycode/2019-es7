@@ -53,6 +53,11 @@ var gameSceneState = {
     spFireTimer: 0,
     // Stage clear / game over
     resultTimer: 0,
+    // Turbo activation effect
+    turboEffectActive: 0,
+    turboImpacts: [],
+    turboFlashAlpha: 0,
+    turboBlackoutAlpha: 0,
 };
 
 // Continue scene state
@@ -163,6 +168,10 @@ function initGameScene() {
     gs.spFireTimer = 0;
     gs.spLineH = 0;
     gs.resultTimer = 0;
+    gs.turboEffectActive = 0;
+    gs.turboImpacts = [];
+    gs.turboFlashAlpha = 0;
+    gs.turboBlackoutAlpha = 0;
 
     // Load stage enemy list from recipe
     var recipe = gameState.recipe;

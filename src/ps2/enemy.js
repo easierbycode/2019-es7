@@ -99,12 +99,13 @@ function enemyLoop(e, playerRef) {
     }
 
     // Movement
-    e.y += e.speed;
+    var eMul = gameState.turboMode ? 2 : 1;
+    e.y += e.speed * eMul;
 
     switch (e.name) {
     case "soliderA":
         if (e.y >= GH / 1.5 && playerRef) {
-            e.x += 0.005 * (playerRef.x - e.x);
+            e.x += 0.005 * eMul * (playerRef.x - e.x);
         }
         break;
     case "soliderB":
@@ -118,8 +119,8 @@ function enemyLoop(e, playerRef) {
             }
         }
         if (e.y >= GH / 3) {
-            if (e.posName === "right") e.x -= 1;
-            else if (e.posName === "left") e.x += 1;
+            if (e.posName === "right") e.x -= 1 * eMul;
+            else if (e.posName === "left") e.x += 1 * eMul;
         }
         break;
     }
@@ -135,7 +136,8 @@ function enemyLoop(e, playerRef) {
 
     // Shooting
     var shouldShoot = 0;
-    if (e.shootFlg && !e.hardleFlg && e.interval > 0 && e.bulletFrameCnt % e.interval === 0) {
+    var eInterval = gameState.turboMode ? Math.max(1, Math.floor(e.interval / 2)) : e.interval;
+    if (e.shootFlg && !e.hardleFlg && eInterval > 0 && e.bulletFrameCnt % eInterval === 0) {
         shouldShoot = 1;
     }
 
