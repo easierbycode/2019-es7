@@ -13,7 +13,7 @@ set -euo pipefail
 # ============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SRC="$SCRIPT_DIR"                    # 2019-es7 repo root
+SRC="$SCRIPT_DIR"                       # 2019-es7 repo root
 DST="$(dirname "$SCRIPT_DIR")/../2028"  # ../2028 relative to CODE/
 
 echo "=== Copy 2019-es7 → 2028 ==="
@@ -113,29 +113,28 @@ cp "$SRC/.github/workflows/ios-testflight.yml" "$DST/.github/workflows/ios-testf
 echo "  ✓ HTML, manifest, config.xml, electron/, hooks/, .github/workflows/"
 
 # ── Step 6: Rewrite import paths ────────────────────────────────────────
+# Uses perl -pi -e which works identically on macOS and Linux
+# (unlike sed -i which differs between GNU and BSD)
 echo ""
 echo "🔧 [6/7] Rewriting import paths..."
 
-# Shared module names to match
-TARGETS='(constants|gameState|firebaseScores|haptics|highScoreUi|soundManager|globals)'
-
 # Root-level phaser files: from "../module.js" → from "../shared/module.js"
-find "$DST/src/phaser" -maxdepth 1 -name '*.js' -exec \
-  sed -i '' -E "s@from \"\.\./${TARGETS}\.js\"@from \"../shared/\1.js\"@g" {} +
+find "$DST/src/phaser" -maxdepth 1 -name '*.js' -print0 | xargs -0 \
+  perl -pi -e 's|from "\.\./(constants|gameState|firebaseScores|haptics|highScoreUi|soundManager|globals)\.js"|from "../shared/$1.js"|g'
 
 # Root-level phaser files: from "../enums/" → from "../shared/enums/"
-find "$DST/src/phaser" -maxdepth 1 -name '*.js' -exec \
-  sed -i '' -E 's|from "\.\./enums/|from "../shared/enums/|g' {} +
+find "$DST/src/phaser" -maxdepth 1 -name '*.js' -print0 | xargs -0 \
+  perl -pi -e 's|from "\.\./enums/|from "../shared/enums/|g'
 
 # Subdirectory files: from "../../module.js" → from "../../shared/module.js"
 find "$DST/src/phaser/game-objects" "$DST/src/phaser/bosses" "$DST/src/phaser/effects" "$DST/src/phaser/ui" \
-  -name '*.js' -exec \
-  sed -i '' -E "s@from \"\.\.\/\.\./${TARGETS}\.js\"@from \"../../shared/\1.js\"@g" {} +
+  -name '*.js' -print0 | xargs -0 \
+  perl -pi -e 's|from "\.\./\.\.\/(constants|gameState|firebaseScores|haptics|highScoreUi|soundManager|globals)\.js"|from "../../shared/$1.js"|g'
 
 # Subdirectory files: from "../../enums/" → from "../../shared/enums/"
 find "$DST/src/phaser/game-objects" "$DST/src/phaser/bosses" "$DST/src/phaser/effects" "$DST/src/phaser/ui" \
-  -name '*.js' -exec \
-  sed -i '' -E 's|from "\.\./\.\./enums/|from "../../shared/enums/|g' {} +
+  -name '*.js' -print0 | xargs -0 \
+  perl -pi -e 's|from "\.\./\.\./enums/|from "../../shared/enums/|g'
 
 echo "  ✓ ../xxx.js → ../shared/xxx.js  (root-level scenes)"
 echo "  ✓ ../../xxx.js → ../../shared/xxx.js  (subdirectory files)"
@@ -145,11 +144,27 @@ echo "  ✓ enums/ paths updated at both levels"
 echo ""
 echo "🔧 [7/7] Updating phaser-game.html inline imports..."
 
-sed -i '' 's|from "./src/gameState.js"|from "./src/shared/gameState.js"|g'           "$DST/phaser-game.html"
-sed -i '' 's|from "./src/firebaseScores.js"|from "./src/shared/firebaseScores.js"|g' "$DST/phaser-game.html"
-sed -i '' 's|from "./src/constants.js"|from "./src/shared/constants.js"|g'           "$DST/phaser-game.html"
+perl -pi -e 's|from "./src/gameState.js"|from "./src/shared/gameState.js"|g'           "$DST/phaser-game.html"
+perl -pi -e 's|from "./src/firebaseScores.js"|from "./src/shared/firebaseScores.js"|g' "$DST/phaser-game.html"
+perl -pi -e 's|from "./src/constants.js"|from "./src/shared/constants.js"|g'           "$DST/phaser-game.html"
 
 echo "  ✓ phaser-game.html"
+
+# ── Verify ───────────────────────────────────────────────────────────────
+echo ""
+echo "🔍 Verifying import rewrites..."
+BAD_IMPORTS=$(grep -rn 'from "\.\./constants\|from "\.\./gameState\|from "\.\./firebaseScores\|from "\.\./haptics\|from "\.\./highScoreUi\|from "\.\./soundManager\|from "\.\./globals\|from "\.\./enums/' "$DST/src/phaser/" | grep -v shared || true)
+BAD_HTML=$(grep -n 'from "./src/gameState\|from "./src/firebaseScores\|from "./src/constants' "$DST/phaser-game.html" | grep -v shared || true)
+
+if [ -n "$BAD_IMPORTS" ] || [ -n "$BAD_HTML" ]; then
+  echo "  ⚠️  Some imports were NOT rewritten:"
+  [ -n "$BAD_IMPORTS" ] && echo "$BAD_IMPORTS"
+  [ -n "$BAD_HTML" ] && echo "$BAD_HTML"
+  echo ""
+  echo "  Fix these manually before committing."
+else
+  echo "  ✓ All imports correctly point to src/shared/"
+fi
 
 # ── Generate package.json ────────────────────────────────────────────────
 echo ""
@@ -203,10 +218,6 @@ echo "============================================================"
 echo "✅ Done! New repo populated at: $DST"
 echo "   Files: $(find "$DST" -type f -not -path '*/.git/*' | wc -l)"
 echo "============================================================"
-echo ""
-echo "Verify import rewrites (should show ZERO lines):"
-echo "  cd $DST"
-echo "  grep -rn 'from \"\\.\\./constants' src/phaser/ | grep -v shared"
 echo ""
 echo "Next steps:"
 echo "  cd $DST"
