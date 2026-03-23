@@ -405,6 +405,7 @@
         let currentStageKey = "stage0";
         let currentGrid = [];
         let enemyData = {};
+        let bossData = {};
         let frameThumbs = {};       // key -> canvas
         let thumbDataURLs = {};     // key -> dataURL (cached)
         let extraSprites = [];
@@ -670,6 +671,7 @@
                     if (k.includes('enemy') && typeof gameData[k] === 'object') enemyData[k] = gameData[k];
                 }
             }
+            bossData = gameData.bossData || {};
             populateStagePills();
             loadCurrentStage();
         }
@@ -692,6 +694,35 @@
                 frameThumbs[key] = thumb;
             }
             document.getElementById('frame-count').textContent = Object.keys(frameThumbs).length;
+            checkMissingTextures();
+        }
+
+        function checkMissingTextures() {
+            if (!atlasData || !atlasData.frames) return;
+            const frames = atlasData.frames;
+            const missing = new Set();
+
+            function collectTextures(texArr) {
+                if (!Array.isArray(texArr)) return;
+                for (const t of texArr) { if (t && !frames[t]) missing.add(t); }
+            }
+
+            for (const d of Object.values(enemyData)) {
+                if (!d) continue;
+                collectTextures(d.texture);
+                if (d.bulletData) collectTextures(d.bulletData.texture);
+            }
+            for (const b of Object.values(bossData)) {
+                if (!b) continue;
+                if (b.anim) { for (const animFrames of Object.values(b.anim)) collectTextures(animFrames); }
+                if (b.bulletData) collectTextures(b.bulletData.texture);
+            }
+
+            if (missing.size > 0) {
+                const list = [...missing].join('\n');
+                console.warn('Level editor: missing textures in atlas:', [...missing]);
+                alert(`Warning: ${missing.size} texture(s) referenced by enemy/boss data are not in the atlas:\n\n${list}`);
+            }
         }
 
         // ================== STAGE PILLS ==================
@@ -1446,6 +1477,7 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
                             if (k.includes('enemy') && typeof gameData[k] === 'object') enemyData[k] = gameData[k];
                         }
                     }
+                    bossData = gameData.bossData || {};
                     populateStagePills();
                     loadCurrentStage();
                 }
