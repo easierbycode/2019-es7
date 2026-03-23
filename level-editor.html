@@ -127,6 +127,27 @@
         .fb-level-item .fb-date { font-size: 10px; color: #666; }
         .fb-level-loading { text-align: center; color: #666; padding: 24px; font-size: 13px; }
 
+        /* ===== MISSING TEXTURES PANEL ===== */
+        .missing-tex-row {
+            display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+            border-radius: 6px; border: 1px solid #333; margin-bottom: 4px; background: #111;
+        }
+        .missing-tex-row.uploaded { border-color: #84cc16; }
+        .missing-tex-preview {
+            width: 32px; height: 32px; border-radius: 4px; background: #222; flex-shrink: 0;
+            image-rendering: pixelated; object-fit: contain;
+        }
+        .missing-tex-name {
+            flex: 1; font-size: 11px; font-family: monospace; color: #aaa;
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .missing-tex-upload {
+            font-size: 11px; padding: 4px 10px; border-radius: 4px; cursor: pointer;
+            border: 1px solid #555; background: #222; color: #ccc;
+            font-family: 'Orbitron', sans-serif; flex-shrink: 0; white-space: nowrap;
+        }
+        .missing-tex-upload.done { border-color: #84cc16; color: #84cc16; }
+
         /* ===== MENU DRAWER ===== */
         .menu-backdrop { position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,0.5); animation: fadeIn 0.15s; }
         .menu-panel {
@@ -284,6 +305,17 @@
         </div>
     </div>
 
+    <!-- MISSING TEXTURES PANEL -->
+    <div id="missing-tex-overlay" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+        <div class="picker-panel" style="max-height:80vh">
+            <div class="picker-title">MISSING TEXTURES — upload an image for each</div>
+            <div id="missing-tex-list" style="padding:0 4px;"></div>
+            <button id="missing-tex-repack-btn" onclick="repackFromMissingPanel()"
+                    class="menu-btn" style="background:#84cc16;color:#000;font-weight:700;margin-top:12px;width:100%;justify-content:center;opacity:0.4;"
+                    disabled>Repack Atlas</button>
+        </div>
+    </div>
+
     <!-- ATLAS MANAGER MODAL -->
     <div id="atlas-modal" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
         <div class="picker-panel" style="max-height:80vh">
@@ -406,6 +438,7 @@
         let currentGrid = [];
         let enemyData = {};
         let bossData = {};
+        let pendingTextureUploads = {};  // textureName -> { key, canvas, w, h }
         let frameThumbs = {};       // key -> canvas
         let thumbDataURLs = {};     // key -> dataURL (cached)
         let extraSprites = [];
@@ -719,10 +752,76 @@
             }
 
             if (missing.size > 0) {
-                const list = [...missing].join('\n');
                 console.warn('Level editor: missing textures in atlas:', [...missing]);
-                alert(`Warning: ${missing.size} texture(s) referenced by enemy/boss data are not in the atlas:\n\n${list}`);
+                showMissingTexturesPanel([...missing]);
             }
+        }
+
+        function showMissingTexturesPanel(missingList) {
+            pendingTextureUploads = {};
+            const list = document.getElementById('missing-tex-list');
+            list.innerHTML = '';
+            for (const name of missingList) {
+                const row = document.createElement('div');
+                row.className = 'missing-tex-row';
+
+                const preview = document.createElement('canvas');
+                preview.className = 'missing-tex-preview';
+                preview.width = 1; preview.height = 1;
+
+                const nameEl = document.createElement('div');
+                nameEl.className = 'missing-tex-name';
+                nameEl.title = name;
+                nameEl.textContent = name;
+
+                const uploadLabel = document.createElement('label');
+                uploadLabel.className = 'missing-tex-upload';
+                uploadLabel.textContent = '↑ Upload';
+                const input = document.createElement('input');
+                input.type = 'file'; input.accept = 'image/*'; input.style.display = 'none';
+                input.onchange = (e) => handleMissingTextureUpload(name, e.target.files[0], preview, uploadLabel, row);
+                uploadLabel.appendChild(input);
+
+                row.appendChild(preview);
+                row.appendChild(nameEl);
+                row.appendChild(uploadLabel);
+                list.appendChild(row);
+            }
+            updateMissingTexRepackBtn();
+            document.getElementById('missing-tex-overlay').classList.remove('hidden');
+        }
+
+        async function handleMissingTextureUpload(textureName, file, previewCanvas, uploadLabel, row) {
+            if (!file) return;
+            const img = new Image();
+            img.src = URL.createObjectURL(file);
+            await new Promise(r => img.onload = r);
+            const cv = document.createElement('canvas');
+            cv.width = img.width; cv.height = img.height;
+            cv.getContext('2d').drawImage(img, 0, 0);
+            pendingTextureUploads[textureName] = { key: textureName, canvas: cv, w: img.width, h: img.height };
+            previewCanvas.width = img.width; previewCanvas.height = img.height;
+            previewCanvas.getContext('2d').drawImage(img, 0, 0);
+            uploadLabel.textContent = '✓ Ready';
+            uploadLabel.classList.add('done');
+            row.classList.add('uploaded');
+            updateMissingTexRepackBtn();
+        }
+
+        function updateMissingTexRepackBtn() {
+            const btn = document.getElementById('missing-tex-repack-btn');
+            const hasPending = Object.keys(pendingTextureUploads).length > 0;
+            btn.disabled = !hasPending;
+            btn.style.opacity = hasPending ? '1' : '0.4';
+        }
+
+        function repackFromMissingPanel() {
+            for (const sprite of Object.values(pendingTextureUploads)) {
+                if (!extraSprites.find(s => s.key === sprite.key)) extraSprites.push(sprite);
+            }
+            pendingTextureUploads = {};
+            document.getElementById('missing-tex-overlay').classList.add('hidden');
+            repackAtlas();
         }
 
         // ================== STAGE PILLS ==================
