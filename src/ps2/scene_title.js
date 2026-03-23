@@ -14,7 +14,11 @@ function updateTitleScene() {
     }
 
     if (ts.startBtnVisible) {
-        if (isConfirmPressed()) {
+        if (isSelectPressed()) {
+            gameState.turboMode = 1;
+            playSound("se_decision");
+            switchScene(SCENE_ADV);
+        } else if (isConfirmPressed()) {
             playSound("se_decision");
             switchScene(SCENE_ADV);
         }
@@ -70,6 +74,8 @@ function drawTitleScene() {
         if (sceneTimer % 40 < 30) {
             fontPrint(toScreenX(GCX - 45), toScreenY(GH - 60), "PRESS START", white);
         }
+        fontPrint(toScreenX(GCX - 55), toScreenY(GH - 42),
+            "SELECT = TURBO MODE", Color.new(255, 100, 0));
     }
 
     // Copyright

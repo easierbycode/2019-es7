@@ -137,6 +137,7 @@ function initTitleScene() {
     titleState.introDone = 0;
     titleState.startBtnVisible = 0;
     titleState.bgScrollX = 0;
+    gameState.turboMode = 0;
     stopAllSounds();
 }
 
