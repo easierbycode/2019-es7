@@ -3165,6 +3165,9 @@ function drawEndingScene() {
             "PROGRAMMING",
             "Claude Code",
             "",
+            "SPECIAL THANKS",
+            "Seamus McNamara",
+            "",
             "THANK YOU",
             "FOR PLAYING!",
         ];
