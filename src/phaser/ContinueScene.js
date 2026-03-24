@@ -470,7 +470,10 @@ export class PhaserContinueScene extends Phaser.Scene {
         if (this.scoreSyncText) {
             this.scoreSyncText.setText(getHighScoreSyncText());
             var syncTint = getHighScoreSyncTint();
-            this.scoreSyncText.setColor("#" + syncTint.toString(16).padStart(6, "0"));
+            var syncColor = "#" + syncTint.toString(16).padStart(6, "0");
+            if (this.scoreSyncText.style.color !== syncColor) {
+                this.scoreSyncText.setColor(syncColor);
+            }
         }
 
         // Keyboard + gamepad continue controls

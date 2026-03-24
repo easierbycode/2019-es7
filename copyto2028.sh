@@ -113,28 +113,29 @@ cp "$SRC/.github/workflows/ios-testflight.yml" "$DST/.github/workflows/ios-testf
 echo "  ✓ HTML, manifest, config.xml, electron/, hooks/, .github/workflows/"
 
 # ── Step 6: Rewrite import paths ────────────────────────────────────────
-# Uses perl -pi -e which works identically on macOS and Linux
+# Uses perl -pi which works identically on macOS and Linux
 # (unlike sed -i which differs between GNU and BSD)
+# Uses find -exec instead of xargs to avoid shell re-parsing the perl expression
 echo ""
 echo "🔧 [6/7] Rewriting import paths..."
 
 # Root-level phaser files: from "../module.js" → from "../shared/module.js"
-find "$DST/src/phaser" -maxdepth 1 -name '*.js' -print0 | xargs -0 \
-  perl -pi -e 's|from "\.\./(constants|gameState|firebaseScores|haptics|highScoreUi|soundManager|globals)\.js"|from "../shared/$1.js"|g'
+find "$DST/src/phaser" -maxdepth 1 -name '*.js' -exec \
+  perl -pi -e 's%from "\.\./(constants|gameState|firebaseScores|haptics|highScoreUi|soundManager|globals)\.js"%from "../shared/$1.js"%g' {} +
 
 # Root-level phaser files: from "../enums/" → from "../shared/enums/"
-find "$DST/src/phaser" -maxdepth 1 -name '*.js' -print0 | xargs -0 \
-  perl -pi -e 's|from "\.\./enums/|from "../shared/enums/|g'
+find "$DST/src/phaser" -maxdepth 1 -name '*.js' -exec \
+  perl -pi -e 's%from "\.\./enums/%from "../shared/enums/%g' {} +
 
 # Subdirectory files: from "../../module.js" → from "../../shared/module.js"
 find "$DST/src/phaser/game-objects" "$DST/src/phaser/bosses" "$DST/src/phaser/effects" "$DST/src/phaser/ui" \
-  -name '*.js' -print0 | xargs -0 \
-  perl -pi -e 's|from "\.\./\.\.\/(constants|gameState|firebaseScores|haptics|highScoreUi|soundManager|globals)\.js"|from "../../shared/$1.js"|g'
+  -name '*.js' -exec \
+  perl -pi -e 's%from "\.\./\.\.\/(constants|gameState|firebaseScores|haptics|highScoreUi|soundManager|globals)\.js"%from "../../shared/$1.js"%g' {} +
 
 # Subdirectory files: from "../../enums/" → from "../../shared/enums/"
 find "$DST/src/phaser/game-objects" "$DST/src/phaser/bosses" "$DST/src/phaser/effects" "$DST/src/phaser/ui" \
-  -name '*.js' -print0 | xargs -0 \
-  perl -pi -e 's|from "\.\./\.\./enums/|from "../../shared/enums/|g'
+  -name '*.js' -exec \
+  perl -pi -e 's%from "\.\./\.\./enums/%from "../../shared/enums/%g' {} +
 
 echo "  ✓ ../xxx.js → ../shared/xxx.js  (root-level scenes)"
 echo "  ✓ ../../xxx.js → ../../shared/xxx.js  (subdirectory files)"
@@ -144,9 +145,9 @@ echo "  ✓ enums/ paths updated at both levels"
 echo ""
 echo "🔧 [7/7] Updating phaser-game.html inline imports..."
 
-perl -pi -e 's|from "./src/gameState.js"|from "./src/shared/gameState.js"|g'           "$DST/phaser-game.html"
-perl -pi -e 's|from "./src/firebaseScores.js"|from "./src/shared/firebaseScores.js"|g' "$DST/phaser-game.html"
-perl -pi -e 's|from "./src/constants.js"|from "./src/shared/constants.js"|g'           "$DST/phaser-game.html"
+perl -pi -e 's%from "./src/gameState.js"%from "./src/shared/gameState.js"%g'           "$DST/phaser-game.html"
+perl -pi -e 's%from "./src/firebaseScores.js"%from "./src/shared/firebaseScores.js"%g' "$DST/phaser-game.html"
+perl -pi -e 's%from "./src/constants.js"%from "./src/shared/constants.js"%g'           "$DST/phaser-game.html"
 
 echo "  ✓ phaser-game.html"
 
