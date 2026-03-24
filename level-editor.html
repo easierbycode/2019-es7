@@ -313,6 +313,14 @@
     <div id="missing-tex-overlay" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
         <div class="picker-panel" style="max-height:80vh">
             <div class="picker-title">MISSING TEXTURES — upload an image for each</div>
+            <div style="padding:4px 4px 8px;border-bottom:1px solid #333;margin-bottom:8px;">
+                <div style="font-size:11px;color:#888;margin-bottom:6px;font-family:monospace;">Upload atlas to resolve multiple at once:</div>
+                <label class="missing-tex-upload" style="cursor:pointer;">
+                    ↑ Upload Atlas (PNG + JSON)
+                    <input id="missing-tex-atlas-input" type="file" accept=".png,.json,image/png,application/json" multiple style="display:none" onchange="handleAtlasUpload(this.files)">
+                </label>
+                <span id="missing-tex-atlas-status" style="font-size:11px;font-family:monospace;color:#888;margin-left:8px;"></span>
+            </div>
             <div id="missing-tex-list" style="padding:0 4px;"></div>
             <button id="missing-tex-repack-btn" onclick="repackFromMissingPanel()"
                     class="menu-btn" style="background:#84cc16;color:#000;font-weight:700;margin-top:12px;width:100%;justify-content:center;opacity:0.4;"
@@ -443,6 +451,7 @@
         let enemyData = {};
         let bossData = {};
         let pendingTextureUploads = {};  // textureName -> { key, canvas, w, h }
+        let currentMissingSet = new Set(); // textures shown in the missing panel
         let frameThumbs = {};       // key -> canvas
         let thumbDataURLs = {};     // key -> dataURL (cached)
         let extraSprites = [];
@@ -763,6 +772,8 @@
 
         function showMissingTexturesPanel(missingList) {
             pendingTextureUploads = {};
+            currentMissingSet = new Set(missingList);
+            document.getElementById('missing-tex-atlas-status').textContent = '';
             const list = document.getElementById('missing-tex-list');
             list.innerHTML = '';
             for (const name of missingList) {
@@ -809,6 +820,82 @@
             uploadLabel.textContent = '✓ Ready';
             uploadLabel.classList.add('done');
             row.classList.add('uploaded');
+            updateMissingTexRepackBtn();
+        }
+
+        async function handleAtlasUpload(files) {
+            const statusEl = document.getElementById('missing-tex-atlas-status');
+            if (!files || files.length < 2) {
+                statusEl.textContent = 'Select both a PNG and JSON file.';
+                statusEl.style.color = '#f87171';
+                return;
+            }
+            let pngFile = null, jsonFile = null;
+            for (const f of files) {
+                if (f.name.endsWith('.json') || f.type === 'application/json') jsonFile = f;
+                else if (f.name.endsWith('.png') || f.type.startsWith('image/')) pngFile = f;
+            }
+            if (!pngFile || !jsonFile) {
+                statusEl.textContent = 'Need one PNG and one JSON.';
+                statusEl.style.color = '#f87171';
+                return;
+            }
+            let atlasJson;
+            try { atlasJson = JSON.parse(await jsonFile.text()); } catch(e) {
+                statusEl.textContent = 'Invalid JSON.';
+                statusEl.style.color = '#f87171';
+                return;
+            }
+            const img = new Image();
+            img.src = URL.createObjectURL(pngFile);
+            await new Promise(r => img.onload = r);
+
+            // Parse frames — support both Phaser array and object formats
+            const frameMap = {}; // name -> {x,y,w,h}
+            if (atlasJson.frames) {
+                if (Array.isArray(atlasJson.frames)) {
+                    for (const f of atlasJson.frames) {
+                        const fn = f.filename || f.name;
+                        if (fn && f.frame) frameMap[fn] = f.frame;
+                    }
+                } else {
+                    for (const [name, data] of Object.entries(atlasJson.frames)) {
+                        if (data.frame) frameMap[name] = data.frame;
+                    }
+                }
+            }
+
+            let resolved = 0;
+            for (const texName of currentMissingSet) {
+                const fr = frameMap[texName];
+                if (!fr) continue;
+                if (pendingTextureUploads[texName]) continue; // already uploaded individually
+                const cv = document.createElement('canvas');
+                cv.width = fr.w; cv.height = fr.h;
+                cv.getContext('2d').drawImage(img, fr.x, fr.y, fr.w, fr.h, 0, 0, fr.w, fr.h);
+                pendingTextureUploads[texName] = { key: texName, canvas: cv, w: fr.w, h: fr.h };
+                // Update the corresponding row UI
+                for (const row of document.querySelectorAll('.missing-tex-row')) {
+                    const nameEl = row.querySelector('.missing-tex-name');
+                    if (!nameEl || nameEl.textContent !== texName) continue;
+                    const preview = row.querySelector('.missing-tex-preview');
+                    if (preview) {
+                        preview.width = fr.w; preview.height = fr.h;
+                        preview.getContext('2d').drawImage(img, fr.x, fr.y, fr.w, fr.h, 0, 0, fr.w, fr.h);
+                    }
+                    const lbl = row.querySelector('.missing-tex-upload');
+                    if (lbl) { lbl.textContent = '✓ Atlas'; lbl.classList.add('done'); }
+                    row.classList.add('uploaded');
+                    break;
+                }
+                resolved++;
+            }
+            statusEl.textContent = resolved > 0
+                ? `✓ Resolved ${resolved} texture${resolved > 1 ? 's' : ''}`
+                : 'No matching frames found.';
+            statusEl.style.color = resolved > 0 ? '#84cc16' : '#f87171';
+            // Reset the file input so the same files can be re-selected if needed
+            document.getElementById('missing-tex-atlas-input').value = '';
             updateMissingTexRepackBtn();
         }
 
