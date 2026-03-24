@@ -282,6 +282,10 @@
             <div class="menu-section-title">Advanced</div>
             <button class="menu-btn" onclick="showEnemyEditor()">👾 Enemy Editor</button>
             <button class="menu-btn" onclick="showAtlasManager()">🎨 Atlas Manager</button>
+            <label class="menu-btn" style="cursor:pointer">
+                <input type="file" id="title-bg-input" accept="image/*" style="display:none" onchange="uploadTitleBg(event)">
+                🖼 Upload Title Background
+            </label>
         </div>
         <div id="status" style="font-size:11px;color:#666;margin-top:16px;">No directory loaded</div>
     </div>
@@ -1394,6 +1398,23 @@
             const a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }));
             a.download = `${currentStageKey}-level.json`; a.click();
+        }
+
+        // ================== TITLE BACKGROUND UPLOAD ==================
+        async function uploadTitleBg(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            event.target.value = '';
+            if (!dirHandle) { alert("Load game directory first"); return; }
+            try {
+                const ah = await dirHandle.getDirectoryHandle(ATLAS_DIR, { create: true });
+                const fh = await ah.getFileHandle('title_bg.jpg', { create: true });
+                const w = await fh.createWritable();
+                await w.write(await file.arrayBuffer());
+                await w.close();
+                closeMenu();
+                alert('title_bg.jpg saved to assets/');
+            } catch (e) { alert('Save failed: ' + e.message); }
         }
 
         // ================== KEYBOARD ==================
