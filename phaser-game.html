@@ -323,6 +323,18 @@
             var scale = Math.min(vw / 256, vh / 480);
             pc.style.width = Math.floor(256 * scale) + "px";
             pc.style.height = Math.floor(480 * scale) + "px";
+
+            // Sync Phaser's input coordinate mapping with the CSS-scaled
+            // canvas.  refresh() recalculates displayScale from the actual
+            // canvas BCR so pointer→game-coord transforms are correct.
+            // Skip when CSS-rotated: patchCanvasInputForRotation handles
+            // that case with its own BCR override + coord swap.
+            if (!cssRotated) {
+                var game = window.__PHASER_4_GAME__;
+                if (game && game.scale && typeof game.scale.refresh === "function") {
+                    game.scale.refresh();
+                }
+            }
         }
         window.addEventListener("resize", fitCanvas);
         window.__fitCanvas = fitCanvas;
