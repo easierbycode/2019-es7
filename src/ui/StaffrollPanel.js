@@ -40,12 +40,14 @@ export class StaffrollPanel extends BaseCast {
         this.addLinkButton("staffrollLinkBtn.gif", 161, 355, "http://hi-score-girl.com/");
 
         const thanksLabel = new PIXI.Text("SPECIAL THANKS", { fontSize: 8, fontFamily: "Arial", fill: 0xffff00, align: "center", stroke: 0x000000, strokeThickness: 2 });
+        thanksLabel.resolution = 4;
         thanksLabel.anchor.set(0.5, 0);
         thanksLabel.x = GAME_DIMENSIONS.CENTER_X - 15;
         thanksLabel.y = 303;
         this.panel.addChild(thanksLabel);
 
         const thanksName = new PIXI.Text("Seamus McNamara", { fontSize: 7, fontFamily: "Arial", fill: 0xffffff, align: "center", stroke: 0x000000, strokeThickness: 2 });
+        thanksName.resolution = 4;
         thanksName.anchor.set(0.5, 0);
         thanksName.x = GAME_DIMENSIONS.CENTER_X - 15;
         thanksName.y = 315;
