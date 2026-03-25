@@ -322,9 +322,13 @@
                 <span id="missing-tex-atlas-status" style="font-size:11px;font-family:monospace;color:#888;margin-left:8px;"></span>
             </div>
             <div id="missing-tex-list" style="padding:0 4px;"></div>
-            <button id="missing-tex-repack-btn" onclick="repackFromMissingPanel()"
-                    class="menu-btn" style="background:#84cc16;color:#000;font-weight:700;margin-top:12px;width:100%;justify-content:center;opacity:0.4;"
-                    disabled>Repack Atlas</button>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+                <button id="missing-tex-repack-btn" onclick="repackFromMissingPanel()"
+                        class="menu-btn" style="background:#84cc16;color:#000;font-weight:700;flex:1;justify-content:center;opacity:0.4;"
+                        disabled>Repack Atlas</button>
+                <button onclick="skipMissingTextures()"
+                        class="menu-btn" style="background:#475569;color:#e2e8f0;font-weight:700;flex:1;justify-content:center;">Skip — Use Original Bosses</button>
+            </div>
         </div>
     </div>
 
@@ -913,6 +917,11 @@
             pendingTextureUploads = {};
             document.getElementById('missing-tex-overlay').classList.add('hidden');
             repackAtlas();
+        }
+
+        function skipMissingTextures() {
+            pendingTextureUploads = {};
+            document.getElementById('missing-tex-overlay').classList.add('hidden');
         }
 
         // ================== STAGE PILLS ==================
