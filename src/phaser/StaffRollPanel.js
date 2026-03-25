@@ -63,12 +63,12 @@ export class StaffRollPanel extends Phaser.GameObjects.Container {
         this.addLinkButton("staffrollLinkBtn.gif", 153, 329, "https://magazine.jp.square-enix.com/biggangan/introduction/highscoregirl/");
         this.addLinkButton("staffrollLinkBtn.gif", 161, 355, "http://hi-score-girl.com/");
 
-        var thanksLabelStyle = { fontSize: "8px", fontFamily: "Arial", fill: "#ffff00", align: "center", stroke: "#000000", strokeThickness: 2, resolution: 4 };
-        var thanksNameStyle = { fontSize: "7px", fontFamily: "Arial", fill: "#ffffff", align: "center", stroke: "#000000", strokeThickness: 2, resolution: 4 };
+        var thanksLabelStyle = { fontSize: "8px", fontFamily: "Orbitron, Arial", fill: "#ffff00", align: "center", stroke: "#000000", strokeThickness: 2, resolution: 4 };
+        var thanksNameStyle = { fontSize: "7px", fontFamily: "Orbitron, Arial", fill: "#ffffff", align: "center", stroke: "#000000", strokeThickness: 2, resolution: 4 };
         this.thanksLabel = scene.add.text(this.GCX, 393, "SPECIAL THANKS", thanksLabelStyle);
         this.thanksLabel.setOrigin(0.5, 0);
         this.add(this.thanksLabel);
-        this.thanksName = scene.add.text(this.GCX, 405, "Seamus McNamara", thanksNameStyle);
+        this.thanksName = scene.add.text(this.GCX, 405, "SEAMUS MCNAMARA", thanksNameStyle);
         this.thanksName.setOrigin(0.5, 0);
         this.add(this.thanksName);
 
