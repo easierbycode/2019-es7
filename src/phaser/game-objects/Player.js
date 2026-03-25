@@ -90,6 +90,10 @@ export function clampPlayerX(scene, x) {
 
 export function onScreenDragStart(scene, pointer) {
     if (!scene.gameStarted || scene.playerDead) return;
+    if (pointer.rightButtonDown()) {
+        scene.onSpFire();
+        return;
+    }
     scene.playerUnitX = pointer.x;
     scene.isDragging = true;
     scene.dragPointerId = pointerId(pointer);

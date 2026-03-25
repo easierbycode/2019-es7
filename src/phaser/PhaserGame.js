@@ -29,6 +29,11 @@ export function createPhaserGame() {
         fps: {
             target: 60
         },
+        input: {
+            mouse: {
+                preventDefaultRight: true   // suppress context menu for right-click SP
+            }
+        },
         scale: {
             mode: Phaser.Scale.NONE,
             autoCenter: Phaser.Scale.NO_CENTER
