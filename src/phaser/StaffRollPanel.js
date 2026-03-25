@@ -63,6 +63,15 @@ export class StaffRollPanel extends Phaser.GameObjects.Container {
         this.addLinkButton("staffrollLinkBtn.gif", 153, 329, "https://magazine.jp.square-enix.com/biggangan/introduction/highscoregirl/");
         this.addLinkButton("staffrollLinkBtn.gif", 161, 355, "http://hi-score-girl.com/");
 
+        var thanksLabelStyle = { fontSize: "8px", fontFamily: "Arial", fill: "#ffff00", align: "center" };
+        var thanksNameStyle = { fontSize: "7px", fontFamily: "Arial", fill: "#ffffff", align: "center" };
+        this.thanksLabel = scene.add.text(this.GCX, 393, "SPECIAL THANKS", thanksLabelStyle);
+        this.thanksLabel.setOrigin(0.5, 0);
+        this.add(this.thanksLabel);
+        this.thanksName = scene.add.text(this.GCX, 405, "Seamus McNamara", thanksNameStyle);
+        this.thanksName.setOrigin(0.5, 0);
+        this.add(this.thanksName);
+
         this.setSize(this.GW, this.GH);
         this.setInteractive(new Phaser.Geom.Rectangle(0, 0, this.GW, this.GH), Phaser.Geom.Rectangle.Contains);
         this.on("pointerup", function () {});
