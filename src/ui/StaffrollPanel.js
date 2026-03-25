@@ -39,15 +39,15 @@ export class StaffrollPanel extends BaseCast {
         this.addLinkButton("staffrollLinkBtn.gif", 153, 329, "https://magazine.jp.square-enix.com/biggangan/introduction/highscoregirl/");
         this.addLinkButton("staffrollLinkBtn.gif", 161, 355, "http://hi-score-girl.com/");
 
-        const thanksLabel = new PIXI.Text("SPECIAL THANKS", { fontSize: 10, fontFamily: "Orbitron, Arial", fill: 0xffff00, align: "center", stroke: 0x000000, strokeThickness: 2 });
-        thanksLabel.resolution = 4;
+        const thanksLabel = new PIXI.Text("SPECIAL THANKS", { fontSize: 12, fontFamily: "Orbitron, Arial", fill: 0xffff00, align: "center", stroke: 0x000000, strokeThickness: 1 });
+        thanksLabel.resolution = 8;
         thanksLabel.anchor.set(0.5, 0);
         thanksLabel.x = GAME_DIMENSIONS.CENTER_X - 15;
         thanksLabel.y = 303;
         this.panel.addChild(thanksLabel);
 
-        const thanksName = new PIXI.Text("SEAMUS MCNAMARA", { fontSize: 9, fontFamily: "Orbitron, Arial", fill: 0xffffff, align: "center", stroke: 0x000000, strokeThickness: 2 });
-        thanksName.resolution = 4;
+        const thanksName = new PIXI.Text("SEAMUS MCNAMARA", { fontSize: 11, fontFamily: "Orbitron, Arial", fill: 0xffffff, align: "center", stroke: 0x000000, strokeThickness: 1 });
+        thanksName.resolution = 8;
         thanksName.anchor.set(0.5, 0);
         thanksName.x = GAME_DIMENSIONS.CENTER_X - 15;
         thanksName.y = 315;
