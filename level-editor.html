@@ -764,7 +764,7 @@
             }
             for (const b of Object.values(bossData)) {
                 if (!b) continue;
-                if (b.anim) { for (const animFrames of Object.values(b.anim)) collectTextures(animFrames); }
+                if (b.anim) { for (const [k, animFrames] of Object.entries(b.anim)) { if (!k.startsWith('_')) collectTextures(animFrames); } }
                 if (b.bulletData) collectTextures(b.bulletData.texture);
             }
 

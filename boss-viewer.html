@@ -301,6 +301,7 @@
                 var firstFrame = null;
                 if (boss.anim) {
                     for (var k in boss.anim) {
+                        if (k.startsWith("_")) continue;
                         if (boss.anim[k] && boss.anim[k].length > 0) {
                             firstFrame = boss.anim[k][0];
                             break;
@@ -356,6 +357,7 @@
                 if (!boss || !boss.anim) return;
 
                 for (var animName in boss.anim) {
+                    if (animName.startsWith("_")) continue;
                     var animKey = bossId + "_" + animName;
                     if (this.anims.exists(animKey)) continue;
 
@@ -422,6 +424,7 @@
             if (!boss || !boss.anim) return;
 
             for (var animName in boss.anim) {
+                if (animName.startsWith("_")) continue;
                 (function(name) {
                     var btn = document.createElement("button");
                     btn.className = "anim-btn";
