@@ -378,6 +378,10 @@ export class BootScene extends Phaser.Scene {
                     baseRecipe.enemyData = merged;
                 }
 
+                if (data.bossData) {
+                    baseRecipe.bossData = JSON.parse(JSON.stringify(data.bossData));
+                }
+
                 gameState._phaserRecipe = baseRecipe;
 
                 var stageId = stageParam != null
