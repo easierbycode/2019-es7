@@ -651,6 +651,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             var firstFrame = null;
             if (boss.anim) {
                 for (var k in boss.anim) {
+                    if (k.startsWith("_")) continue;
                     if (boss.anim[k] && boss.anim[k].length > 0) { firstFrame = boss.anim[k][0]; break; }
                 }
             }
@@ -672,6 +673,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             var boss = bossData[bossId];
             if (!boss || !boss.anim) return;
             for (var animName in boss.anim) {
+                if (animName.startsWith("_")) continue;
                 var key = bossId + "_" + animName;
                 if (this.anims.exists(key)) continue;
                 var frameNames = boss.anim[animName];
