@@ -655,11 +655,90 @@
 
         // ================== FILE SYSTEM ==================
         async function loadDirectory() {
-            try {
-                dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
-                document.getElementById('status').innerHTML = `<span style="color:#84cc16">Loaded: ${dirHandle.name}</span>`;
-                await loadGameFiles();
-            } catch (e) { alert("Directory picker cancelled or not supported"); }
+            if (window.showDirectoryPicker) {
+                try {
+                    dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+                    document.getElementById('status').innerHTML = `<span style="color:#84cc16">Loaded: ${dirHandle.name}</span>`;
+                    await loadGameFiles();
+                } catch (e) { alert("Directory picker cancelled or not supported"); }
+            } else {
+                // Fallback for mobile / browsers without File System Access API
+                loadDirectoryViaInput();
+            }
+        }
+
+        function loadDirectoryViaInput() {
+            let inp = document.getElementById('dir-fallback-input');
+            if (!inp) {
+                inp = document.createElement('input');
+                inp.id = 'dir-fallback-input';
+                inp.type = 'file';
+                inp.webkitdirectory = true;
+                inp.multiple = true;
+                inp.style.display = 'none';
+                document.body.appendChild(inp);
+            }
+            inp.onchange = async () => {
+                const files = Array.from(inp.files || []);
+                if (!files.length) return;
+                try {
+                    await loadGameFilesFromFileList(files);
+                } catch (e) { alert('Failed to load game files: ' + e.message); }
+                inp.value = '';
+            };
+            inp.click();
+        }
+
+        async function loadGameFilesFromFileList(files) {
+            // Build a path -> File map for quick lookup
+            const fileMap = {};
+            for (const f of files) {
+                // webkitRelativePath: "dirname/assets/game.json"
+                const rel = (f.webkitRelativePath || f.name).replace(/^[^/]+\//, '');
+                fileMap[rel] = f;
+                fileMap[rel.replace(/\\/g, '/')] = f;
+            }
+
+            function findFile(name) {
+                // Try exact, then under assets/
+                return fileMap[name] || fileMap['assets/' + name] || fileMap[name.toLowerCase()] || null;
+            }
+
+            // Load game.json
+            const gameJsonFile = findFile('game.json') || findFile('assets/game.json');
+            if (!gameJsonFile) { alert('game.json not found in selected folder'); return; }
+            gameData = JSON.parse(await gameJsonFile.text());
+
+            enemyData = gameData.enemyData || {};
+            if (!enemyData || Object.keys(enemyData).length === 0) {
+                for (let k in gameData) {
+                    if (k.includes('enemy') && typeof gameData[k] === 'object') enemyData[k] = gameData[k];
+                }
+            }
+            bossData = gameData.bossData || {};
+
+            // Load atlas JSON
+            const atlasJsonFile = findFile('_game_asset.json') || findFile('game_asset.json') || findFile('assets/game_asset.json');
+            if (atlasJsonFile) {
+                atlasData = normalizeAtlasData(JSON.parse(await atlasJsonFile.text()));
+            }
+
+            // Load atlas PNG
+            const atlasPngFile = findFile('_game_asset.png') || findFile('img/_game_asset.png')
+                || findFile('game_asset.png') || findFile('img/game_asset.png')
+                || findFile('assets/img/game_asset.png');
+            if (atlasPngFile) {
+                atlasImage = new Image();
+                atlasImage.src = URL.createObjectURL(atlasPngFile);
+                await new Promise((res, rej) => { atlasImage.onload = res; atlasImage.onerror = rej; });
+                buildFrameThumbs();
+            }
+
+            const dirName = (files[0].webkitRelativePath || '').split('/')[0] || 'folder';
+            document.getElementById('status').innerHTML = `<span style="color:#84cc16">Loaded: ${dirName}</span>`;
+            populateStagePills();
+            loadCurrentStage();
+            renderAll();
         }
 
         async function getFileHandle(pathParts) {
