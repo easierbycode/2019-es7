@@ -330,7 +330,7 @@ export class BootScene extends Phaser.Scene {
         }
 
         var explicitLevel = readLevelParam();
-        var levelName = explicitLevel || "2028";
+        var levelName = explicitLevel || "foo";
         this._loadFirebaseLevel(levelName, !explicitLevel);
     }
 

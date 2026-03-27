@@ -220,8 +220,8 @@ function loadAllAssets() {
     // Load cyber-liberty player spritesheet (32x32 frames)
     loadSpritesheet("cyber-liberty", "assets/cyber_liberty.png", 32, 32);
 
-    // Load 2028 level custom enemy atlas (pre-exported from Firebase)
-    loadAtlas("level_atlas", "assets/level_2028_atlas.png", "assets/level_2028_atlas.json");
+    // Load foo level custom enemy atlas (pre-exported from Firebase)
+    loadAtlas("level_atlas", "assets/level_foo_atlas.png", "assets/level_foo_atlas.json");
 
     // Load game recipe (level data)
     var recipeText = std.loadFile("assets/game.json");
@@ -236,9 +236,9 @@ function loadAllAssets() {
     // Normalize recipe: map web format -> PS2 format
     normalizeRecipe(gameState.recipe);
 
-    // Load and merge the pre-exported Firebase 2028 level
-    // This file is a JSON export of the Firebase levels/2028 entry
-    loadFirebaseLevel(gameState.recipe, "assets/level_2028.json");
+    // Load and merge the pre-exported Firebase foo level
+    // This file is a JSON export of the Firebase levels/foo entry
+    loadFirebaseLevel(gameState.recipe, "assets/level_foo.json");
 
     // Initialize player data defaults from recipe
     if (gameState.recipe && gameState.recipe.playerData) {
