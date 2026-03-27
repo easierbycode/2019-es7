@@ -656,7 +656,7 @@
         // ================== FILE SYSTEM ==================
         async function loadDirectory() {
             try {
-                dirHandle = await window.showDirectoryPicker();
+                dirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
                 document.getElementById('status').innerHTML = `<span style="color:#84cc16">Loaded: ${dirHandle.name}</span>`;
                 await loadGameFiles();
             } catch (e) { alert("Directory picker cancelled or not supported"); }
@@ -1503,6 +1503,10 @@
             event.target.value = '';
             if (!dirHandle) { alert("Load game directory first"); return; }
             try {
+                // Ensure write permission is active — onchange counts as user activation
+                if ((await dirHandle.requestPermission({ mode: 'readwrite' })) !== 'granted') {
+                    alert('Write permission required'); return;
+                }
                 const ah = await dirHandle.getDirectoryHandle(ATLAS_DIR, { create: true });
                 const fh = await ah.getFileHandle('title_bg.jpg', { create: true });
                 const w = await fh.createWritable();
