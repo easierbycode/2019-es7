@@ -747,9 +747,30 @@
             checkMissingTextures();
         }
 
-        function checkMissingTextures() {
+        async function checkMissingTextures() {
             if (!atlasData || !atlasData.frames) return;
-            const frames = atlasData.frames;
+            const frames = Object.assign({}, atlasData.frames);
+
+            // Also load game_ui and game_asset atlases from root for cross-atlas verification
+            for (const altKey of ['game_ui', 'game_asset']) {
+                if (ATLAS_CONFIGS[altKey] && altKey !== currentAtlasKey) {
+                    try {
+                        let altJson;
+                        if (dirHandle) {
+                            const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                            altJson = JSON.parse(await (await (await ad.getFileHandle(ATLAS_CONFIGS[altKey].json)).getFile()).text());
+                        } else {
+                            const resp = await fetch('assets/' + ATLAS_CONFIGS[altKey].json);
+                            if (resp.ok) altJson = await resp.json();
+                        }
+                        if (altJson) {
+                            const norm = normalizeAtlasData(altJson);
+                            if (norm && norm.frames) Object.assign(frames, norm.frames);
+                        }
+                    } catch (e) { /* alt atlas not available, skip */ }
+                }
+            }
+
             const missing = new Set();
 
             function collectTextures(texArr) {
@@ -1563,6 +1584,23 @@
                     }
                 }
             }
+            // Boss textures
+            for (const k of Object.keys(bossData)) {
+                const b = bossData[k];
+                if (b && b.anim) {
+                    for (const [ak, animFrames] of Object.entries(b.anim)) {
+                        if (ak.startsWith('_') || !Array.isArray(animFrames)) continue;
+                        for (const tex of animFrames) {
+                            if (tex && frameThumbs[tex]) thumbs[fbKeyEncode(tex)] = frameThumbs[tex].toDataURL('image/png');
+                        }
+                    }
+                }
+                if (b && b.bulletData && b.bulletData.texture) {
+                    for (const tex of b.bulletData.texture) {
+                        if (tex && frameThumbs[tex]) thumbs[fbKeyEncode(tex)] = frameThumbs[tex].toDataURL('image/png');
+                    }
+                }
+            }
             // Powerup frames
             for (const pt of POWERUP_TYPES) {
                 if (pt.frame && frameThumbs[pt.frame]) thumbs[fbKeyEncode(pt.frame)] = frameThumbs[pt.frame].toDataURL('image/png');
@@ -1606,7 +1644,7 @@
             try {
                 const payload = {
                     name, stageKey: currentStageKey, enemylist: normalizeGrid(currentGrid),
-                    enemyData: enemyData || {}, width: 8, savedAt: firebase.database.ServerValue.TIMESTAMP
+                    enemyData: enemyData || {}, bossData: bossData || {}, width: 8, savedAt: firebase.database.ServerValue.TIMESTAMP
                 };
                 const thumbs = buildFrameThumbnailsForSave();
                 if (thumbs) payload.frameThumbnails = thumbs;
@@ -1638,6 +1676,7 @@
                 if (!d) { alert(`"${name}" not found`); return false; }
                 currentGrid = normalizeGrid(d.enemylist || []);
                 if (d.enemyData && typeof d.enemyData === 'object') enemyData = d.enemyData;
+                if (d.bossData && typeof d.bossData === 'object') bossData = d.bossData;
                 if (d.stageKey) currentStageKey = d.stageKey;
                 document.getElementById('firebase-level-name').value = name;
                 document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Firebase: ${name}</span>`;

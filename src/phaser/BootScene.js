@@ -378,6 +378,45 @@ export class BootScene extends Phaser.Scene {
                     baseRecipe.enemyData = merged;
                 }
 
+                if (data.bossData) {
+                    // Merge Firebase boss data, keeping local anim textures when
+                    // Firebase textures don't exist in the loaded atlas
+                    var mergedBoss = JSON.parse(JSON.stringify(data.bossData));
+                    var localBossData = baseRecipe.bossData ? JSON.parse(JSON.stringify(baseRecipe.bossData)) : {};
+                    try {
+                        var bossAtlas = self.textures.get("game_asset");
+                        var bossAtlasFrames = bossAtlas && bossAtlas.frames ? bossAtlas.frames : null;
+                        if (bossAtlasFrames) {
+                            for (var bk in mergedBoss) {
+                                var fb = mergedBoss[bk];
+                                var lb = localBossData[bk];
+                                if (fb && fb.anim) {
+                                    for (var ak in fb.anim) {
+                                        if (ak.startsWith('_')) continue;
+                                        var fbAnim = fb.anim[ak];
+                                        if (Array.isArray(fbAnim) && fbAnim.length > 0 && !bossAtlasFrames[fbAnim[0]]) {
+                                            if (lb && lb.anim && lb.anim[ak]) {
+                                                fb.anim[ak] = lb.anim[ak];
+                                            }
+                                        }
+                                    }
+                                }
+                                if (fb && fb.bulletData && fb.bulletData.texture) {
+                                    var fbBulletTex = fb.bulletData.texture;
+                                    if (fbBulletTex.length > 0 && !bossAtlasFrames[fbBulletTex[0]]) {
+                                        if (lb && lb.bulletData && lb.bulletData.texture) {
+                                            fb.bulletData.texture = lb.bulletData.texture;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } catch (bossTexErr) {
+                        console.warn("Boss texture resolution failed, using Firebase boss data as-is:", bossTexErr);
+                    }
+                    baseRecipe.bossData = mergedBoss;
+                }
+
                 gameState._phaserRecipe = baseRecipe;
 
                 var stageId = stageParam != null
