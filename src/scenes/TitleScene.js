@@ -16,6 +16,7 @@ import {
     getWorldBestLabel,
 } from "../highScoreUi.js";
 import { play as playSound } from "../soundManager.js";
+import { pollGamepads } from "../phaser/GamepadInput.js";
 import { StartButton } from "../ui/StartButton.js";
 import { HowtoButton } from "../ui/HowtoButton.js";
 import { StaffrollButton } from "../ui/StaffrollButton.js";
@@ -73,6 +74,22 @@ export class TitleScene extends BaseScene {
         }
 
         this.refreshHighScoreUi();
+
+        // Gamepad: R3 launches level editor, face/start buttons begin game
+        var gp = pollGamepads();
+        if (!this.transitioning) {
+            if (gp.editor) {
+                this.launchLevelEditor();
+            } else if (gp.sp || gp.enter) {
+                this.titleStart();
+            }
+        }
+    }
+
+    launchLevelEditor() {
+        try {
+            window.open("level-editor.html", "_blank");
+        } catch (e) {}
     }
 
     run() {
