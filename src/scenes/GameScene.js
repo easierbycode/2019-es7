@@ -12,7 +12,8 @@ import { globals } from "../globals.js";
 import { HitTester } from "../HitTester.js";
 import { CUSTOM_EVENTS } from "../events/custom-events.js";
 import { BOSS_STATES } from "../enums/player-boss-states.js";
-import { play, bgmPlay, stop } from "../soundManager.js";
+import { play, bgmPlay, stop, pauseAll, resumeAll } from "../soundManager.js";
+import { pollGamepads } from "../phaser/GamepadInput.js";
 import { Player } from "../game-objects/Player.js";
 import { Enemy } from "../game-objects/Enemy.js";
 import { Bullet } from "../game-objects/Bullet.js";
@@ -242,6 +243,32 @@ export class GameScene extends BaseScene {
         this.stageEnemyPositionList = [];
         this.stageBgmName = "";
         this._sceneRemovedHandled = false;
+
+        this._pauseKeyDown = false;
+        this._onPauseKeyDown = (e) => {
+            if (e.keyCode === 13 || e.keyCode === 27) { // Enter or Escape
+                if (!this._pauseKeyDown) {
+                    this._togglePause();
+                }
+                this._pauseKeyDown = true;
+            }
+        };
+        this._onPauseKeyUp = (e) => {
+            if (e.keyCode === 13 || e.keyCode === 27) {
+                this._pauseKeyDown = false;
+            }
+        };
+        document.addEventListener("keydown", this._onPauseKeyDown);
+        document.addEventListener("keyup", this._onPauseKeyUp);
+    }
+
+    _togglePause() {
+        gameState.paused = gameState.paused ? 0 : 1;
+        if (gameState.paused) {
+            pauseAll();
+        } else {
+            resumeAll();
+        }
     }
 
     normalizeRecipeProjectileData() {
@@ -287,6 +314,14 @@ export class GameScene extends BaseScene {
     }
 
     loop() {
+        const gp = pollGamepads();
+        if (gp.enter) {
+            this._togglePause();
+        }
+        if (gameState.paused) {
+            return;
+        }
+
         const frame = Number(gameState.frame || 0);
         gameState.frame = frame === 59 ? 0 : frame + 1;
 
@@ -1208,6 +1243,11 @@ export class GameScene extends BaseScene {
             return;
         }
         this._sceneRemovedHandled = true;
+
+        document.removeEventListener("keydown", this._onPauseKeyDown);
+        document.removeEventListener("keyup", this._onPauseKeyUp);
+
+        gameState.paused = 0;
 
         if (this.stageBgmName) {
             stop(this.stageBgmName);
