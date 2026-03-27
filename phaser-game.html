@@ -400,14 +400,40 @@
             function swapCoords(e) {
                 var cx = e.clientX;
                 var cy = e.clientY;
-                Object.defineProperty(e, "clientX", { value: cy });
-                Object.defineProperty(e, "clientY", { value: vh - cx });
+                Object.defineProperty(e, "clientX", { value: cy, configurable: true });
+                Object.defineProperty(e, "clientY", { value: vh - cx, configurable: true });
+                Object.defineProperty(e, "pageX", { value: cy, configurable: true });
+                Object.defineProperty(e, "pageY", { value: vh - cx, configurable: true });
             }
             var evts = ["pointerdown", "pointerup", "pointermove",
                         "mousedown", "mouseup", "mousemove"];
             for (var i = 0; i < evts.length; i++) {
                 canvas.addEventListener(evts[i], swapCoords, true);
             }
+        }
+
+        // -----------------------------------------------------------------------
+        // Fix Phaser hit-testing under external CSS scaling.
+        // Phaser 4's ScaleManager.transformX/Y map page coordinates to game
+        // coordinates.  With Scale.NONE the built-in displayScale usually
+        // tracks the CSS-scaled canvas correctly, but on high-DPI devices or
+        // when the canvas resolution !== gameSize the ratio can drift.
+        // We override transformX/Y to always use gameSize / canvasBounds,
+        // which is correct for any DPR, CSS scale, or rotation (since the
+        // rotation patch already provides a virtual canvasBounds).
+        // -----------------------------------------------------------------------
+        function fixPhaserTransform() {
+            var game = window.__PHASER_4_GAME__;
+            if (!game || !game.scale) return;
+            var GW = 256, GH = 480;
+            game.scale.transformX = function (pageX) {
+                var cb = this.canvasBounds;
+                return (pageX - cb.x) * (GW / cb.width);
+            };
+            game.scale.transformY = function (pageY) {
+                var cb = this.canvasBounds;
+                return (pageY - cb.y) * (GH / cb.height);
+            };
         }
 
         // Prevent back-navigation
@@ -526,6 +552,7 @@
         }).then(function () {
             createPhaserGame();
             fitCanvas();
+            fixPhaserTransform();
         });
     </script>
 </body>

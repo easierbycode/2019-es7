@@ -228,25 +228,10 @@ jobs:
           cd src/ps2/deploy
           bash build.sh
 
-      - name: Prepare ISO root
-        run: |
-          mkdir -p iso_root
-          # Copy build output
-          cp src/ps2/deploy/build/main.js iso_root/main.js
-          cp -r src/ps2/deploy/build/assets iso_root/assets
-
-          # ATHA_000.01 is athena.elf renamed for PS2 ISO 8.3 naming
-          cp src/ps2/deploy/build/athena.elf iso_root/ATHA_000.01
-
-          # SYSTEM.CNF — PS2 boot descriptor
-          printf 'BOOT2 = cdrom0:\\ATHA_000.01;1\nVER = 1.00\nVMODE = NTSC\n' > iso_root/SYSTEM.CNF
-
-          # athena.ini — AthenaEnv v4 configuration
-          printf 'boot_logo = false\ndark_mode = true\ndefault_script = "main.js"\n\n# IOP module loading\naudsrv = true\n' > iso_root/athena.ini
-
       - name: Create PS2 ISO
         run: |
-          genisoimage -udf -l -allow-lowercase -allow-multidot -o ps2.iso iso_root/
+          genisoimage -udf -l -allow-lowercase -allow-multidot \
+            -o ps2.iso src/ps2/deploy/build/
           ls -lh ps2.iso
 
       - name: Upload PS2 ISO artifact

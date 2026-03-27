@@ -66,7 +66,10 @@ function addTween(opts) {
     return id;
 }
 
+var tweensPaused = 0;
+
 function updateTweens(dt) {
+    if (tweensPaused) return;
     for (var i = tweens.length - 1; i >= 0; i--) {
         var tw = tweens[i];
         if (!tw.active) {

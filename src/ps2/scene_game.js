@@ -7,9 +7,23 @@ function updateGameScene() {
 
     // Pause toggle
     if (isStartPressed()) {
-        gameState.paused = gameState.paused ? 0 : 1;
+        if (gameState.paused) {
+            // Unpause: resume timers/tweens
+            gameState.paused = 0;
+            timersPaused = 0;
+            tweensPaused = 0;
+        } else {
+            // Pause: freeze timers/tweens, reset menu cursor
+            gameState.paused = 1;
+            gameState.pauseCursor = 0;
+            timersPaused = 1;
+            tweensPaused = 1;
+        }
     }
-    if (gameState.paused) return;
+    if (gameState.paused) {
+        updatePauseMenu();
+        return;
+    }
 
     // Turbo mode toggle: SELECT + DPAD_DOWN
     if (!gs.turboEffectActive && isTurboToggle()) {
@@ -422,11 +436,9 @@ function drawGameScene() {
         drawTurboEffect(gs);
     }
 
-    // Pause overlay
+    // Pause menu overlay
     if (gameState.paused) {
-        Draw.rect(0, 0, SCREEN_W, SCREEN_H, Color.new(0, 0, 0, 64));
-        fontPrint(toScreenX(GCX - 25), toScreenY(GCY - 10),
-            "PAUSE", Color.new(255, 255, 255));
+        drawPauseMenu();
     }
 }
 
@@ -681,6 +693,67 @@ function drawTurboEffect(gs) {
         var fa = Math.floor(gs.turboFlashAlpha * 128);
         Draw.rect(0, 0, SCREEN_W, SCREEN_H, Color.new(255, 255, 255, fa));
     }
+}
+
+// --- Pause menu ---
+
+function updatePauseMenu() {
+    // Navigate cursor
+    if (isUpPressed()) {
+        gameState.pauseCursor--;
+        if (gameState.pauseCursor < 0) gameState.pauseCursor = 1;
+    }
+    if (isDownPressed()) {
+        gameState.pauseCursor++;
+        if (gameState.pauseCursor > 1) gameState.pauseCursor = 0;
+    }
+
+    // Confirm selection
+    if (isConfirmPressed()) {
+        if (gameState.pauseCursor === 0) {
+            // Resume
+            gameState.paused = 0;
+            timersPaused = 0;
+            tweensPaused = 0;
+        } else {
+            // Quit to title
+            gameState.paused = 0;
+            timersPaused = 0;
+            tweensPaused = 0;
+            stopAllSounds();
+            switchScene(SCENE_TITLE);
+        }
+    }
+}
+
+function drawPauseMenu() {
+    // Dim overlay
+    Draw.rect(0, 0, SCREEN_W, SCREEN_H, Color.new(0, 0, 0, 80));
+
+    var menuX = GCX - 40;
+    var menuY = GCY - 40;
+    var white = Color.new(255, 255, 255);
+    var gray = Color.new(100, 100, 100);
+    var yellow = Color.new(255, 255, 0);
+
+    // Title
+    fontPrint(toScreenX(menuX - 2), toScreenY(menuY), "PAUSE", white);
+
+    // Menu items
+    var items = ["RESUME", "QUIT"];
+    for (var i = 0; i < items.length; i++) {
+        var iy = menuY + 30 + i * 20;
+        var col = (i === gameState.pauseCursor) ? yellow : gray;
+        // Cursor arrow
+        if (i === gameState.pauseCursor) {
+            fontPrint(toScreenX(menuX - 2), toScreenY(iy), ">", yellow);
+        }
+        fontPrint(toScreenX(menuX + 10), toScreenY(iy), items[i], col);
+    }
+
+    // Controls hint
+    fontPrint(toScreenX(menuX - 10), toScreenY(menuY + 80),
+        "START:BACK", Color.new(140, 140, 140));
 }
 
 // --- AABB helper ---

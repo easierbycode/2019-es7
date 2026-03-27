@@ -151,6 +151,9 @@ function initAdvScene() {
 
 function initGameScene() {
     gameState.paused = 0;
+    gameState.pauseCursor = 0;
+    timersPaused = 0;
+    tweensPaused = 0;
     var gs = gameSceneState;
     gs.waveCount = 0;
     gs.frameCnt = 0;

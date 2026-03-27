@@ -47,7 +47,10 @@ function removeTimer(id) {
     }
 }
 
+var timersPaused = 0;
+
 function updateTimers(dt) {
+    if (timersPaused) return;
     for (var i = timers.length - 1; i >= 0; i--) {
         var t = timers[i];
         if (!t.active) {

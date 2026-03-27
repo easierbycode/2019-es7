@@ -50,6 +50,14 @@ function isDownHeld() {
     return isDown(Pads.DOWN) || getAnalogY() > 0.3;
 }
 
+function isUpPressed() {
+    return isPressed(Pads.UP);
+}
+
+function isDownPressed() {
+    return isPressed(Pads.DOWN);
+}
+
 function isFirePressed() {
     return isPressed(Pads.CROSS) || isPressed(Pads.CIRCLE);
 }

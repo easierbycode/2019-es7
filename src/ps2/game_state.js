@@ -17,6 +17,7 @@ var gameState = {
     secondLoop: 0,
     recipe: null,
     paused: 0,
+    pauseCursor: 0,
     turboMode: 0,
 };
 
