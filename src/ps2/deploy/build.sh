@@ -291,9 +291,9 @@ if [ -f "$PS2_ASSETS/level_2028.json" ]; then
 fi
 
 # Copy cyber-liberty player spritesheet (small enough, no downscale needed)
-if [ -f "$PS2_ASSETS/cyber-liberty.png" ]; then
-    cp "$PS2_ASSETS/cyber-liberty.png" "$BUILD_DIR/assets/cyber-liberty.png"
-    echo "  Copied cyber-liberty.png"
+if [ -f "$PS2_ASSETS/cyber_liberty.png" ]; then
+    cp "$PS2_ASSETS/cyber_liberty.png" "$BUILD_DIR/assets/cyber_liberty.png"
+    echo "  Copied cyber_liberty.png"
 fi
 
 # Copy game recipe

@@ -218,7 +218,7 @@ function loadAllAssets() {
     loadAtlas("game_asset", "assets/game_asset.png", "assets/game_asset.json");
 
     // Load cyber-liberty player spritesheet (32x32 frames)
-    loadSpritesheet("cyber-liberty", "assets/cyber-liberty.png", 32, 32);
+    loadSpritesheet("cyber-liberty", "assets/cyber_liberty.png", 32, 32);
 
     // Load 2028 level custom enemy atlas (pre-exported from Firebase)
     loadAtlas("level_atlas", "assets/level_2028_atlas.png", "assets/level_2028_atlas.json");
