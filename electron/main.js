@@ -108,7 +108,7 @@ function createWindow() {
         },
     });
 
-    win.loadURL("app://game/phaser-game.html?level=2028");
+    win.loadURL("app://game/phaser-game.html?level=foo");
 
     win.webContents.on("did-finish-load", function () {
         // When xrandr physically rotated the display, mark <html> so the

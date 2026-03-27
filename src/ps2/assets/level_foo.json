@@ -1,0 +1,718 @@
+{
+  "enemylist": [
+    [
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "R0",
+      "S0",
+      "R0",
+      "A0",
+      "A0",
+      "R0",
+      "S0",
+      "R0"
+    ],
+    [
+      "B1",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "B0",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "B3"
+    ],
+    [
+      "B0",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "B0"
+    ],
+    [
+      "A0",
+      "A0",
+      "A0",
+      "00",
+      "00",
+      "A0",
+      "A0",
+      "A0"
+    ],
+    [
+      "00",
+      "00",
+      "A0",
+      "A0",
+      "A0",
+      "A0",
+      "00",
+      "00"
+    ],
+    [
+      "B0",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "B0"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "00",
+      "A3",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "B0",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "B0"
+    ],
+    [
+      "B0",
+      "00",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "B0"
+    ],
+    [
+      "R0",
+      "S0",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "S0",
+      "R0"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "S0",
+      "R0",
+      "S0",
+      "A2",
+      "A3",
+      "S0",
+      "R0",
+      "S0"
+    ],
+    [
+      "A0",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "A1"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "B0",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "B0"
+    ],
+    [
+      "A0",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "A0"
+    ],
+    [
+      "A0",
+      "A0",
+      "00",
+      "00",
+      "00",
+      "00",
+      "A0",
+      "A0"
+    ],
+    [
+      "A0",
+      "A0",
+      "A0",
+      "00",
+      "00",
+      "A0",
+      "A0",
+      "A0"
+    ],
+    [
+      "00",
+      "00",
+      "A0",
+      "A0",
+      "A0",
+      "A0",
+      "00",
+      "00"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "A0",
+      "A0",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "A0",
+      "A3",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "R0",
+      "S0",
+      "R0",
+      "00",
+      "00",
+      "R0",
+      "S0",
+      "R0"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "A2",
+      "A0",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "S0",
+      "R0",
+      "S0",
+      "00",
+      "00",
+      "S0",
+      "R0",
+      "S0"
+    ],
+    [
+      "B9",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "00",
+      "B3"
+    ],
+    [
+      "R0",
+      "S0",
+      "A0",
+      "A3",
+      "A0",
+      "A0",
+      "S0",
+      "R0"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "00",
+      "A1",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "S0",
+      "R0",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "R0",
+      "S0"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "R0",
+      "S0",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "S0",
+      "R0"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "B3",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "00",
+      "B9"
+    ],
+    [
+      "00",
+      "A0",
+      "A0",
+      "A0",
+      "A0",
+      "A0",
+      "A0",
+      "00"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "A0",
+      "00",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "A0"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "A3",
+      "00",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "A0",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "00",
+      "A0"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "00"
+    ],
+    [
+      "00",
+      "00",
+      "00",
+      "A0",
+      "00",
+      "00",
+      "00",
+      "00"
+    ]
+  ],
+  "stageKey": "stage0",
+  "enemyData": {
+    "enemyA": {
+      "cagage": 4,
+      "hp": 1,
+      "interval": 300,
+      "name": "redEyeOcto",
+      "projectileData": {
+        "cagage": 2,
+        "damage": 1,
+        "hp": 1,
+        "score": 100,
+        "sound": [
+          "bullet_ultra1",
+          "bullet_ultra2",
+          "bullet_ultra3",
+          "bullet_ultra4"
+        ],
+        "speed": 1,
+        "texture": [
+          "redEyeOctoProjectile0.png",
+          "redEyeOctoProjectile1.png"
+        ]
+      },
+      "score": 100,
+      "shadowOffsetY": 10,
+      "shadowReverse": true,
+      "speed": 0.8,
+      "texture": [
+        "redEyeOcto0.png",
+        "redEyeOcto1.png",
+        "redEyeOcto2.png",
+        "redEyeOcto3.png"
+      ]
+    },
+    "enemyB": {
+      "cagage": 7,
+      "hp": 3,
+      "interval": 60,
+      "name": "stickman",
+      "projectileData": {
+        "cagage": 2,
+        "damage": 1,
+        "hp": 2,
+        "score": 100,
+        "sound": [
+          "balloon_people"
+        ],
+        "speed": 2,
+        "texture": [
+          "stickmanBullet0.png",
+          "stickmanBullet1.png"
+        ]
+      },
+      "score": 200,
+      "shadowOffsetY": 10,
+      "shadowReverse": true,
+      "speed": 0.7,
+      "texture": [
+        "stickman0.png",
+        "stickman1.png",
+        "stickman2.png",
+        "stickman3.png",
+        "stickman4.png",
+        "stickman5.png"
+      ]
+    },
+    "enemyC": {
+      "cagage": 5,
+      "hp": 1,
+      "interval": 170,
+      "name": "flirtyGirl",
+      "projectileData": {
+        "cagage": 1,
+        "damage": 1,
+        "hp": 1,
+        "score": 100,
+        "sound": [
+          "smooch"
+        ],
+        "speed": 1.2,
+        "texture": [
+          "flirtyGirlProjectile0.png",
+          "flirtyGirlProjectile1.png",
+          "flirtyGirlProjectile2.png"
+        ]
+      },
+      "score": 200,
+      "shadowOffsetY": 30,
+      "shadowReverse": false,
+      "speed": 0.8,
+      "texture": [
+        "flirtyGirl0.png",
+        "flirtyGirl1.png"
+      ]
+    },
+    "enemyD": {
+      "cagage": 10,
+      "hp": 5,
+      "interval": -1,
+      "name": "tiger",
+      "score": 200,
+      "shadowOffsetY": 35,
+      "shadowReverse": false,
+      "speed": 1.5,
+      "texture": [
+        "tiger0.png",
+        "tiger1.png",
+        "tiger2.png",
+        "tiger3.png",
+        "tiger4.png",
+        "tiger5.png",
+        "tiger6.png",
+        "tiger7.png",
+        "tiger8.png",
+        "tiger9.png"
+      ]
+    },
+    "enemyO": {
+      "cagage": 1,
+      "hp": 5,
+      "interval": -1,
+      "name": "ufo",
+      "score": 100,
+      "shadowOffsetY": 10,
+      "shadowReverse": true,
+      "speed": 0.7,
+      "texture": [
+        "ufo0.png",
+        "ufo1.png",
+        "ufo2.png",
+        "ufo3.png",
+        "ufo4.png",
+        "ufo5.png"
+      ]
+    },
+    "enemyP": {
+      "cagage": 1,
+      "hp": 18,
+      "interval": -1,
+      "name": "asteroidFace",
+      "score": 300,
+      "shadowOffsetY": 10,
+      "shadowReverse": true,
+      "speed": 0.7,
+      "texture": [
+        "asteroidFace0.png",
+        "asteroidFace1.png"
+      ]
+    },
+    "enemyQ": {
+      "cagage": 1,
+      "hp": 30,
+      "interval": 100,
+      "name": "launchpad",
+      "projectileData": {
+        "cagage": 1,
+        "damage": 1,
+        "hp": 1,
+        "score": 400,
+        "sound": [
+          "cannon"
+        ],
+        "speed": 3.8,
+        "texture": [
+          "eyeshot0.png",
+          "eyeshot1.png",
+          "eyeshot2.png",
+          "eyeshot3.png",
+          "eyeshot4.png",
+          "eyeshot5.png",
+          "eyeshot6.png",
+          "eyeshot7.png",
+          "eyeshot8.png",
+          "eyeshot9.png"
+        ]
+      },
+      "score": 300,
+      "shadowOffsetY": 10,
+      "shadowReverse": true,
+      "speed": 0.7,
+      "texture": [
+        "launchpad.png"
+      ]
+    },
+    "enemyR": {
+      "cagage": 1,
+      "hp": 20,
+      "interval": -1,
+      "name": "spikeA",
+      "score": 400,
+      "shadowOffsetY": 10,
+      "shadowReverse": true,
+      "speed": 0.7,
+      "texture": [
+        "spikeC0.png"
+      ]
+    },
+    "enemyS": {
+      "cagage": 2,
+      "hp": 20,
+      "interval": -1,
+      "name": "spikeB",
+      "score": 200,
+      "shadowOffsetY": 10,
+      "shadowReverse": true,
+      "speed": 0.7,
+      "texture": [
+        "spikeD0.png"
+      ]
+    },
+    "enemyT": {
+      "cagage": 5,
+      "hp": 10,
+      "interval": -1,
+      "name": "roseVineA",
+      "score": 300,
+      "shadowOffsetY": 10,
+      "shadowReverse": true,
+      "speed": 0.7,
+      "texture": [
+        "roseVineA.png"
+      ]
+    },
+    "enemyU": {
+      "cagage": 5,
+      "hp": 10,
+      "interval": -1,
+      "name": "roseVineB",
+      "score": 300,
+      "shadowOffsetY": 10,
+      "shadowReverse": true,
+      "speed": 0.7,
+      "texture": [
+        "roseVineB.png"
+      ]
+    },
+    "enemyV": {
+      "cagage": 0,
+      "hp": "infinity",
+      "interval": -1,
+      "name": "orbous",
+      "score": 300,
+      "shadowOffsetY": 10,
+      "shadowReverse": true,
+      "speed": 0.7,
+      "texture": [
+        "orbous0.png",
+        "orbous1.png"
+      ]
+    }
+  },
+  "name": "foo",
+  "width": 8
+}
