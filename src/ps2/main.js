@@ -182,6 +182,25 @@ function loadFirebaseLevel(recipe, levelPath) {
         console.log("[Main] Firebase enemyData merged (level_atlas)");
     }
 
+    // Merge bossData: use Firebase values, tag textures with level_atlas
+    if (data.bossData) {
+        var mergedBoss = JSON.parse(JSON.stringify(data.bossData));
+
+        for (var bk in mergedBoss) {
+            var boss = mergedBoss[bk];
+            if (boss && boss.anim) {
+                boss.atlas = "level_atlas";
+            }
+            var bossProjKey = boss && boss.bulletData ? "bulletData" : null;
+            if (bossProjKey && boss[bossProjKey]) {
+                boss[bossProjKey].atlas = "level_atlas";
+            }
+        }
+
+        recipe.bossData = mergedBoss;
+        console.log("[Main] Firebase bossData merged (level_atlas)");
+    }
+
     // Parse stageId from stageKey and set in gameState
     var stageId = parseInt(stageKey.replace("stage", ""), 10);
     if (isNaN(stageId) || stageId < 0) stageId = 0;
