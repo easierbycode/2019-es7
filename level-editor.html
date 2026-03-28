@@ -190,6 +190,26 @@
         }
 
         .hidden { display: none !important; }
+
+        /* ===== BOSS PATTERN ASSIGNMENT ===== */
+        .boss-pattern-row {
+            display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+            border-radius: 8px; border: 1px solid #333; margin-bottom: 6px; background: #111;
+        }
+        .boss-pattern-thumb {
+            width: 40px; height: 40px; border-radius: 6px; background: #222; flex-shrink: 0;
+            image-rendering: pixelated; object-fit: contain;
+        }
+        .boss-pattern-info { flex: 1; min-width: 0; }
+        .boss-pattern-name { font-size: 13px; font-weight: 600; color: #e2e8f0; }
+        .boss-pattern-key { font-size: 10px; color: #666; font-family: monospace; }
+        .boss-pattern-select {
+            background: #1e293b; color: #e2e8f0; border: 1px solid #475569; border-radius: 6px;
+            padding: 6px 10px; font-size: 12px; font-family: 'Orbitron', sans-serif;
+            cursor: pointer; flex-shrink: 0;
+        }
+        .boss-pattern-select option { background: #1e293b; }
+        .boss-pattern-row.overridden { border-color: #f59e0b; background: #1a1508; }
     </style>
 </head>
 <body>
@@ -281,6 +301,7 @@
         <div class="menu-section">
             <div class="menu-section-title">Advanced</div>
             <button class="menu-btn" onclick="showEnemyEditor()">👾 Enemy Editor</button>
+            <button class="menu-btn" onclick="showBossPatternEditor()">👹 Boss Patterns</button>
             <button class="menu-btn" onclick="showAtlasManager()">🎨 Atlas Manager</button>
             <label class="menu-btn" style="cursor:pointer">
                 <input type="file" id="title-bg-input" accept="image/*" style="display:none" onchange="uploadTitleBg(event)">
@@ -350,6 +371,15 @@
                 <button onclick="repackAtlas()" class="menu-btn" style="flex:1;justify-content:center;">Repack Atlas</button>
             </div>
             <div id="atlas-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;"></div>
+        </div>
+    </div>
+
+    <!-- BOSS PATTERN ASSIGNMENT MODAL -->
+    <div id="boss-pattern-modal" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+        <div class="picker-panel" style="max-height:80vh">
+            <div class="picker-title">BOSS PATTERN ASSIGNMENT</div>
+            <div style="font-size:11px;color:#888;margin-bottom:12px;font-family:monospace;">Assign any boss's attack pattern to any stage boss</div>
+            <div id="boss-pattern-list" style="padding:0 4px;"></div>
         </div>
     </div>
 
@@ -1615,6 +1645,95 @@
                 closeMenu();
                 alert('title_bg.jpg saved to assets/');
             } catch (e) { alert('Save failed: ' + e.message); }
+        }
+
+        // ================== BOSS PATTERN ASSIGNMENT ==================
+        const BOSS_PATTERN_NAMES = {
+            boss0: 'Bison',  boss1: 'Barlog', boss2: 'Sagat',
+            boss3: 'Vega',   boss4: 'Fang',   bossExtra: 'Goki'
+        };
+
+        function showBossPatternEditor() {
+            closeMenu();
+            if (!bossData || Object.keys(bossData).length === 0) {
+                alert('No bossData loaded. Load a game directory or Firebase level first.');
+                return;
+            }
+            renderBossPatternList();
+            document.getElementById('boss-pattern-modal').classList.remove('hidden');
+        }
+
+        function renderBossPatternList() {
+            const list = document.getElementById('boss-pattern-list');
+            list.innerHTML = '';
+            const allBossKeys = Object.keys(bossData).sort();
+            // Pattern sources: all bosses available as patterns
+            const patternOptions = allBossKeys.map(k => ({
+                key: k,
+                label: BOSS_PATTERN_NAMES[k] || bossData[k].name || k
+            }));
+
+            for (const bk of allBossKeys) {
+                const b = bossData[bk];
+                const row = document.createElement('div');
+                row.className = 'boss-pattern-row' + (b.attackPattern ? ' overridden' : '');
+
+                // Thumb
+                const thumb = document.createElement('div');
+                thumb.className = 'boss-pattern-thumb';
+                const idleFrame = b.anim && b.anim.idle && b.anim.idle[0];
+                if (idleFrame) {
+                    const url = getThumbURL(idleFrame);
+                    if (url) {
+                        const img = document.createElement('img');
+                        img.src = url;
+                        img.className = 'boss-pattern-thumb';
+                        thumb.replaceWith(img);
+                        row.appendChild(img);
+                    } else {
+                        thumb.style.cssText += 'display:flex;align-items:center;justify-content:center;font-size:20px;';
+                        thumb.textContent = '👹';
+                        row.appendChild(thumb);
+                    }
+                } else {
+                    thumb.style.cssText += 'display:flex;align-items:center;justify-content:center;font-size:20px;';
+                    thumb.textContent = '👹';
+                    row.appendChild(thumb);
+                }
+
+                // Info
+                const info = document.createElement('div');
+                info.className = 'boss-pattern-info';
+                info.innerHTML = `<div class="boss-pattern-name">${BOSS_PATTERN_NAMES[bk] || b.name || bk}</div><div class="boss-pattern-key">${bk} · HP ${b.hp || '?'}</div>`;
+                row.appendChild(info);
+
+                // Select
+                const sel = document.createElement('select');
+                sel.className = 'boss-pattern-select';
+                // Default option = use own pattern
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = '';
+                defaultOpt.textContent = '(default)';
+                sel.appendChild(defaultOpt);
+                for (const po of patternOptions) {
+                    if (po.key === bk) continue; // skip self
+                    const opt = document.createElement('option');
+                    opt.value = po.key;
+                    opt.textContent = po.label + ' (' + po.key + ')';
+                    sel.appendChild(opt);
+                }
+                sel.value = b.attackPattern || '';
+                sel.onchange = () => {
+                    if (sel.value) {
+                        bossData[bk].attackPattern = sel.value;
+                    } else {
+                        delete bossData[bk].attackPattern;
+                    }
+                    renderBossPatternList();
+                };
+                row.appendChild(sel);
+                list.appendChild(row);
+            }
         }
 
         // ================== KEYBOARD ==================

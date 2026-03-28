@@ -367,7 +367,15 @@ export function bossShootStart(scene) {
         bossPatternGoki(scene, seed);
         return;
     }
-    switch (scene.bossStageId) {
+    // Check for attackPattern override from level editor bossData
+    var patternKey = null;
+    var currentBossData = scene.recipe.bossData ? scene.recipe.bossData["boss" + String(scene.bossStageId)] : null;
+    if (currentBossData && currentBossData.attackPattern) {
+        var m = currentBossData.attackPattern.match(/boss(\d+)/);
+        if (m) patternKey = Number(m[1]);
+    }
+    var patternId = patternKey !== null ? patternKey : scene.bossStageId;
+    switch (patternId) {
     case 0: bossPatternBison(scene, seed); break;
     case 1: bossPatternBarlog(scene, seed); break;
     case 2: bossPatternSagat(scene, seed); break;
