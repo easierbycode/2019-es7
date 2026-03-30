@@ -435,6 +435,32 @@ export class BootScene extends Phaser.Scene {
                     titleImg.src = data.titleBgDataURL;
                 }
 
+                // Replace logo if Firebase provides a custom one
+                if (data.logoDataURL) {
+                    var logoImg = new Image();
+                    logoImg.onload = function () {
+                        try {
+                            self.textures.addImage("custom_logo", logoImg);
+                        } catch (e) {
+                            console.warn("Failed to load custom logo:", e);
+                        }
+                    };
+                    logoImg.src = data.logoDataURL;
+                }
+
+                // Replace subTitle if Firebase provides a custom one
+                if (data.subTitleDataURL) {
+                    var subTitleImg = new Image();
+                    subTitleImg.onload = function () {
+                        try {
+                            self.textures.addImage("custom_subTitle", subTitleImg);
+                        } catch (e) {
+                            console.warn("Failed to load custom subTitle:", e);
+                        }
+                    };
+                    subTitleImg.src = data.subTitleDataURL;
+                }
+
                 gameState._phaserRecipe = baseRecipe;
 
                 var stageId = stageParam != null

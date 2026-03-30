@@ -30,13 +30,21 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.titleG.setOrigin(0, 0);
         this.titleG.setPosition(GAME_DIMENSIONS.WIDTH, 100);
 
-        this.logo = this.add.sprite(0, 0, "game_ui", "logo.gif");
+        if (this.textures.exists("custom_logo")) {
+            this.logo = this.add.sprite(0, 0, "custom_logo");
+        } else {
+            this.logo = this.add.sprite(0, 0, "game_ui", "logo.gif");
+        }
         this.logo.setOrigin(0.5);
         this.logo.setPosition(this.logo.width / 2, -this.logo.height / 2);
         this.logo.setScale(2);
 
-        var subtitleKey = "subTitle" + (LANG === "ja" ? "" : "En") + ".gif";
-        this.subTitle = this.add.sprite(0, 0, "game_ui", subtitleKey);
+        if (this.textures.exists("custom_subTitle")) {
+            this.subTitle = this.add.sprite(0, 0, "custom_subTitle");
+        } else {
+            var subtitleKey = "subTitle" + (LANG === "ja" ? "" : "En") + ".gif";
+            this.subTitle = this.add.sprite(0, 0, "game_ui", subtitleKey);
+        }
         this.subTitle.setOrigin(0.5);
         this.subTitle.setPosition(this.subTitle.width / 2, -this.logo.height / 2);
         this.subTitle.setScale(3);

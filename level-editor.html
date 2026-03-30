@@ -249,28 +249,36 @@
         .story-images-row {
             display: flex; gap: 12px; margin-bottom: 12px;
         }
-        .story-image-slot {
+        .story-image-slot, .title-image-slot {
             flex: 1; border: 1px solid #333; border-radius: 8px; padding: 10px;
             background: #111; text-align: center;
         }
-        .story-image-slot .slot-label {
+        .story-image-slot .slot-label, .title-image-slot .slot-label {
             font-size: 11px; font-weight: 700; color: #888; margin-bottom: 8px;
         }
-        .story-image-slot .slot-preview {
+        .story-image-slot .slot-preview, .title-image-slot .slot-preview {
             width: 100%; aspect-ratio: 256/224; border-radius: 6px; background: #000;
             overflow: hidden; margin-bottom: 8px; position: relative;
         }
-        .story-image-slot .slot-preview img {
+        .title-image-slot .slot-preview { aspect-ratio: auto; min-height: 40px; display:flex; align-items:center; justify-content:center; }
+        .story-image-slot .slot-preview img, .title-image-slot .slot-preview img {
             width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated;
         }
-        .story-image-slot .slot-upload-btn {
+        .title-image-slot .slot-preview img { width: auto; height: auto; max-width: 100%; max-height: 120px; object-fit: contain; }
+        .story-image-slot .slot-upload-btn, .title-image-slot .slot-upload-btn {
             background: #1e293b; color: #94a3b8; border: 1px solid #475569; border-radius: 6px;
             padding: 6px 12px; font-size: 11px; cursor: pointer; width: 100%;
             font-family: 'Orbitron', sans-serif; transition: background 0.15s;
         }
-        .story-image-slot .slot-upload-btn:hover {
+        .story-image-slot .slot-upload-btn:hover, .title-image-slot .slot-upload-btn:hover {
             background: #334155; color: #e2e8f0;
         }
+        .title-image-slot .slot-reset-btn {
+            background: none; color: #f87171; border: 1px solid #7f1d1d; border-radius: 6px;
+            padding: 4px 10px; font-size: 10px; cursor: pointer; margin-top: 6px;
+            font-family: 'Orbitron', sans-serif; transition: background 0.15s;
+        }
+        .title-image-slot .slot-reset-btn:hover { background: #7f1d1d; color: #fca5a5; }
     </style>
 </head>
 <body>
@@ -365,10 +373,7 @@
             <button class="menu-btn" onclick="showBossPatternEditor()">👹 Boss Patterns</button>
             <button class="menu-btn" onclick="showStoryEditor()">📖 Story Editor</button>
             <button class="menu-btn" onclick="showAtlasManager()">🎨 Atlas Manager</button>
-            <label class="menu-btn" style="cursor:pointer">
-                <input type="file" id="title-bg-input" accept="image/*" style="display:none" onchange="uploadTitleBg(event)">
-                🖼 Upload Title Background
-            </label>
+            <button class="menu-btn" onclick="showTitleEditor()">🖼 Title Editor</button>
         </div>
         <div id="status" style="font-size:11px;color:#666;margin-top:16px;">No directory loaded</div>
     </div>
@@ -457,6 +462,15 @@
                 <button onclick="addStoryPart()" class="menu-btn" style="flex:1;justify-content:center;">+ Add Part</button>
                 <button onclick="saveStoryData()" class="menu-btn" style="background:#84cc16;color:#000;font-weight:700;flex:1;justify-content:center;">Save Story</button>
             </div>
+        </div>
+    </div>
+
+    <!-- TITLE EDITOR MODAL -->
+    <div id="title-editor-modal" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+        <div class="picker-panel" style="max-height:80vh">
+            <div class="picker-title">TITLE EDITOR</div>
+            <div style="font-size:11px;color:#888;margin-bottom:12px;font-family:monospace;">Customize title screen logo, subtitle, and background</div>
+            <div id="title-editor-slots" class="story-images-row"></div>
         </div>
     </div>
 
@@ -1747,41 +1761,161 @@
             a.download = `${currentStageKey}-level.json`; a.click();
         }
 
-        // ================== TITLE BACKGROUND UPLOAD ==================
+        // ================== TITLE EDITOR ==================
         let titleBgDataURL = null;
+        let logoDataURL = null;
+        let subTitleDataURL = null;
 
-        async function uploadTitleBg(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            event.target.value = '';
+        // Cached game_ui atlas for title editor preview
+        let _titleEditorUiImage = null;
+        let _titleEditorUiFrames = null;
 
-            // Always store as dataURL for Firebase
+        async function _ensureGameUiAtlas() {
+            if (_titleEditorUiImage && _titleEditorUiFrames) return;
+            try {
+                let jsonData, imgSrc;
+                if (dirHandle) {
+                    const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                    let jsonText;
+                    try { jsonText = await (await (await ad.getFileHandle('_game_ui.json')).getFile()).text(); }
+                    catch { jsonText = await (await (await ad.getFileHandle('game_ui.json')).getFile()).text(); }
+                    jsonData = normalizeAtlasData(JSON.parse(jsonText));
+                    let pngBlob;
+                    try { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle('_game_ui.png')).getFile(); }
+                    catch { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle('game_ui.png')).getFile(); }
+                    imgSrc = URL.createObjectURL(pngBlob);
+                } else {
+                    let resp = await fetch('assets/_game_ui.json');
+                    if (!resp.ok) resp = await fetch('assets/game_ui.json');
+                    jsonData = normalizeAtlasData(await resp.json());
+                    let imgResp = await fetch('assets/img/_game_ui.png');
+                    if (!imgResp.ok) imgResp = await fetch('assets/img/game_ui.png');
+                    imgSrc = URL.createObjectURL(await imgResp.blob());
+                }
+                _titleEditorUiFrames = jsonData.frames;
+                _titleEditorUiImage = new Image();
+                _titleEditorUiImage.src = imgSrc;
+                await new Promise((res, rej) => { _titleEditorUiImage.onload = res; _titleEditorUiImage.onerror = rej; });
+            } catch (e) { console.warn('Could not load game_ui atlas for title editor preview:', e); }
+        }
+
+        function _extractFrameDataURL(frameKey) {
+            if (!_titleEditorUiImage || !_titleEditorUiFrames) return null;
+            const fd = _titleEditorUiFrames[frameKey];
+            if (!fd) return null;
+            const f = fd.frame || fd;
+            const cv = document.createElement('canvas');
+            cv.width = f.w; cv.height = f.h;
+            cv.getContext('2d').drawImage(_titleEditorUiImage, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+            return cv.toDataURL();
+        }
+
+        async function showTitleEditor() {
+            closeMenu();
+            await _ensureGameUiAtlas();
+            renderTitleEditor();
+            document.getElementById('title-editor-modal').classList.remove('hidden');
+        }
+
+        function getTitleSlotPreviewSrc(type) {
+            if (type === 'logo' && logoDataURL) return logoDataURL;
+            if (type === 'subTitle' && subTitleDataURL) return subTitleDataURL;
+            if (type === 'title_bg' && titleBgDataURL) return titleBgDataURL;
+            if (type === 'logo') return _extractFrameDataURL('logo.gif');
+            if (type === 'subTitle') return _extractFrameDataURL('subTitle.gif');
+            if (type === 'title_bg') return 'assets/img/title_bg.jpg';
+            return null;
+        }
+
+        function renderTitleEditor() {
+            const container = document.getElementById('title-editor-slots');
+            container.innerHTML = '';
+            const slots = [
+                { type: 'logo', label: 'Logo', hint: '256 x 88' },
+                { type: 'subTitle', label: 'Subtitle', hint: '256 x 28' },
+                { type: 'title_bg', label: 'Title Background', hint: '256 x 480' },
+            ];
+            slots.forEach(s => {
+                const slot = document.createElement('div');
+                slot.className = 'title-image-slot';
+
+                const label = document.createElement('div');
+                label.className = 'slot-label';
+                label.textContent = s.label;
+                slot.appendChild(label);
+
+                const hint = document.createElement('div');
+                hint.style.cssText = 'font-size:9px;color:#555;margin-bottom:6px;font-family:monospace;';
+                hint.textContent = s.hint;
+                slot.appendChild(hint);
+
+                const preview = document.createElement('div');
+                preview.className = 'slot-preview';
+                const src = getTitleSlotPreviewSrc(s.type);
+                if (src) {
+                    const img = document.createElement('img');
+                    img.src = src;
+                    preview.appendChild(img);
+                } else {
+                    const ph = document.createElement('div');
+                    ph.style.cssText = 'color:#555;font-size:11px;';
+                    ph.textContent = 'Default';
+                    preview.appendChild(ph);
+                }
+                slot.appendChild(preview);
+
+                const uploadBtn = document.createElement('label');
+                uploadBtn.className = 'slot-upload-btn';
+                uploadBtn.textContent = 'Upload Replacement';
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'image/*';
+                fileInput.style.display = 'none';
+                const capturedType = s.type;
+                fileInput.onchange = (e) => {
+                    if (e.target.files[0]) handleTitleImageUpload(capturedType, e.target.files[0]);
+                };
+                uploadBtn.appendChild(fileInput);
+                slot.appendChild(uploadBtn);
+
+                const dataVar = capturedType === 'logo' ? logoDataURL : capturedType === 'subTitle' ? subTitleDataURL : titleBgDataURL;
+                if (dataVar) {
+                    const resetBtn = document.createElement('button');
+                    resetBtn.className = 'slot-reset-btn';
+                    resetBtn.textContent = '\u2715 Reset to Default';
+                    resetBtn.onclick = () => {
+                        if (capturedType === 'logo') logoDataURL = null;
+                        else if (capturedType === 'subTitle') subTitleDataURL = null;
+                        else titleBgDataURL = null;
+                        renderTitleEditor();
+                    };
+                    slot.appendChild(resetBtn);
+                }
+
+                container.appendChild(slot);
+            });
+        }
+
+        async function handleTitleImageUpload(type, file) {
             const reader = new FileReader();
-            reader.onload = () => { titleBgDataURL = reader.result; };
+            reader.onload = () => {
+                if (type === 'logo') logoDataURL = reader.result;
+                else if (type === 'subTitle') subTitleDataURL = reader.result;
+                else titleBgDataURL = reader.result;
+                renderTitleEditor();
+            };
             reader.readAsDataURL(file);
 
-            // Also save to filesystem if directory is loaded
-            if (dirHandle) {
+            // Save to filesystem if directory is loaded
+            if (dirHandle && type === 'title_bg') {
                 try {
-                    if ((await dirHandle.requestPermission({ mode: 'readwrite' })) !== 'granted') {
-                        closeMenu();
-                        alert('Title background stored for Firebase (no write permission for local file)');
-                        return;
-                    }
+                    if ((await dirHandle.requestPermission({ mode: 'readwrite' })) !== 'granted') return;
                     const ah = await dirHandle.getDirectoryHandle(ATLAS_DIR, { create: true });
                     const fh = await ah.getFileHandle('title_bg.jpg', { create: true });
                     const w = await fh.createWritable();
                     await w.write(await file.arrayBuffer());
                     await w.close();
-                    closeMenu();
-                    alert('title_bg.jpg saved to assets/ and stored for Firebase');
-                } catch (e) {
-                    closeMenu();
-                    alert('Local save failed, but title background stored for Firebase: ' + e.message);
-                }
-            } else {
-                closeMenu();
-                alert('Title background stored for Firebase save');
+                } catch (e) { console.warn('Local title_bg save failed:', e); }
             }
         }
 
@@ -2267,6 +2401,8 @@
                 const thumbs = buildFrameThumbnailsForSave();
                 if (thumbs) payload.frameThumbnails = thumbs;
                 if (titleBgDataURL) payload.titleBgDataURL = titleBgDataURL;
+                if (logoDataURL) payload.logoDataURL = logoDataURL;
+                if (subTitleDataURL) payload.subTitleDataURL = subTitleDataURL;
                 // Save atlas image + frame data so the game can load it
                 if (atlasImage && atlasData) {
                     try {
@@ -2302,6 +2438,8 @@
                 }
                 if (d.stageKey) currentStageKey = d.stageKey;
                 titleBgDataURL = d.titleBgDataURL || null;
+                logoDataURL = d.logoDataURL || null;
+                subTitleDataURL = d.subTitleDataURL || null;
                 // Restore atlas image + frame data so re-saving doesn't lose custom sprites
                 if (d.atlasImageDataURL && d.atlasFrames) {
                     const decodedFrames = {};
