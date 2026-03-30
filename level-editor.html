@@ -2302,6 +2302,15 @@
                 }
                 if (d.stageKey) currentStageKey = d.stageKey;
                 titleBgDataURL = d.titleBgDataURL || null;
+                // Restore atlas image + frame data so re-saving doesn't lose custom sprites
+                if (d.atlasImageDataURL && d.atlasFrames) {
+                    const decodedFrames = {};
+                    for (const [k, v] of Object.entries(d.atlasFrames)) decodedFrames[fbKeyDecode(k)] = v;
+                    atlasData = { frames: decodedFrames };
+                    atlasImage = new Image();
+                    atlasImage.src = d.atlasImageDataURL;
+                    atlasImage.onload = () => { buildFrameThumbs(); storeAtlasForViewers(); renderAtlas(); };
+                }
                 document.getElementById('firebase-level-name').value = name;
                 document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Firebase: ${name}</span>`;
 // Restore sprite thumbnails from Firebase data
