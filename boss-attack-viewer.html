@@ -658,13 +658,13 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
 
             this.activeBoss = bossId;
 
-            // Set projectile data — use source boss's data when attackPattern is set
-            var patternKey = getEffectivePatternKey(bossId);
-            var projSource = (patternKey !== bossId && bossData[patternKey]) ? bossData[patternKey] : boss;
-            this.bossProjData = projSource.bulletData || projSource.bulletDataA || null;
-            this.bossProjDataA = projSource.bulletDataA || null;
-            this.bossProjDataB = projSource.bulletDataB || null;
-            this.bossProjDataC = projSource.bulletDataC || null;
+            // Set projectile data — always use current boss's own bullet visuals
+            // (attackPattern only changes the pattern function, not the projectile textures)
+            var defaultProj = { texture: ["normalProjectile0.gif"], speed: 1.5, damage: 1, hp: 5, score: 100, spgage: 5 };
+            this.bossProjDataA = boss.bulletDataA || boss.projectileDataA || null;
+            this.bossProjDataB = boss.bulletDataB || boss.projectileDataB || null;
+            this.bossProjDataC = boss.bulletDataC || boss.projectileDataC || null;
+            this.bossProjData = boss.bulletData || boss.projectileData || this.bossProjDataA || defaultProj;
 
             // Get first frame
             var firstFrame = null;
@@ -991,6 +991,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             height: viewerEl.clientHeight,
             parent: "viewer",
             backgroundColor: "#0a0a0a",
+            fps: { target: 60 },
             scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
             scene: [BossAttackViewerScene]
         });
