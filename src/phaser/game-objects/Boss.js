@@ -14,6 +14,7 @@ import {
     bossPatternVega,
     bossPatternFang,
     bossPatternGoki,
+    bossPatternPyramid,
 } from "../bosses/index.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
@@ -376,12 +377,12 @@ export function bossShootStart(scene) {
     }
     var patternId = patternKey !== null ? patternKey : scene.bossStageId;
     switch (patternId) {
-    case 0: bossPatternBison(scene, seed); break;
+    case 0: bossPatternPyramid(scene, seed); break;
     case 1: bossPatternBarlog(scene, seed); break;
     case 2: bossPatternSagat(scene, seed); break;
     case 3: bossPatternVega(scene, seed); break;
     case 4: bossPatternFang(scene, seed); break;
-    default: bossPatternBison(scene, seed); break;
+    default: bossPatternPyramid(scene, seed); break;
     }
 }
 
@@ -509,6 +510,12 @@ export function bossShootSpread(scene, projData, count, angleDeg) {
         bullet.setData("rotX", Math.cos(angle));
         bullet.setData("rotY", Math.sin(angle));
 
+        if (frames.length > 1) {
+            bullet.setData("frames", frames);
+            bullet.setData("animIdx", 0);
+            bullet.setData("animTimer", 0);
+        }
+
         scene.enemyBullets.push(bullet);
     }
 }
@@ -532,6 +539,12 @@ export function bossShootRadial(scene, projData, count) {
         bullet.setData("spgage", projData.spgage || 0);
         bullet.setData("rotX", Math.cos(angle));
         bullet.setData("rotY", Math.sin(angle));
+
+        if (frames.length > 1) {
+            bullet.setData("frames", frames);
+            bullet.setData("animIdx", 0);
+            bullet.setData("animTimer", 0);
+        }
 
         scene.enemyBullets.push(bullet);
     }
