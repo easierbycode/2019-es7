@@ -1890,16 +1890,21 @@
             try {
                 let jsonText, pngBlob;
                 const cfg = ATLAS_CONFIGS.game_ui;
+                let loadedFromDir = false;
                 if (dirHandle) {
-                    const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
-                    try { jsonText = await (await (await ad.getFileHandle("_" + cfg.json)).getFile()).text(); }
-                    catch { jsonText = await (await (await ad.getFileHandle(cfg.json)).getFile()).text(); }
-                    try { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle("_" + cfg.png)).getFile(); }
-                    catch {
-                        try { pngBlob = await (await ad.getFileHandle(cfg.png)).getFile(); }
-                        catch { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle(cfg.png)).getFile(); }
-                    }
-                } else {
+                    try {
+                        const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                        try { jsonText = await (await (await ad.getFileHandle("_" + cfg.json)).getFile()).text(); }
+                        catch { jsonText = await (await (await ad.getFileHandle(cfg.json)).getFile()).text(); }
+                        try { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle("_" + cfg.png)).getFile(); }
+                        catch {
+                            try { pngBlob = await (await ad.getFileHandle(cfg.png)).getFile(); }
+                            catch { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle(cfg.png)).getFile(); }
+                        }
+                        loadedFromDir = true;
+                    } catch (_) { /* fall through to fetch */ }
+                }
+                if (!loadedFromDir) {
                     let jr = await fetch('assets/_' + cfg.json);
                     if (!jr.ok) jr = await fetch('assets/' + cfg.json);
                     jsonText = await jr.text();
