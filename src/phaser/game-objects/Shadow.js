@@ -19,7 +19,7 @@
 export function createShadow(scene, sprite, frameKey, shadowReverse, shadowOffsetY, textureKey) {
     var shadow = scene.add.sprite(sprite.x, sprite.y, textureKey || "game_asset", frameKey);
     shadow.setOrigin(0.5);
-    shadow.setTintFill(0x000000);
+    shadow.setTint(0x000000).setTintMode(Phaser.TintModes.FILL);
     shadow.setAlpha(0.5);
     shadow.setDepth((sprite.depth || 0) - 1);
     if (shadowReverse) {
