@@ -421,6 +421,20 @@ export class BootScene extends Phaser.Scene {
                     baseRecipe.storyData = data.storyData;
                 }
 
+                // Replace title_bg texture if Firebase provides a custom one
+                if (data.titleBgDataURL) {
+                    var titleImg = new Image();
+                    titleImg.onload = function () {
+                        try {
+                            self.textures.remove("title_bg");
+                            self.textures.addImage("title_bg", titleImg);
+                        } catch (e) {
+                            console.warn("Failed to load custom title_bg:", e);
+                        }
+                    };
+                    titleImg.src = data.titleBgDataURL;
+                }
+
                 gameState._phaserRecipe = baseRecipe;
 
                 var stageId = stageParam != null

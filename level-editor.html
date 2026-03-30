@@ -1748,24 +1748,41 @@
         }
 
         // ================== TITLE BACKGROUND UPLOAD ==================
+        let titleBgDataURL = null;
+
         async function uploadTitleBg(event) {
             const file = event.target.files[0];
             if (!file) return;
             event.target.value = '';
-            if (!dirHandle) { alert("Load game directory first"); return; }
-            try {
-                // Ensure write permission is active — onchange counts as user activation
-                if ((await dirHandle.requestPermission({ mode: 'readwrite' })) !== 'granted') {
-                    alert('Write permission required'); return;
+
+            // Always store as dataURL for Firebase
+            const reader = new FileReader();
+            reader.onload = () => { titleBgDataURL = reader.result; };
+            reader.readAsDataURL(file);
+
+            // Also save to filesystem if directory is loaded
+            if (dirHandle) {
+                try {
+                    if ((await dirHandle.requestPermission({ mode: 'readwrite' })) !== 'granted') {
+                        closeMenu();
+                        alert('Title background stored for Firebase (no write permission for local file)');
+                        return;
+                    }
+                    const ah = await dirHandle.getDirectoryHandle(ATLAS_DIR, { create: true });
+                    const fh = await ah.getFileHandle('title_bg.jpg', { create: true });
+                    const w = await fh.createWritable();
+                    await w.write(await file.arrayBuffer());
+                    await w.close();
+                    closeMenu();
+                    alert('title_bg.jpg saved to assets/ and stored for Firebase');
+                } catch (e) {
+                    closeMenu();
+                    alert('Local save failed, but title background stored for Firebase: ' + e.message);
                 }
-                const ah = await dirHandle.getDirectoryHandle(ATLAS_DIR, { create: true });
-                const fh = await ah.getFileHandle('title_bg.jpg', { create: true });
-                const w = await fh.createWritable();
-                await w.write(await file.arrayBuffer());
-                await w.close();
+            } else {
                 closeMenu();
-                alert('title_bg.jpg saved to assets/');
-            } catch (e) { alert('Save failed: ' + e.message); }
+                alert('Title background stored for Firebase save');
+            }
         }
 
         // ================== BOSS PATTERN ASSIGNMENT ==================
@@ -2249,6 +2266,7 @@
                 };
                 const thumbs = buildFrameThumbnailsForSave();
                 if (thumbs) payload.frameThumbnails = thumbs;
+                if (titleBgDataURL) payload.titleBgDataURL = titleBgDataURL;
                 // Save atlas image + frame data so the game can load it
                 if (atlasImage && atlasData) {
                     try {
@@ -2283,6 +2301,7 @@
                     gameData.storyData = d.storyData;
                 }
                 if (d.stageKey) currentStageKey = d.stageKey;
+                titleBgDataURL = d.titleBgDataURL || null;
                 document.getElementById('firebase-level-name').value = name;
                 document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Firebase: ${name}</span>`;
 // Restore sprite thumbnails from Firebase data
