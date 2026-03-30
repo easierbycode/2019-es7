@@ -486,6 +486,31 @@
         let bossData = {};
         function storeBossDataForViewers() {
             try { sessionStorage.setItem('editorBossData', JSON.stringify(bossData)); } catch (e) {}
+            storeAtlasForViewers();
+        }
+        function storeAtlasForViewers() {
+            // Store atlas frames JSON in sessionStorage
+            if (atlasData && atlasData.frames) {
+                try { sessionStorage.setItem('editorAtlasFrames', JSON.stringify(atlasData)); } catch (e) {}
+            }
+            // Store atlas image in IndexedDB (too large for sessionStorage)
+            if (atlasImage && atlasImage.complete && atlasImage.naturalWidth > 0) {
+                try {
+                    const cv = document.createElement('canvas');
+                    cv.width = atlasImage.naturalWidth; cv.height = atlasImage.naturalHeight;
+                    cv.getContext('2d').drawImage(atlasImage, 0, 0);
+                    cv.toBlob(function(blob) {
+                        if (!blob) return;
+                        const req = indexedDB.open('editorViewerBridge', 1);
+                        req.onupgradeneeded = function(e) { e.target.result.createObjectStore('assets'); };
+                        req.onsuccess = function(e) {
+                            const db = e.target.result;
+                            const tx = db.transaction('assets', 'readwrite');
+                            tx.objectStore('assets').put(blob, 'atlasImage');
+                        };
+                    }, 'image/png');
+                } catch (e) {}
+            }
         }
         let pendingTextureUploads = {};  // textureName -> { key, canvas, w, h }
         let currentMissingSet = new Set(); // textures shown in the missing panel
@@ -659,7 +684,7 @@
                     }
                     atlasImage = new Image();
                     atlasImage.src = URL.createObjectURL(pngBlob);
-                    atlasImage.onload = () => { buildFrameThumbs(); renderAtlas(); };
+                    atlasImage.onload = () => { buildFrameThumbs(); storeAtlasForViewers(); renderAtlas(); };
                 } catch (e) { console.warn("Atlas load failed for " + key, e); alert("Failed to load atlas: " + key); }
             } else {
                 try {
@@ -681,6 +706,7 @@
                         atlasImage.onerror = reject;
                     });
                     buildFrameThumbs();
+                    storeAtlasForViewers();
                     renderAtlas();
                 } catch (e) { console.warn("Atlas fetch failed for " + key, e); alert("Failed to load atlas: " + key); }
             }
@@ -766,6 +792,7 @@
                 atlasImage.src = URL.createObjectURL(atlasPngFile);
                 await new Promise((res, rej) => { atlasImage.onload = res; atlasImage.onerror = rej; });
                 buildFrameThumbs();
+                storeAtlasForViewers();
             }
 
             const dirName = (files[0].webkitRelativePath || '').split('/')[0] || 'folder';
@@ -825,7 +852,7 @@
                 }
                 atlasImage = new Image();
                 atlasImage.src = URL.createObjectURL(pngBlob);
-                atlasImage.onload = () => { buildFrameThumbs(); renderAll(); };
+                atlasImage.onload = () => { buildFrameThumbs(); storeAtlasForViewers(); renderAll(); };
             } catch (e) { console.warn("Atlas load failed", e); }
 
             enemyData = gameData.enemyData || {};
@@ -1963,6 +1990,7 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
                         atlasImage.onerror = reject;
                     });
                     buildFrameThumbs();
+                    storeAtlasForViewers();
                     renderGrid();
                                        updateToolUI();
                 }

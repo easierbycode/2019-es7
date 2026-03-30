@@ -69,6 +69,8 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
 
     var bossData = null;
     var scene = null;
+    var customAtlasImageURL = null;
+    var customAtlasFrames = null;
     var looping = false;
     var speedIdx = 1;
     var speeds = [0.5, 1, 2];
@@ -527,7 +529,11 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
         }
 
         preload() {
-            this.load.atlas("game_asset", "assets/img/game_asset.png", "assets/game_asset.json");
+            if (customAtlasImageURL && customAtlasFrames) {
+                this.load.atlas("game_asset", customAtlasImageURL, customAtlasFrames);
+            } else {
+                this.load.atlas("game_asset", "assets/img/game_asset.png", "assets/game_asset.json");
+            }
             this.load.json("recipe", "assets/game.json");
         }
 
@@ -652,11 +658,13 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
 
             this.activeBoss = bossId;
 
-            // Set projectile data
-            this.bossProjData = boss.bulletData || boss.bulletDataA || null;
-            this.bossProjDataA = boss.bulletDataA || null;
-            this.bossProjDataB = boss.bulletDataB || null;
-            this.bossProjDataC = boss.bulletDataC || null;
+            // Set projectile data — use source boss's data when attackPattern is set
+            var patternKey = getEffectivePatternKey(bossId);
+            var projSource = (patternKey !== bossId && bossData[patternKey]) ? bossData[patternKey] : boss;
+            this.bossProjData = projSource.bulletData || projSource.bulletDataA || null;
+            this.bossProjDataA = projSource.bulletDataA || null;
+            this.bossProjDataB = projSource.bulletDataB || null;
+            this.bossProjDataC = projSource.bulletDataC || null;
 
             // Get first frame
             var firstFrame = null;
@@ -916,10 +924,25 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
         }
     }
 
+    function getEffectivePatternKey(bossId) {
+        if (bossData && bossData[bossId] && bossData[bossId].attackPattern) {
+            return bossData[bossId].attackPattern;
+        }
+        return bossId;
+    }
+
     function buildPatternButtons(bossId) {
         var bar = document.getElementById("pattern-bar");
         bar.innerHTML = "";
-        var patterns = PATTERNS[bossId] || [];
+        var patternKey = getEffectivePatternKey(bossId);
+        var patterns = PATTERNS[patternKey] || [];
+        if (patternKey !== bossId) {
+            var label = document.createElement("span");
+            var srcName = (bossData && bossData[patternKey] && bossData[patternKey].name) ? bossData[patternKey].name : patternKey;
+            label.textContent = "(" + srcName + " patterns)";
+            label.style.cssText = "color:#f59e0b;font-size:11px;padding:5px 8px;";
+            bar.appendChild(label);
+        }
         for (var i = 0; i < patterns.length; i++) {
             (function(pat) {
                 var btn = document.createElement("button");
@@ -959,15 +982,49 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
     // ---- Init ----
 
     var viewerEl = document.getElementById("viewer");
-    var game = new Phaser.Game({
-        type: Phaser.AUTO,
-        width: viewerEl.clientWidth,
-        height: viewerEl.clientHeight,
-        parent: "viewer",
-        backgroundColor: "#0a0a0a",
-        scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
-        scene: [BossAttackViewerScene]
-    });
+    var game = null;
+
+    function createGame() {
+        game = new Phaser.Game({
+            type: Phaser.AUTO,
+            width: viewerEl.clientWidth,
+            height: viewerEl.clientHeight,
+            parent: "viewer",
+            backgroundColor: "#0a0a0a",
+            scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
+            scene: [BossAttackViewerScene]
+        });
+    }
+
+    // Load custom atlas from editor before creating Phaser
+    function loadEditorAtlasThenStart() {
+        var framesRaw = null;
+        try { framesRaw = sessionStorage.getItem('editorAtlasFrames'); } catch (e) {}
+        if (!framesRaw) { createGame(); return; }
+        try { customAtlasFrames = JSON.parse(framesRaw); } catch (e) { createGame(); return; }
+
+        try {
+            var req = indexedDB.open('editorViewerBridge', 1);
+            req.onupgradeneeded = function(e) { e.target.result.createObjectStore('assets'); };
+            req.onsuccess = function(e) {
+                var db = e.target.result;
+                var tx = db.transaction('assets', 'readonly');
+                var getReq = tx.objectStore('assets').get('atlasImage');
+                getReq.onsuccess = function() {
+                    if (getReq.result) {
+                        customAtlasImageURL = URL.createObjectURL(getReq.result);
+                    } else {
+                        customAtlasFrames = null;
+                    }
+                    createGame();
+                };
+                getReq.onerror = function() { customAtlasFrames = null; createGame(); };
+            };
+            req.onerror = function() { customAtlasFrames = null; createGame(); };
+        } catch (e) { customAtlasFrames = null; createGame(); }
+    }
+
+    loadEditorAtlasThenStart();
 
     window.addEventListener("resize", function() {
         if (scene && scene.bossSprite) {
