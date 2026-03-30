@@ -1,7 +1,7 @@
 # Project Notes
 
 ## Architecture
-- Two game engines coexist: **PIXI.js** (legacy, `src/`) and **Phaser 4 RC6** (`src/phaser/`)
+- Two game engines coexist: **PIXI.js** (legacy, `src/`) and **Phaser 4 RC7** (`src/phaser/`)
 - Phaser game entry point: `phaser-game.html` (served via `npx serve`)
 - PIXI game entry point: `index.html` (mode select screen — NOT the Phaser game)
 - Launch config: `.claude/launch.json` with `url: "/phaser-game.html?lowmode=1"`

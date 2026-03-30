@@ -14,7 +14,7 @@ import { pauseAll, resumeAll, setInitialVolumes } from "../soundManager.js";
 import { ModeButton } from "../ui/ModeButton.js";
 import { RecommendButton } from "../ui/RecommendButton.js";
 
-const PHASER_URL = "https://cdn.jsdelivr.net/npm/phaser@4.0.0-rc.6/dist/phaser.min.js";
+const PHASER_URL = "https://cdn.jsdelivr.net/npm/phaser@4.0.0-rc.7/dist/phaser.min.js";
 
 function loadScript(src) {
     return new Promise(function (resolve, reject) {

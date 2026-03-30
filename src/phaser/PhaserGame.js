@@ -1,4 +1,4 @@
-// src/phaser/PhaserGame.js  ← corrected & ready for Phaser 4.0.0-rc.6
+// src/phaser/PhaserGame.js  ← corrected & ready for Phaser 4.0.0-rc.7
 
 import { GAME_DIMENSIONS } from "../constants.js";
 import { syncRuntimeFlagsFromLocation } from "../gameState.js";
@@ -25,6 +25,7 @@ export function createPhaserGame() {
         width: GAME_DIMENSIONS.WIDTH,
         height: GAME_DIMENSIONS.HEIGHT,
         parent: "phaser-canvas",           // ← FIXED (matches your HTML)
+        pixelArt: true,
         backgroundColor: "#000000",
         fps: {
             target: 60
