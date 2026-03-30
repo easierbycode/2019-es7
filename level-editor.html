@@ -484,6 +484,9 @@
         let currentGrid = [];
         let enemyData = {};
         let bossData = {};
+        function storeBossDataForViewers() {
+            try { sessionStorage.setItem('editorBossData', JSON.stringify(bossData)); } catch (e) {}
+        }
         let pendingTextureUploads = {};  // textureName -> { key, canvas, w, h }
         let currentMissingSet = new Set(); // textures shown in the missing panel
         let frameThumbs = {};       // key -> canvas
@@ -746,6 +749,7 @@
                 }
             }
             bossData = gameData.bossData || {};
+            storeBossDataForViewers();
 
             // Load atlas JSON
             const atlasJsonFile = findFile('_game_asset.json') || findFile('game_asset.json') || findFile('assets/game_asset.json');
@@ -831,6 +835,7 @@
                 }
             }
             bossData = gameData.bossData || {};
+            storeBossDataForViewers();
             populateStagePills();
             loadCurrentStage();
         }
@@ -1729,6 +1734,7 @@
                     } else {
                         delete bossData[bk].attackPattern;
                     }
+                    storeBossDataForViewers();
                     renderBossPatternList();
                 };
                 row.appendChild(sel);
@@ -1874,7 +1880,7 @@
                 if (!d) { alert(`"${name}" not found`); return false; }
                 currentGrid = normalizeGrid(d.enemylist || []);
                 if (d.enemyData && typeof d.enemyData === 'object') enemyData = d.enemyData;
-                if (d.bossData && typeof d.bossData === 'object') bossData = d.bossData;
+                if (d.bossData && typeof d.bossData === 'object') { bossData = d.bossData; storeBossDataForViewers(); }
                 if (d.stageKey) currentStageKey = d.stageKey;
                 document.getElementById('firebase-level-name').value = name;
                 document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Firebase: ${name}</span>`;
@@ -1935,6 +1941,7 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
                         }
                     }
                     bossData = gameData.bossData || {};
+                    storeBossDataForViewers();
                     populateStagePills();
                     loadCurrentStage();
                 }

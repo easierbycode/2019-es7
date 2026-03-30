@@ -84,6 +84,7 @@
     <div id="app">
         <div id="nav">
             <span class="nav-title">BOSS VIEWER</span>
+            <span id="custom-data-badge" style="display:none;color:#f59e0b;font-size:11px;font-weight:700;letter-spacing:0.5px">CUSTOM DATA</span>
             <div class="nav-spacer"></div>
             <a class="nav-link" href="boss-attack-viewer.html">Attack Viewer</a>
             <a class="nav-link" href="level-editor.html">Level Editor</a>
@@ -125,7 +126,17 @@
 
             create() {
                 var recipe = this.cache.json.get("recipe");
-                bossData = recipe.bossData;
+                var storedBossData = null;
+                try {
+                    var raw = sessionStorage.getItem('editorBossData');
+                    if (raw) storedBossData = JSON.parse(raw);
+                } catch (e) {}
+                if (storedBossData && Object.keys(storedBossData).length > 0) {
+                    bossData = storedBossData;
+                    document.getElementById("custom-data-badge").style.display = "";
+                } else {
+                    bossData = recipe.bossData;
+                }
 
                 this.cameras.main.setBackgroundColor(0x0a0a0a);
 
