@@ -246,6 +246,31 @@
             padding: 4px 10px; font-size: 11px; cursor: pointer;
             font-family: 'Orbitron', sans-serif;
         }
+        .story-images-row {
+            display: flex; gap: 12px; margin-bottom: 12px;
+        }
+        .story-image-slot {
+            flex: 1; border: 1px solid #333; border-radius: 8px; padding: 10px;
+            background: #111; text-align: center;
+        }
+        .story-image-slot .slot-label {
+            font-size: 11px; font-weight: 700; color: #888; margin-bottom: 8px;
+        }
+        .story-image-slot .slot-preview {
+            width: 100%; aspect-ratio: 256/224; border-radius: 6px; background: #000;
+            overflow: hidden; margin-bottom: 8px; position: relative;
+        }
+        .story-image-slot .slot-preview img {
+            width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated;
+        }
+        .story-image-slot .slot-upload-btn {
+            background: #1e293b; color: #94a3b8; border: 1px solid #475569; border-radius: 6px;
+            padding: 6px 12px; font-size: 11px; cursor: pointer; width: 100%;
+            font-family: 'Orbitron', sans-serif; transition: background 0.15s;
+        }
+        .story-image-slot .slot-upload-btn:hover {
+            background: #334155; color: #e2e8f0;
+        }
     </style>
 </head>
 <body>
@@ -426,6 +451,7 @@
             <div class="picker-title">STORY EDITOR</div>
             <div style="font-size:11px;color:#888;margin-bottom:12px;font-family:monospace;">Edit AdvScene dialog per stage</div>
             <div style="display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap;" id="story-stage-pills"></div>
+            <div id="story-images-row" class="story-images-row"></div>
             <div id="story-parts-list"></div>
             <div style="display:flex;gap:8px;margin-top:12px;">
                 <button onclick="addStoryPart()" class="menu-btn" style="flex:1;justify-content:center;">+ Add Part</button>
@@ -587,6 +613,7 @@
         ];
         let storyEditorStage = 0;
         let gameUiThumbs = {};
+        let storyCustomImages = {}; // { "stage0_part0": dataURL, ... }
 
         // ================== HELPERS ==================
         function createEmptyWave() { return Array(8).fill("00"); }
@@ -1904,10 +1931,36 @@
             closeMenu();
             if (!gameData) gameData = {};
             if (!gameData.storyData) gameData.storyData = getDefaultStoryData();
+            // Restore any previously saved custom images
+            if (gameData.storyData.customImages) {
+                Object.assign(storyCustomImages, gameData.storyData.customImages);
+            }
             storyEditorStage = 0;
             await ensureGameUiThumbs();
             renderStoryEditor();
             document.getElementById('story-editor-modal').classList.remove('hidden');
+        }
+
+        function getPartImageSrc(stageIdx, partIdx) {
+            const customKey = 'stage' + stageIdx + '_part' + partIdx;
+            if (storyCustomImages[customKey]) return storyCustomImages[customKey];
+            const stageData = gameData.storyData['stage' + stageIdx];
+            if (!stageData || !stageData.part || !stageData.part[partIdx]) return null;
+            const bgVal = stageData.part[partIdx].background;
+            const frame = 'advBg' + bgVal + '.gif';
+            return gameUiThumbs[frame] || null;
+        }
+
+        function handleStoryImageUpload(partIdx, file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const customKey = 'stage' + storyEditorStage + '_part' + partIdx;
+                storyCustomImages[customKey] = e.target.result;
+                if (!gameData.storyData.customImages) gameData.storyData.customImages = {};
+                gameData.storyData.customImages[customKey] = e.target.result;
+                renderStoryEditor();
+            };
+            reader.readAsDataURL(file);
         }
 
         function renderStoryEditor() {
@@ -1939,10 +1992,60 @@
             };
             pillsEl.appendChild(addPill);
 
-            const listEl = document.getElementById('story-parts-list');
-            listEl.innerHTML = '';
+            // Render part 1 & part 2 image slots
+            const imagesRow = document.getElementById('story-images-row');
+            imagesRow.innerHTML = '';
             const stageData = gameData.storyData['stage' + storyEditorStage];
             if (!stageData || !stageData.part) return;
+
+            const partCount = Math.min(stageData.part.length, 2);
+            for (let pi = 0; pi < partCount; pi++) {
+                const slot = document.createElement('div');
+                slot.className = 'story-image-slot';
+
+                const label = document.createElement('div');
+                label.className = 'slot-label';
+                label.textContent = 'Part ' + (pi + 1) + ' Image';
+                slot.appendChild(label);
+
+                const preview = document.createElement('div');
+                preview.className = 'slot-preview';
+                const imgSrc = getPartImageSrc(storyEditorStage, pi);
+                if (imgSrc) {
+                    const img = document.createElement('img');
+                    img.src = imgSrc;
+                    preview.appendChild(img);
+                } else {
+                    preview.style.display = 'flex';
+                    preview.style.alignItems = 'center';
+                    preview.style.justifyContent = 'center';
+                    const placeholder = document.createElement('div');
+                    placeholder.style.cssText = 'color:#555;font-size:11px;';
+                    placeholder.textContent = 'No image';
+                    preview.appendChild(placeholder);
+                }
+                slot.appendChild(preview);
+
+                const uploadBtn = document.createElement('label');
+                uploadBtn.className = 'slot-upload-btn';
+                uploadBtn.textContent = 'Upload Replacement';
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'image/*';
+                fileInput.style.display = 'none';
+                const capturedIdx = pi;
+                fileInput.onchange = (e) => {
+                    if (e.target.files[0]) handleStoryImageUpload(capturedIdx, e.target.files[0]);
+                };
+                uploadBtn.appendChild(fileInput);
+                slot.appendChild(uploadBtn);
+
+                imagesRow.appendChild(slot);
+            }
+
+            // Render part text areas and bg selectors
+            const listEl = document.getElementById('story-parts-list');
+            listEl.innerHTML = '';
 
             stageData.part.forEach((part, idx) => {
                 const row = document.createElement('div');
@@ -1960,7 +2063,7 @@
                 if (stageData.part.length > 1) {
                     const delBtn = document.createElement('button');
                     delBtn.className = 'story-delete-btn';
-                    delBtn.textContent = '✕ Delete';
+                    delBtn.textContent = '\u2715 Delete';
                     delBtn.onclick = () => { syncStoryFromUI(); stageData.part.splice(idx, 1); renderStoryEditor(); };
                     header.appendChild(delBtn);
                 }
