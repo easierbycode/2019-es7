@@ -417,6 +417,10 @@ export class BootScene extends Phaser.Scene {
                     baseRecipe.bossData = mergedBoss;
                 }
 
+                if (data.storyData) {
+                    baseRecipe.storyData = data.storyData;
+                }
+
                 gameState._phaserRecipe = baseRecipe;
 
                 var stageId = stageParam != null

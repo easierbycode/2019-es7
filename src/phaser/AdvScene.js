@@ -113,6 +113,7 @@ export class PhaserAdvScene extends Phaser.Scene {
         } else {
             this.scenario = LANG === "ja" ? ADV_SCENARIO_JA : ADV_SCENARIO_EN;
         }
+        this.customImages = this.scenario.customImages || {};
         this.partNum = 0;
         this.stageKey = "stage" + String(gameState.stageId);
         this.partText = this.scenario[this.stageKey].part[this.partNum].text;
@@ -135,6 +136,7 @@ export class PhaserAdvScene extends Phaser.Scene {
         var bgKey = "advBg" + this.scenario[this.stageKey].part[this.partNum].background + ".gif";
         this.bgSprite = this.add.sprite(0, 0, "game_ui", bgKey);
         this.bgSprite.setOrigin(0, 0);
+        this._applyCustomImage(this.stageKey, this.partNum);
 
         this.txtBg = this.add.graphics();
         this.txtBg.lineStyle(2, 0xffffff, 1);
@@ -245,6 +247,26 @@ export class PhaserAdvScene extends Phaser.Scene {
         } catch (e) {}
     }
 
+    _applyCustomImage(stageKey, partNum) {
+        var customKey = stageKey + "_part" + partNum;
+        var dataURL = this.customImages[customKey];
+        if (!dataURL) return;
+        var texKey = "advCustom_" + customKey;
+        var self = this;
+        if (this.textures.exists(texKey)) {
+            this.bgSprite.setTexture(texKey);
+        } else {
+            var img = new Image();
+            img.onload = function () {
+                self.textures.addImage(texKey, img);
+                if (self.bgSprite && self.bgSprite.active) {
+                    self.bgSprite.setTexture(texKey);
+                }
+            };
+            img.src = dataURL;
+        }
+    }
+
     onNextPress() {
         var maxParts = this.scenario[this.stageKey].part.length;
 
@@ -257,12 +279,18 @@ export class PhaserAdvScene extends Phaser.Scene {
             this.txt.setText("");
             this.nextBtn.setVisible(false);
 
-            var bgKey = "advBg" + this.scenario[this.stageKey].part[this.partNum].background + ".gif";
-            if (this.textures.getFrame("game_ui", bgKey)) {
-                this.bgSprite.setFrame(bgKey);
+            var customKey = this.stageKey + "_part" + this.partNum;
+            if (this.customImages[customKey]) {
+                this._applyCustomImage(this.stageKey, this.partNum);
+            } else {
+                var bgKey = "advBg" + this.scenario[this.stageKey].part[this.partNum].background + ".gif";
+                if (this.textures.getFrame("game_ui", bgKey)) {
+                    this.bgSprite.setTexture("game_ui", bgKey);
+                }
             }
 
-            if (bgKey === "advBgDone.gif") {
+            var bgKeyForSound = "advBg" + this.scenario[this.stageKey].part[this.partNum].background + ".gif";
+            if (bgKeyForSound === "advBgDone.gif") {
                 this.playSound("g_adbenture_voice0", 0.5);
             }
         } else {
