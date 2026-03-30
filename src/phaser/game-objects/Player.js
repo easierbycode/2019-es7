@@ -155,7 +155,9 @@ export function handleKeyboardInput(scene) {
  */
 export function playerDamage(scene, amount) {
     if (scene.barrierActive) return;
+    if (scene.damageAnimationFlg) return;
 
+    scene.damageAnimationFlg = true;
     scene.playerHp -= amount;
     if (scene.playerHp <= 0) {
         scene.playerHp = 0;
@@ -177,13 +179,49 @@ export function playerDamage(scene, amount) {
         repeat: 2,
     });
 
-    scene.tweens.add({
-        targets: scene.playerSprite,
-        alpha: 0.3,
-        duration: 80,
-        yoyo: true,
-        repeat: 3,
-    });
+    // Damage animation matching original PIXI TimelineMax:
+    // 4 cycles of red tint + alpha down + y offset, then back to normal
+    var sprite = scene.playerSprite;
+    var baseY = sprite.y;
+
+    // Build sequential tween chain using cumulative delays
+    // Original: each step is 150ms, with 50ms gaps between cycles 2-4
+    var steps = [
+        // Cycle 1: down+red
+        { y: baseY + 2, alpha: 0.2, tint: 0xFF0000, dur: 150, delay: 0 },
+        { y: baseY - 2, alpha: 1, tint: null, dur: 150, delay: 150 },
+        // Cycle 2: down+red (50ms gap)
+        { y: baseY + 2, alpha: 0.2, tint: 0xFF0000, dur: 150, delay: 350 },
+        { y: baseY - 2, alpha: 1, tint: null, dur: 150, delay: 500 },
+        // Cycle 3: down+red (50ms gap)
+        { y: baseY + 2, alpha: 0.2, tint: 0xFF0000, dur: 150, delay: 700 },
+        { y: baseY, alpha: 1, tint: null, dur: 150, delay: 850 },
+        // Cycle 4: down+red (50ms gap)
+        { y: baseY + 2, alpha: 0.2, tint: 0xFF0000, dur: 150, delay: 1050 },
+        { y: baseY, alpha: 1, tint: null, dur: 150, delay: 1200 },
+    ];
+
+    for (var i = 0; i < steps.length; i++) {
+        (function (step, isLast) {
+            scene.tweens.add({
+                targets: sprite,
+                y: step.y,
+                alpha: step.alpha,
+                duration: step.dur,
+                delay: step.delay,
+                onStart: function () {
+                    if (step.tint != null) {
+                        sprite.setTint(step.tint);
+                    } else {
+                        sprite.clearTint();
+                    }
+                },
+                onComplete: isLast ? function () {
+                    scene.damageAnimationFlg = false;
+                } : undefined,
+            });
+        })(steps[i], i === steps.length - 1);
+    }
 }
 
 /**

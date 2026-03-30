@@ -98,19 +98,40 @@ export function showHitImpact(scene, x, y, isGuard) {
     impact.once("animationcomplete", function () { impact.destroy(); });
 }
 
+// Enemy/playerBullet damage flash: red 0.1s then white 0.1s (matches PIXI original)
 export function flashEnemyTint(scene, enemy) {
     if (!enemy || !enemy.active) return;
-    var existing = enemy.getData("_tintTimer");
-    if (existing) existing.remove(false);
-    // PIXI: TweenMax.to tint:16711680, 0.1s, then delay 0.1 back to white
-    enemy.setTint(16711680);
-    var timer = scene.time.delayedCall(200, function () {
-        if (enemy && enemy.active) {
-            enemy.clearTint();
-            enemy.setData("_tintTimer", null);
+    var existing = enemy.getData("_tintTween");
+    if (existing) existing.stop();
+    enemy.setTint(0xFF0000);
+    var tw = scene.tweens.addCounter({
+        from: 0, to: 1, duration: 100, delay: 100,
+        onComplete: function () {
+            if (enemy && enemy.active) {
+                enemy.clearTint();
+                enemy.setData("_tintTween", null);
+            }
         }
     });
-    enemy.setData("_tintTimer", timer);
+    enemy.setData("_tintTween", tw);
+}
+
+// Boss damage flash: lighter red 0xFF8080 then white after 0.2s delay (matches PIXI original)
+export function flashBossTint(scene, boss) {
+    if (!boss || !boss.active) return;
+    var existing = boss.getData("_tintTween");
+    if (existing) existing.stop();
+    boss.setTint(0xFF8080);
+    var tw = scene.tweens.addCounter({
+        from: 0, to: 1, duration: 100, delay: 200,
+        onComplete: function () {
+            if (boss && boss.active) {
+                boss.clearTint();
+                boss.setData("_tintTween", null);
+            }
+        }
+    });
+    boss.setData("_tintTween", tw);
 }
 
 // Boss death explosion (PIXI: animationSpeed=0.15 at 120fps ≈ 18fps, scale 1.0)

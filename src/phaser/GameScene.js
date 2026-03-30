@@ -55,6 +55,7 @@ import {
     spExplosions as _spExplosions,
     showHitImpact as _showHitImpact,
     flashEnemyTint as _flashEnemyTint,
+    flashBossTint as _flashBossTint,
 } from "./effects/index.js";
 import { showAkebonoFinish as _showAkebonoFinish } from "./effects/AkebonoFinish.js";
 
@@ -101,6 +102,7 @@ export class PhaserGameScene extends Phaser.Scene {
     showExplosion(x, y) { _showExplosion(this, x, y); }
     showHitImpact(x, y, isGuard) { _showHitImpact(this, x, y, isGuard); }
     flashEnemyTint(enemy) { _flashEnemyTint(this, enemy); }
+    flashBossTint(boss) { _flashBossTint(this, boss); }
     showAkebonoFinish() { _showAkebonoFinish(this); }
     showScorePopup(x, y, score, ratio) { _showScorePopup(this, x, y, score, ratio); }
 
@@ -132,6 +134,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this.gameStarted = false;
         this.stageCleared = false;
         this.playerDead = false;
+        this.damageAnimationFlg = false;
         this.bossEntering = false;
 
         this.scoreCount = gameState.score || 0;
@@ -963,11 +966,19 @@ export class PhaserGameScene extends Phaser.Scene {
                                 break;
                             }
 
-                            this.flashEnemyTint(enemy);
+                            if (isBoss) {
+                                this.flashBossTint(enemy);
+                            } else {
+                                this.flashEnemyTint(enemy);
+                            }
                         } else {
                             this.showHitImpact(pb.x, pb.y, true);
                             this.playSound("se_guard", 0.2);
-                            this.flashEnemyTint(enemy);
+                            if (isBoss) {
+                                this.flashBossTint(enemy);
+                            } else {
+                                this.flashEnemyTint(enemy);
+                            }
                         }
                     }
 
