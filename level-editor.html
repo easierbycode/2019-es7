@@ -210,6 +210,42 @@
         }
         .boss-pattern-select option { background: #1e293b; }
         .boss-pattern-row.overridden { border-color: #f59e0b; background: #1a1508; }
+
+        /* ===== STORY EDITOR ===== */
+        .story-part-row {
+            border: 1px solid #333; border-radius: 8px; padding: 10px;
+            margin-bottom: 8px; background: #111;
+        }
+        .story-part-header {
+            display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+        }
+        .story-part-num {
+            font-size: 11px; font-weight: 700; color: #888; min-width: 50px;
+        }
+        .story-bg-options { display: flex; gap: 6px; flex-wrap: wrap; }
+        .story-bg-opt {
+            width: 48px; height: 42px; border-radius: 6px; border: 2px solid transparent;
+            cursor: pointer; overflow: hidden; transition: border-color 0.15s;
+            position: relative;
+        }
+        .story-bg-opt.sel { border-color: #84cc16; }
+        .story-bg-opt img {
+            width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated;
+        }
+        .story-bg-opt .story-bg-label {
+            position: absolute; bottom: 0; left: 0; right: 0; text-align: center;
+            font-size: 7px; color: #fff; background: rgba(0,0,0,0.6); line-height: 1.4;
+        }
+        .story-text-area {
+            width: 100%; min-height: 70px; padding: 8px 10px; border-radius: 6px;
+            border: 1px solid #444; background: #1a1a1a; color: #fff; font-size: 13px;
+            font-family: sans-serif; resize: vertical; line-height: 1.4;
+        }
+        .story-delete-btn {
+            background: #7f1d1d; color: #fca5a5; border: none; border-radius: 6px;
+            padding: 4px 10px; font-size: 11px; cursor: pointer;
+            font-family: 'Orbitron', sans-serif;
+        }
     </style>
 </head>
 <body>
@@ -302,6 +338,7 @@
             <div class="menu-section-title">Advanced</div>
             <button class="menu-btn" onclick="showEnemyEditor()">👾 Enemy Editor</button>
             <button class="menu-btn" onclick="showBossPatternEditor()">👹 Boss Patterns</button>
+            <button class="menu-btn" onclick="showStoryEditor()">📖 Story Editor</button>
             <button class="menu-btn" onclick="showAtlasManager()">🎨 Atlas Manager</button>
             <label class="menu-btn" style="cursor:pointer">
                 <input type="file" id="title-bg-input" accept="image/*" style="display:none" onchange="uploadTitleBg(event)">
@@ -380,6 +417,20 @@
             <div class="picker-title">BOSS PATTERN ASSIGNMENT</div>
             <div style="font-size:11px;color:#888;margin-bottom:12px;font-family:monospace;">Assign any boss's attack pattern to any stage boss</div>
             <div id="boss-pattern-list" style="padding:0 4px;"></div>
+        </div>
+    </div>
+
+    <!-- STORY EDITOR MODAL -->
+    <div id="story-editor-modal" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+        <div class="picker-panel" style="max-height:80vh">
+            <div class="picker-title">STORY EDITOR</div>
+            <div style="font-size:11px;color:#888;margin-bottom:12px;font-family:monospace;">Edit AdvScene dialog per stage</div>
+            <div style="display:flex;gap:4px;margin-bottom:12px;flex-wrap:wrap;" id="story-stage-pills"></div>
+            <div id="story-parts-list"></div>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+                <button onclick="addStoryPart()" class="menu-btn" style="flex:1;justify-content:center;">+ Add Part</button>
+                <button onclick="saveStoryData()" class="menu-btn" style="background:#84cc16;color:#000;font-weight:700;flex:1;justify-content:center;">Save Story</button>
+            </div>
         </div>
     </div>
 
@@ -525,6 +576,17 @@
         let selectedEnemyFullKey = null;
         let selectedPowerup = '0';
         let currentTool = 'none';
+
+        // Story editor state
+        const ADV_BG_OPTIONS = [
+            { value: "0",    frame: "advBg0.gif",    label: "BG 0" },
+            { value: "1",    frame: "advBg1.gif",    label: "BG 1" },
+            { value: "2",    frame: "advBg2.gif",    label: "BG 2" },
+            { value: "3",    frame: "advBg3.gif",    label: "BG 3" },
+            { value: "Done", frame: "advBgDone.gif", label: "Done" },
+        ];
+        let storyEditorStage = 0;
+        let gameUiThumbs = {};
 
         // ================== HELPERS ==================
         function createEmptyWave() { return Array(8).fill("00"); }
@@ -1769,6 +1831,204 @@
             }
         }
 
+        // ================== STORY EDITOR ==================
+        function getDefaultStoryData() {
+            return {
+                stage0: { part: [
+                    { background: "0", text: "Your fight is our fight.\nIt is up to the citizens \nof the world to challenge \nthe high score" },
+                    { background: "Done", text: "in this shooting \ngame (STG)!" },
+                ]},
+                stage1: { part: [
+                    { background: "1", text: "Through achieving\nthe high score,\nboth you and I," },
+                    { background: "Done", text: "can come to a mutual \nunderstanding!" },
+                ]},
+                stage2: { part: [
+                    { background: "2", text: "The people of Earth, \ncoming together to \nachieve the high score, \nis truly a beautiful thing." },
+                    { background: "Done", text: "This beauty is something \nthat both you as well as I,\nboth possess!" },
+                ]},
+                stage3: { part: [
+                    { background: "3", text: "Now, citizens of the \nearth!\nYou fine people who \nchallenge the high score." },
+                    { background: "3", text: "My high score\nis also your high score." },
+                    { background: "Done", text: "Let us talk to\nour heart's content!" },
+                ]},
+                stage4: { part: [
+                    { background: "Done", text: "Thank you for playing." },
+                    { background: "Done", text: "This high score belongs\n to me,\nand it also belongs to you!" },
+                ]},
+            };
+        }
+
+        async function ensureGameUiThumbs() {
+            if (Object.keys(gameUiThumbs).length > 0) return;
+            try {
+                let jsonText, pngBlob;
+                const cfg = ATLAS_CONFIGS.game_ui;
+                if (dirHandle) {
+                    const ad = await dirHandle.getDirectoryHandle(ATLAS_DIR);
+                    try { jsonText = await (await (await ad.getFileHandle("_" + cfg.json)).getFile()).text(); }
+                    catch { jsonText = await (await (await ad.getFileHandle(cfg.json)).getFile()).text(); }
+                    try { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle("_" + cfg.png)).getFile(); }
+                    catch {
+                        try { pngBlob = await (await ad.getFileHandle(cfg.png)).getFile(); }
+                        catch { pngBlob = await (await (await ad.getDirectoryHandle('img')).getFileHandle(cfg.png)).getFile(); }
+                    }
+                } else {
+                    let jr = await fetch('assets/_' + cfg.json);
+                    if (!jr.ok) jr = await fetch('assets/' + cfg.json);
+                    jsonText = await jr.text();
+                    let ir = await fetch('assets/img/_' + cfg.png);
+                    if (!ir.ok) ir = await fetch('assets/img/' + cfg.png);
+                    pngBlob = await ir.blob();
+                }
+                const uiAtlas = normalizeAtlasData(JSON.parse(jsonText));
+                const uiImg = new Image();
+                uiImg.src = URL.createObjectURL(pngBlob instanceof Blob ? pngBlob : new Blob([pngBlob]));
+                await new Promise((res, rej) => { uiImg.onload = res; uiImg.onerror = rej; });
+                const tc = document.createElement('canvas');
+                const ctx = tc.getContext('2d');
+                for (const opt of ADV_BG_OPTIONS) {
+                    const fd = uiAtlas.frames[opt.frame];
+                    if (!fd || !fd.frame) continue;
+                    const f = fd.frame;
+                    tc.width = f.w; tc.height = f.h;
+                    ctx.clearRect(0, 0, f.w, f.h);
+                    ctx.drawImage(uiImg, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+                    gameUiThumbs[opt.frame] = tc.toDataURL();
+                }
+            } catch (e) {
+                console.warn('Failed to load game_ui thumbnails:', e);
+            }
+        }
+
+        async function showStoryEditor() {
+            closeMenu();
+            if (!gameData) gameData = {};
+            if (!gameData.storyData) gameData.storyData = getDefaultStoryData();
+            storyEditorStage = 0;
+            await ensureGameUiThumbs();
+            renderStoryEditor();
+            document.getElementById('story-editor-modal').classList.remove('hidden');
+        }
+
+        function renderStoryEditor() {
+            const pillsEl = document.getElementById('story-stage-pills');
+            pillsEl.innerHTML = '';
+            const stageKeys = Object.keys(gameData.storyData)
+                .filter(k => k.startsWith('stage'))
+                .sort((a, b) => parseInt(a.replace('stage', '')) - parseInt(b.replace('stage', '')));
+
+            stageKeys.forEach(sk => {
+                const num = parseInt(sk.replace('stage', ''));
+                const pill = document.createElement('div');
+                pill.className = 'tb-pill ' + (num === storyEditorStage ? 'on' : 'off');
+                pill.textContent = num;
+                pill.onclick = () => { syncStoryFromUI(); storyEditorStage = num; renderStoryEditor(); };
+                pillsEl.appendChild(pill);
+            });
+
+            const addPill = document.createElement('div');
+            addPill.className = 'tb-pill add';
+            addPill.textContent = '+';
+            addPill.onclick = () => {
+                syncStoryFromUI();
+                const nums = stageKeys.map(k => parseInt(k.replace('stage', '')));
+                const next = nums.length ? Math.max(...nums) + 1 : 0;
+                gameData.storyData['stage' + next] = { part: [{ background: "0", text: "" }] };
+                storyEditorStage = next;
+                renderStoryEditor();
+            };
+            pillsEl.appendChild(addPill);
+
+            const listEl = document.getElementById('story-parts-list');
+            listEl.innerHTML = '';
+            const stageData = gameData.storyData['stage' + storyEditorStage];
+            if (!stageData || !stageData.part) return;
+
+            stageData.part.forEach((part, idx) => {
+                const row = document.createElement('div');
+                row.className = 'story-part-row';
+
+                const header = document.createElement('div');
+                header.className = 'story-part-header';
+                const numLabel = document.createElement('div');
+                numLabel.className = 'story-part-num';
+                numLabel.textContent = 'Part ' + (idx + 1);
+                header.appendChild(numLabel);
+                const spacer = document.createElement('div');
+                spacer.style.flex = '1';
+                header.appendChild(spacer);
+                if (stageData.part.length > 1) {
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'story-delete-btn';
+                    delBtn.textContent = '✕ Delete';
+                    delBtn.onclick = () => { syncStoryFromUI(); stageData.part.splice(idx, 1); renderStoryEditor(); };
+                    header.appendChild(delBtn);
+                }
+                row.appendChild(header);
+
+                const bgContainer = document.createElement('div');
+                bgContainer.className = 'story-bg-options';
+                ADV_BG_OPTIONS.forEach(opt => {
+                    const bgOpt = document.createElement('div');
+                    bgOpt.className = 'story-bg-opt' + (part.background === opt.value ? ' sel' : '');
+                    bgOpt.dataset.bgValue = opt.value;
+                    const thumbURL = gameUiThumbs[opt.frame];
+                    if (thumbURL) {
+                        const img = document.createElement('img');
+                        img.src = thumbURL;
+                        bgOpt.appendChild(img);
+                    }
+                    const label = document.createElement('div');
+                    label.className = 'story-bg-label';
+                    label.textContent = opt.label;
+                    bgOpt.appendChild(label);
+                    bgOpt.onclick = () => {
+                        bgContainer.querySelectorAll('.story-bg-opt').forEach(el => el.classList.remove('sel'));
+                        bgOpt.classList.add('sel');
+                    };
+                    bgContainer.appendChild(bgOpt);
+                });
+                row.appendChild(bgContainer);
+
+                const textarea = document.createElement('textarea');
+                textarea.className = 'story-text-area';
+                textarea.style.marginTop = '8px';
+                textarea.placeholder = 'Dialog text (use Enter for newlines)';
+                textarea.value = part.text || '';
+                row.appendChild(textarea);
+
+                listEl.appendChild(row);
+            });
+        }
+
+        function syncStoryFromUI() {
+            if (!gameData || !gameData.storyData) return;
+            const stageData = gameData.storyData['stage' + storyEditorStage];
+            if (!stageData || !stageData.part) return;
+            const rows = document.querySelectorAll('#story-parts-list .story-part-row');
+            rows.forEach((row, idx) => {
+                if (idx >= stageData.part.length) return;
+                const selBg = row.querySelector('.story-bg-opt.sel');
+                if (selBg) stageData.part[idx].background = selBg.dataset.bgValue;
+                const textarea = row.querySelector('.story-text-area');
+                if (textarea) stageData.part[idx].text = textarea.value;
+            });
+        }
+
+        function addStoryPart() {
+            syncStoryFromUI();
+            if (!gameData || !gameData.storyData) return;
+            const stageData = gameData.storyData['stage' + storyEditorStage];
+            if (!stageData) return;
+            stageData.part.push({ background: "Done", text: "" });
+            renderStoryEditor();
+        }
+
+        function saveStoryData() {
+            syncStoryFromUI();
+            alert('Story data saved. Use Save All or Firebase Save to persist.');
+        }
+
         // ================== KEYBOARD ==================
         document.addEventListener('keydown', e => {
             if (e.key === 's' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); quickSave(); }
@@ -1875,7 +2135,9 @@
             try {
                 const payload = {
                     name, stageKey: currentStageKey, enemylist: normalizeGrid(currentGrid),
-                    enemyData: enemyData || {}, bossData: bossData || {}, width: 8, savedAt: firebase.database.ServerValue.TIMESTAMP
+                    enemyData: enemyData || {}, bossData: bossData || {},
+                    storyData: (gameData && gameData.storyData) || null,
+                    width: 8, savedAt: firebase.database.ServerValue.TIMESTAMP
                 };
                 const thumbs = buildFrameThumbnailsForSave();
                 if (thumbs) payload.frameThumbnails = thumbs;
@@ -1908,6 +2170,10 @@
                 currentGrid = normalizeGrid(d.enemylist || []);
                 if (d.enemyData && typeof d.enemyData === 'object') enemyData = d.enemyData;
                 if (d.bossData && typeof d.bossData === 'object') { bossData = d.bossData; storeBossDataForViewers(); }
+                if (d.storyData && typeof d.storyData === 'object') {
+                    if (!gameData) gameData = {};
+                    gameData.storyData = d.storyData;
+                }
                 if (d.stageKey) currentStageKey = d.stageKey;
                 document.getElementById('firebase-level-name').value = name;
                 document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Firebase: ${name}</span>`;

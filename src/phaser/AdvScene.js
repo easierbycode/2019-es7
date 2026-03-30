@@ -107,7 +107,12 @@ export class PhaserAdvScene extends Phaser.Scene {
     }
 
     create() {
-        this.scenario = LANG === "ja" ? ADV_SCENARIO_JA : ADV_SCENARIO_EN;
+        var recipe = gameState._phaserRecipe;
+        if (recipe && recipe.storyData) {
+            this.scenario = recipe.storyData;
+        } else {
+            this.scenario = LANG === "ja" ? ADV_SCENARIO_JA : ADV_SCENARIO_EN;
+        }
         this.partNum = 0;
         this.stageKey = "stage" + String(gameState.stageId);
         this.partText = this.scenario[this.stageKey].part[this.partNum].text;
