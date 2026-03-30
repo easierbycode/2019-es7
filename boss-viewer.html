@@ -50,6 +50,7 @@
 
         /* CANVAS AREA */
         #viewer { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; position: relative; }
+        #viewer canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 
         /* ANIM BUTTONS */
         #anim-bar {
@@ -513,6 +514,7 @@
                 width: w,
                 height: h,
                 parent: "viewer",
+                pixelArt: true,
                 backgroundColor: "#0a0a0a",
                 fps: { target: 60 },
                 scale: {

@@ -18,6 +18,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
 #boss-bar button:hover { background:#333; color:#fff; }
 #boss-bar button.active { border-color:#e44; color:#fff; }
 #viewer { flex:1; min-height:0; position:relative; overflow:hidden; }
+#viewer canvas { image-rendering: pixelated; image-rendering: crisp-edges; }
 #boss-name { position:absolute; top:8px; left:50%; transform:translateX(-50%); font-size:20px; font-weight:bold; color:#fff; letter-spacing:2px; z-index:10; pointer-events:none; text-shadow:0 0 10px rgba(0,0,0,0.8); }
 #pattern-info { position:absolute; top:8px; right:12px; font-size:11px; color:#888; z-index:10; pointer-events:none; text-align:right; }
 #bullet-count { position:absolute; bottom:4px; right:12px; font-size:11px; color:#666; z-index:10; pointer-events:none; }
@@ -990,6 +991,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             width: viewerEl.clientWidth,
             height: viewerEl.clientHeight,
             parent: "viewer",
+            pixelArt: true,
             backgroundColor: "#0a0a0a",
             fps: { target: 60 },
             scale: { mode: Phaser.Scale.RESIZE, autoCenter: Phaser.Scale.CENTER_BOTH },
