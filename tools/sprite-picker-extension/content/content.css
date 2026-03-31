@@ -1,0 +1,178 @@
+/* Sprite Picker content script styles */
+
+.sp-toggle-btn {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 999998;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 2px solid #333;
+  background: #222;
+  color: #0f0;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  transition: background 0.2s;
+  font-family: monospace;
+}
+.sp-toggle-btn:hover {
+  background: #333;
+}
+.sp-toggle-btn.active {
+  background: #0a3;
+  color: #fff;
+  border-color: #0f0;
+}
+
+/* Pick mode cursor */
+.sp-pick-mode img {
+  cursor: crosshair !important;
+}
+
+/* Image hover highlight in pick mode */
+.sp-img-highlight {
+  outline: 3px dashed #4af !important;
+  outline-offset: 2px;
+}
+
+/* Overlay container positioned over the target image */
+.sp-overlay-container {
+  position: absolute;
+  z-index: 999999;
+  pointer-events: none;
+}
+.sp-overlay-container canvas {
+  display: block;
+  pointer-events: all;
+  cursor: crosshair;
+  image-rendering: pixelated;
+}
+
+/* Selection panel */
+.sp-panel {
+  position: fixed;
+  bottom: 80px;
+  right: 20px;
+  z-index: 999998;
+  background: #1a1a2e;
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 12px;
+  max-width: 400px;
+  max-height: 60vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+  color: #eee;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+}
+.sp-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: bold;
+  font-size: 14px;
+}
+.sp-panel-close {
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0 4px;
+}
+.sp-panel-close:hover {
+  color: #fff;
+}
+.sp-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.sp-thumb {
+  border: 1px solid #555;
+  background: repeating-conic-gradient(#333 0% 25%, #444 0% 50%) 50% / 8px 8px;
+  image-rendering: pixelated;
+  cursor: pointer;
+}
+.sp-thumb.selected {
+  border-color: #0f0;
+  box-shadow: 0 0 4px #0f0;
+}
+.sp-btn {
+  display: inline-block;
+  padding: 6px 14px;
+  border: 1px solid #555;
+  border-radius: 4px;
+  background: #2a2a4a;
+  color: #eee;
+  cursor: pointer;
+  font-size: 12px;
+  margin-right: 6px;
+  margin-top: 4px;
+}
+.sp-btn:hover {
+  background: #3a3a5a;
+}
+.sp-btn-primary {
+  background: #0a6;
+  border-color: #0c8;
+  color: #fff;
+}
+.sp-btn-primary:hover {
+  background: #0b7;
+}
+.sp-btn-danger {
+  background: #a33;
+  border-color: #c44;
+}
+.sp-btn-danger:hover {
+  background: #b44;
+}
+.sp-status {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #888;
+}
+.sp-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #555;
+  border-top-color: #0f0;
+  border-radius: 50%;
+  animation: sp-spin 0.6s linear infinite;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+@keyframes sp-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Atlas/frame picker in panel */
+.sp-field {
+  margin-top: 8px;
+}
+.sp-field label {
+  display: block;
+  font-size: 11px;
+  color: #aaa;
+  margin-bottom: 3px;
+}
+.sp-field select,
+.sp-field input {
+  width: 100%;
+  padding: 4px 6px;
+  background: #222;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #eee;
+  font-size: 12px;
+}

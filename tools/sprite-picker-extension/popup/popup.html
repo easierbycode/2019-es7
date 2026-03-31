@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      width: 320px;
+      min-height: 200px;
+      background: #1a1a2e;
+      color: #eee;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-size: 13px;
+      padding: 12px;
+    }
+    h2 {
+      font-size: 15px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    h2 .icon { font-size: 18px; }
+    .status {
+      padding: 6px 10px;
+      border-radius: 4px;
+      margin-bottom: 10px;
+      font-size: 12px;
+    }
+    .status.connected { background: #0a3; color: #fff; }
+    .status.disconnected { background: #333; color: #f88; }
+    .section {
+      margin-bottom: 12px;
+    }
+    .section-title {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .help-text {
+      font-size: 12px;
+      color: #999;
+      line-height: 1.5;
+    }
+    .help-text strong { color: #ccc; }
+    ol {
+      padding-left: 18px;
+      line-height: 1.8;
+    }
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #555;
+      border-radius: 4px;
+      background: #2a2a4a;
+      color: #eee;
+      cursor: pointer;
+      font-size: 12px;
+      text-align: center;
+      margin-top: 8px;
+    }
+    .btn:hover { background: #3a3a5a; }
+    .btn-primary { background: #0a6; border-color: #0c8; }
+    .btn-primary:hover { background: #0b7; }
+    .inject-btn { background: #335; border-color: #446; }
+    .inject-btn:hover { background: #446; }
+    .footer {
+      margin-top: 12px;
+      font-size: 10px;
+      color: #555;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h2><span class="icon">&#x2295;</span> Sprite Picker</h2>
+
+  <div id="editorStatus" class="status disconnected">Checking editor connection...</div>
+
+  <div class="section">
+    <div class="section-title">How to use</div>
+    <div class="help-text">
+      <ol>
+        <li>Navigate to a sprite resource site</li>
+        <li>Click the <strong>&#x2295;</strong> button (bottom-right)</li>
+        <li>Click a sprite sheet image to detect sprites</li>
+        <li>Click detected sprites to select them</li>
+        <li>Choose atlas & mode, then <strong>Send to Level Editor</strong></li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Quick Actions</div>
+    <button id="injectBtn" class="btn inject-btn">Inject Picker on Current Tab</button>
+    <button id="refreshBtn" class="btn">Refresh Editor Connection</button>
+  </div>
+
+  <div class="footer">Sprite Picker v1.0</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
