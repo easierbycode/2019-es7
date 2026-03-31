@@ -1641,11 +1641,9 @@
             renderAtlas();
         }
 
-        function repackAtlas() {
-            if (!atlasData || !atlasImage) { alert("Load atlas first"); return; }
+        function buildAtlasWithReplacements() {
             const all = [];
             const frames = atlasData.frames || {};
-            const tc = document.createElement('canvas'), tx = tc.getContext('2d');
             for (let k in frames) {
                 const f = frames[k].frame; if (!f) continue;
                 if (replacedFrames[k]) {
@@ -1667,17 +1665,23 @@
                 pos[s.key] = { x: cx, y: cy }; cx += s.w + P;
                 rh = Math.max(rh, s.h); fh = Math.max(fh, cy + s.h + P);
             });
-            const na = document.createElement('canvas'); na.width = MW; na.height = fh;
-            const nc = na.getContext('2d');
+            const canvas = document.createElement('canvas'); canvas.width = MW; canvas.height = fh;
+            const nc = canvas.getContext('2d');
             all.forEach(s => { const p = pos[s.key]; nc.drawImage(s.canvas, p.x, p.y); });
-            const nf = {};
+            const newFrames = {};
             all.forEach(s => {
                 const p = pos[s.key];
-                nf[s.key] = { frame: { x: p.x, y: p.y, w: s.w, h: s.h }, rotated: false, trimmed: false,
+                newFrames[s.key] = { frame: { x: p.x, y: p.y, w: s.w, h: s.h }, rotated: false, trimmed: false,
                     spriteSourceSize: { x: 0, y: 0, w: s.w, h: s.h }, sourceSize: { w: s.w, h: s.h } };
             });
+            return { canvas, frames: newFrames };
+        }
+
+        function repackAtlas() {
+            if (!atlasData || !atlasImage) { alert("Load atlas first"); return; }
+            const result = buildAtlasWithReplacements();
             const cfg = ATLAS_CONFIGS[currentAtlasKey];
-            saveAtlasFiles(na, { frames: nf, meta: { ...(atlasData.meta || {}), image: cfg.png, size: { w: MW, h: fh } } });
+            saveAtlasFiles(result.canvas, { frames: result.frames, meta: { ...(atlasData.meta || {}), image: cfg.png, size: { w: result.canvas.width, h: result.canvas.height } } });
         }
 
         async function saveAtlasFiles(canvas, json) {
@@ -2404,14 +2408,30 @@
                 if (logoDataURL) payload.logoDataURL = logoDataURL;
                 if (subTitleDataURL) payload.subTitleDataURL = subTitleDataURL;
                 // Save atlas image + frame data so the game can load it
+                // If frames have been replaced, repack them into the saved atlas
                 if (atlasImage && atlasData) {
                     try {
-                        const cv = document.createElement('canvas');
-                        cv.width = atlasImage.naturalWidth; cv.height = atlasImage.naturalHeight;
-                        cv.getContext('2d').drawImage(atlasImage, 0, 0);
-                        payload.atlasImageDataURL = cv.toDataURL('image/png');
+                        let saveCanvas, saveFrames;
+                        if (Object.keys(replacedFrames).length > 0 || extraSprites.length > 0) {
+                            const result = buildAtlasWithReplacements();
+                            saveCanvas = result.canvas;
+                            saveFrames = result.frames;
+                            // Update in-memory state to reflect the baked replacements
+                            atlasData = { frames: saveFrames, meta: atlasData.meta };
+                            atlasImage = new Image();
+                            atlasImage.src = saveCanvas.toDataURL('image/png');
+                            atlasImage.onload = () => { buildFrameThumbs(); storeAtlasForViewers(); renderAtlas(); };
+                            replacedFrames = {};
+                            extraSprites = [];
+                        } else {
+                            saveCanvas = document.createElement('canvas');
+                            saveCanvas.width = atlasImage.naturalWidth; saveCanvas.height = atlasImage.naturalHeight;
+                            saveCanvas.getContext('2d').drawImage(atlasImage, 0, 0);
+                            saveFrames = atlasData.frames || {};
+                        }
+                        payload.atlasImageDataURL = saveCanvas.toDataURL('image/png');
                         const encodedFrames = {};
-                        for (const [k, v] of Object.entries(atlasData.frames || {})) encodedFrames[fbKeyEncode(k)] = v;
+                        for (const [k, v] of Object.entries(saveFrames)) encodedFrames[fbKeyEncode(k)] = v;
                         payload.atlasFrames = encodedFrames;
                     } catch (e) { console.warn('Could not save atlas to Firebase:', e); }
                 }
