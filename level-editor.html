@@ -115,7 +115,7 @@
         .picker-opt .opt-name { font-size: 10px; margin-top: 4px; text-align: center; color: #ccc; line-height: 1.2; }
         .picker-opt .opt-code { font-size: 8px; color: #666; font-family: monospace; }
 
-        /* ===== FIREBASE LEVEL LIST ===== */
+        /* ===== SAVED GAMES LIST ===== */
         .fb-level-item {
             display: flex; align-items: center; gap: 12px; padding: 10px 12px;
             border-radius: 8px; cursor: pointer; transition: background 0.1s;
@@ -126,6 +126,8 @@
         .fb-level-item .fb-name { font-size: 14px; font-weight: 600; color: #e2e8f0; }
         .fb-level-item .fb-date { font-size: 10px; color: #666; }
         .fb-level-loading { text-align: center; color: #666; padding: 24px; font-size: 13px; }
+        .save-badge { font-size: 12px; margin-left: 2px; }
+        .fb-level-item .fb-detail { display: flex; gap: 2px; align-items: center; margin-top: 2px; }
 
         /* ===== MISSING TEXTURES PANEL ===== */
         .missing-tex-row {
@@ -423,11 +425,12 @@
             <button class="menu-btn" onclick="exportCurrentLevelJSON();closeMenu()">📤 Export Level JSON</button>
         </div>
         <div class="menu-section">
-            <div class="menu-section-title">Firebase</div>
-            <input id="firebase-level-name" type="text" placeholder="Level name" class="menu-input">
-            <button class="menu-btn" onclick="saveToFirebase()">🔥 Save to Firebase</button>
-            <button class="menu-btn" onclick="loadFromFirebasePrompt()">📥 Load from Firebase</button>
-            <button class="menu-btn" onclick="playFirebaseLevel()">▶ Play Firebase Level</button>
+            <div class="menu-section-title">Game Save (Cloud)</div>
+            <div style="font-size:10px;color:#888;margin-bottom:6px;line-height:1.4;">Saves everything: title screen, story, sprites, levels, enemies &amp; bosses</div>
+            <input id="firebase-level-name" type="text" placeholder="My game name" class="menu-input">
+            <button class="menu-btn" onclick="saveToFirebase()">💾 Save Game</button>
+            <button class="menu-btn" onclick="loadFromFirebasePrompt()">📥 Load Game</button>
+            <button class="menu-btn" onclick="playFirebaseLevel()">▶ Play Game</button>
         </div>
         <div class="menu-section">
             <div class="menu-section-title">Advanced</div>
@@ -455,7 +458,7 @@
     <!-- FIREBASE LEVEL BROWSER -->
     <div id="firebase-browser" class="picker-overlay hidden" onclick="if(event.target===this)closeFirebaseBrowser()">
         <div class="picker-panel" style="max-height:80vh">
-            <div class="picker-title">FIREBASE LEVELS</div>
+            <div class="picker-title">SAVED GAMES</div>
             <div id="firebase-level-list" style="padding:0 4px;"></div>
         </div>
     </div>
@@ -1324,7 +1327,7 @@
             c.innerHTML = '';
             const keys = Object.keys(enemyData);
             if (!keys.length) {
-                c.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#666;padding:24px;font-size:13px">No enemies loaded. Load a game directory or Firebase level.</div>';
+                c.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:#666;padding:24px;font-size:13px">No enemies loaded. Load a game directory or a saved game.</div>';
                 return;
             }
             keys.forEach(ek => {
@@ -2060,7 +2063,7 @@
         function showBossPatternEditor() {
             closeMenu();
             if (!bossData || Object.keys(bossData).length === 0) {
-                alert('No bossData loaded. Load a game directory or Firebase level first.');
+                alert('No bossData loaded. Load a game directory or a saved game first.');
                 return;
             }
             renderBossPatternList();
@@ -2417,7 +2420,7 @@
 
         function saveStoryData() {
             syncStoryFromUI();
-            alert('Story data saved. Use Save All or Firebase Save to persist.');
+            alert('Story data updated in memory. Use Save Game (cloud) to persist.');
         }
 
         // ================== KEYBOARD ==================
@@ -2566,7 +2569,7 @@
                 }
                 await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${name}`).set(payload);
                 document.getElementById('firebase-level-name').value = name;
-                alert(`"${name}" saved!`);
+                alert(`Game "${name}" saved!\nIncludes: title, story, sprites, levels, enemies & bosses`);
             } catch (e) { alert('Save failed: ' + e.message); }
         }
 
@@ -2600,7 +2603,7 @@
                     atlasImage.onload = () => { buildFrameThumbs(); storeAtlasForViewers(); renderAtlas(); };
                 }
                 document.getElementById('firebase-level-name').value = name;
-                document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Firebase: ${name}</span>`;
+                document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Game: ${name} (cloud)</span>`;
 // Restore sprite thumbnails from Firebase data
                 if (d.frameThumbnails) restoreFrameThumbnails(d.frameThumbnails);
                 renderGrid(); renderPreview(); updateToolUI();
@@ -2612,20 +2615,24 @@
             initFirebase();
             if (!firebaseDb) { alert('Firebase not available'); return; }
             const list = document.getElementById('firebase-level-list');
-            list.innerHTML = '<div class="fb-level-loading">Loading levels...</div>';
+            list.innerHTML = '<div class="fb-level-loading">Loading saved games...</div>';
             document.getElementById('firebase-browser').classList.remove('hidden');
             closeMenu();
             try {
                 const snap = await firebaseDb.ref(FIREBASE_LEVELS_PATH).once('value');
                 const data = snap.val();
-                if (!data) { list.innerHTML = '<div class="fb-level-loading">No levels found</div>'; return; }
+                if (!data) { list.innerHTML = '<div class="fb-level-loading">No saved games found</div>'; return; }
                 const levels = Object.entries(data).sort((a, b) => (b[1].savedAt || 0) - (a[1].savedAt || 0));
                 list.innerHTML = '';
                 for (const [key, val] of levels) {
                     const item = document.createElement('div');
                     item.className = 'fb-level-item';
                     const date = val.savedAt ? new Date(val.savedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-                    item.innerHTML = `<div><div class="fb-name">${key}</div>${date ? `<div class="fb-date">${date}</div>` : ''}</div>`;
+                    let badges = '';
+                    if (val.storyData) badges += '<span class="save-badge" title="Story">📖</span>';
+                    if (val.logoDataURL || val.titleBgDataURL) badges += '<span class="save-badge" title="Title Screen">🖼</span>';
+                    if (val.atlasImageDataURL) badges += '<span class="save-badge" title="Custom Sprites">🎨</span>';
+                    item.innerHTML = `<div><div class="fb-name">${key}</div><div class="fb-detail">${date ? `<span class="fb-date">${date}</span>` : ''}${badges ? `<span style="margin-left:4px">${badges}</span>` : ''}</div></div>`;
                     item.onclick = () => { closeFirebaseBrowser(); loadFromFirebase(key); };
                     list.appendChild(item);
                 }
