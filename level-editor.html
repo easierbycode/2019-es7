@@ -1803,6 +1803,44 @@
             }
         }
 
+        // ================== SPRITE PICKER EXTENSION BRIDGE ==================
+        window.addEventListener("message", async (ev) => {
+            if (!ev.data || ev.data.source !== "sprite-picker-bridge") return;
+
+            if (ev.data.type === "SPRITE_PICKER_INJECT") {
+                const { sprites, atlas, mode, frameName } = ev.data;
+                if (atlas && atlas !== currentAtlasKey) await switchAtlas(atlas);
+
+                for (const spr of sprites) {
+                    const img = new Image();
+                    img.src = spr.dataURL;
+                    await new Promise(r => img.onload = r);
+                    const cv = document.createElement('canvas');
+                    cv.width = img.width; cv.height = img.height;
+                    cv.getContext('2d').drawImage(img, 0, 0);
+
+                    if (mode === "replace" && frameName) {
+                        replacedFrames[frameName] = { key: frameName, canvas: cv, w: img.width, h: img.height };
+                    } else {
+                        extraSprites.push({ key: spr.name || ('sprite_' + Date.now()), canvas: cv, w: img.width, h: img.height });
+                    }
+                }
+                renderAtlas();
+                showAtlasManager();
+            }
+
+            if (ev.data.type === "GET_ATLAS_FRAMES") {
+                const frames = atlasData ? Object.keys(atlasData.frames || {}) : [];
+                window.postMessage({
+                    source: "sprite-picker-page",
+                    type: "ATLAS_FRAMES_RESPONSE",
+                    requestId: ev.data.requestId,
+                    frames: frames,
+                    atlas: currentAtlasKey
+                }, "*");
+            }
+        });
+
         // ================== SAVE ==================
         function quickSave() {
             if (dirHandle && gameData) saveAll();
@@ -1853,6 +1891,7 @@
         let titleBgDataURL = null;
         let logoDataURL = null;
         let subTitleDataURL = null;
+        let titleStartTextDataURL = null;
 
         // Cached game_ui atlas for title editor preview
         let _titleEditorUiImage = null;
@@ -1909,8 +1948,10 @@
             if (type === 'logo' && logoDataURL) return logoDataURL;
             if (type === 'subTitle' && subTitleDataURL) return subTitleDataURL;
             if (type === 'title_bg' && titleBgDataURL) return titleBgDataURL;
+            if (type === 'titleStartText' && titleStartTextDataURL) return titleStartTextDataURL;
             if (type === 'logo') return _extractFrameDataURL('logo.gif');
             if (type === 'subTitle') return _extractFrameDataURL('subTitle.gif');
+            if (type === 'titleStartText') return _extractFrameDataURL('titleStartText.gif');
             if (type === 'title_bg') return 'assets/img/title_bg.jpg';
             return null;
         }
@@ -1921,6 +1962,7 @@
             const slots = [
                 { type: 'logo', label: 'Logo', hint: '256 x 88' },
                 { type: 'subTitle', label: 'Subtitle', hint: '256 x 28' },
+                { type: 'titleStartText', label: 'Start Text', hint: '256 x 16' },
                 { type: 'title_bg', label: 'Title Background', hint: '256 x 480' },
             ];
             slots.forEach(s => {
@@ -1966,7 +2008,7 @@
                 uploadBtn.appendChild(fileInput);
                 slot.appendChild(uploadBtn);
 
-                const dataVar = capturedType === 'logo' ? logoDataURL : capturedType === 'subTitle' ? subTitleDataURL : titleBgDataURL;
+                const dataVar = capturedType === 'logo' ? logoDataURL : capturedType === 'subTitle' ? subTitleDataURL : capturedType === 'titleStartText' ? titleStartTextDataURL : titleBgDataURL;
                 if (dataVar) {
                     const resetBtn = document.createElement('button');
                     resetBtn.className = 'slot-reset-btn';
@@ -1974,6 +2016,7 @@
                     resetBtn.onclick = () => {
                         if (capturedType === 'logo') logoDataURL = null;
                         else if (capturedType === 'subTitle') subTitleDataURL = null;
+                        else if (capturedType === 'titleStartText') titleStartTextDataURL = null;
                         else titleBgDataURL = null;
                         renderTitleEditor();
                     };
@@ -1989,6 +2032,7 @@
             reader.onload = () => {
                 if (type === 'logo') logoDataURL = reader.result;
                 else if (type === 'subTitle') subTitleDataURL = reader.result;
+                else if (type === 'titleStartText') titleStartTextDataURL = reader.result;
                 else titleBgDataURL = reader.result;
                 renderTitleEditor();
             };
@@ -2491,6 +2535,7 @@
                 if (titleBgDataURL) payload.titleBgDataURL = titleBgDataURL;
                 if (logoDataURL) payload.logoDataURL = logoDataURL;
                 if (subTitleDataURL) payload.subTitleDataURL = subTitleDataURL;
+                if (titleStartTextDataURL) payload.titleStartTextDataURL = titleStartTextDataURL;
                 // Save atlas image + frame data so the game can load it
                 // If frames have been replaced, repack them into the saved atlas
                 if (atlasImage && atlasData) {
@@ -2544,6 +2589,7 @@
                 titleBgDataURL = d.titleBgDataURL || null;
                 logoDataURL = d.logoDataURL || null;
                 subTitleDataURL = d.subTitleDataURL || null;
+                titleStartTextDataURL = d.titleStartTextDataURL || null;
                 // Restore atlas image + frame data so re-saving doesn't lose custom sprites
                 if (d.atlasImageDataURL && d.atlasFrames) {
                     const decodedFrames = {};

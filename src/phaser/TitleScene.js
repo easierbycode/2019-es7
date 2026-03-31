@@ -53,10 +53,17 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.belt.fillStyle(0x000000, 1);
         this.belt.fillRect(0, GAME_DIMENSIONS.HEIGHT - 120, GAME_DIMENSIONS.WIDTH, 120);
 
-        this.startText = this.add.sprite(
-            GAME_DIMENSIONS.CENTER_X, 330,
-            "game_ui", "titleStartText.gif"
-        );
+        if (this.textures.exists("custom_titleStartText")) {
+            this.startText = this.add.sprite(
+                GAME_DIMENSIONS.CENTER_X, 330,
+                "custom_titleStartText"
+            );
+        } else {
+            this.startText = this.add.sprite(
+                GAME_DIMENSIONS.CENTER_X, 330,
+                "game_ui", "titleStartText.gif"
+            );
+        }
         this.startText.setOrigin(0.5);
         this.startText.setAlpha(0);
         this.startText.setInteractive({ useHandCursor: true });

@@ -502,6 +502,19 @@ export class BootScene extends Phaser.Scene {
                     subTitleImg.src = data.subTitleDataURL;
                 }
 
+                // Replace titleStartText if Firebase provides a custom one
+                if (data.titleStartTextDataURL) {
+                    var startTextImg = new Image();
+                    startTextImg.onload = function () {
+                        try {
+                            self.textures.addImage("custom_titleStartText", startTextImg);
+                        } catch (e) {
+                            console.warn("Failed to load custom titleStartText:", e);
+                        }
+                    };
+                    startTextImg.src = data.titleStartTextDataURL;
+                }
+
                 gameState._phaserRecipe = baseRecipe;
 
                 var stageId = stageParam != null
