@@ -644,7 +644,9 @@ export class BootScene extends Phaser.Scene {
         }
 
         var self = this;
-        getAllCustomAudioEntries().then(function (entries) {
+
+        // Collect custom audio from all available sources, then load them
+        self._collectCustomAudioEntries().then(function (entries) {
             var keys = Object.keys(entries);
             if (keys.length === 0) {
                 callback();
@@ -656,7 +658,10 @@ export class BootScene extends Phaser.Scene {
 
             for (var i = 0; i < keys.length; i++) {
                 var key = keys[i];
-                var blob = entries[key];
+                var data = entries[key];
+
+                // data may be a Blob (IndexedDB) or ArrayBuffer (Electron IPC)
+                var blob = data instanceof Blob ? data : new Blob([data], { type: "audio/mpeg" });
                 var url = URL.createObjectURL(blob);
                 blobURLs.push(url);
 
@@ -679,6 +684,40 @@ export class BootScene extends Phaser.Scene {
         }).catch(function (err) {
             console.warn("Custom audio load failed:", err);
             callback();
+        });
+    }
+
+    _collectCustomAudioEntries() {
+        var entries = {};
+
+        // Source 1: IndexedDB (browser / level editor flow)
+        var idbPromise = getAllCustomAudioEntries().then(function (idbEntries) {
+            var keys = Object.keys(idbEntries);
+            for (var i = 0; i < keys.length; i++) {
+                entries[keys[i]] = idbEntries[keys[i]];
+            }
+        }).catch(function () {});
+
+        // Source 2: Electron filesystem (AppImage / Steam)
+        // Reads from <userData>/custom-audio/*.mp3 via preload bridge
+        var electronPromise;
+        if (typeof window !== "undefined" && window.electronAudio &&
+            typeof window.electronAudio.loadCustomAudio === "function") {
+            electronPromise = window.electronAudio.loadCustomAudio().then(function (diskEntries) {
+                var keys = Object.keys(diskEntries);
+                for (var i = 0; i < keys.length; i++) {
+                    // Electron entries override IndexedDB (disk is authoritative)
+                    entries[keys[i]] = diskEntries[keys[i]];
+                }
+            }).catch(function (err) {
+                console.warn("Electron custom audio load failed:", err);
+            });
+        } else {
+            electronPromise = Promise.resolve();
+        }
+
+        return Promise.all([idbPromise, electronPromise]).then(function () {
+            return entries;
         });
     }
 }
