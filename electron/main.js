@@ -1,5 +1,6 @@
-const { app, BrowserWindow, screen, protocol, net } = require("electron");
+const { app, BrowserWindow, screen, protocol, net, ipcMain } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const { execSync } = require("child_process");
 
 // ---------------------------------------------------------------------------
@@ -105,6 +106,7 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
+            preload: path.join(__dirname, "preload.js"),
         },
     });
 
@@ -126,6 +128,41 @@ function createWindow() {
         );
     });
 }
+
+// ---------------------------------------------------------------------------
+// Custom audio: read MP3 files from <userData>/custom-audio/ directory.
+// Users place files named by audio key (e.g. boss_bison_bgm.mp3) and
+// BootScene picks them up via window.electronAudio.loadCustomAudio().
+// ---------------------------------------------------------------------------
+ipcMain.handle("load-custom-audio", async function () {
+    var audioDir = path.join(app.getPath("userData"), "custom-audio");
+    var entries = {};
+
+    try {
+        fs.mkdirSync(audioDir, { recursive: true });
+    } catch (e) {}
+
+    var files;
+    try {
+        files = fs.readdirSync(audioDir);
+    } catch (e) {
+        return entries;
+    }
+
+    for (var i = 0; i < files.length; i++) {
+        var file = files[i];
+        if (!file.endsWith(".mp3")) continue;
+        var key = file.slice(0, -4); // strip .mp3
+        try {
+            var buf = fs.readFileSync(path.join(audioDir, file));
+            entries[key] = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+        } catch (e) {
+            console.warn("Failed to read custom audio file:", file, e);
+        }
+    }
+
+    return entries;
+});
 
 app.whenReady().then(createWindow);
 

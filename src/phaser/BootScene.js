@@ -112,6 +112,47 @@ function readEditorPlayRequest() {
     }
 }
 
+var CUSTOM_AUDIO_DB_NAME = "editorCustomAudio";
+var CUSTOM_AUDIO_STORE = "customAudio";
+
+function openCustomAudioDB() {
+    if (typeof indexedDB === "undefined") {
+        return Promise.reject(new Error("IndexedDB not available"));
+    }
+    return new Promise(function (resolve, reject) {
+        var req = indexedDB.open(CUSTOM_AUDIO_DB_NAME, 1);
+        req.onupgradeneeded = function (e) {
+            var db = e.target.result;
+            if (!db.objectStoreNames.contains(CUSTOM_AUDIO_STORE)) {
+                db.createObjectStore(CUSTOM_AUDIO_STORE);
+            }
+        };
+        req.onsuccess = function (e) { resolve(e.target.result); };
+        req.onerror = function (e) { reject(e.target.error); };
+    });
+}
+
+function getAllCustomAudioEntries() {
+    return openCustomAudioDB().then(function (db) {
+        return new Promise(function (resolve, reject) {
+            var tx = db.transaction(CUSTOM_AUDIO_STORE, "readonly");
+            var store = tx.objectStore(CUSTOM_AUDIO_STORE);
+            var entries = {};
+            var cursorReq = store.openCursor();
+            cursorReq.onsuccess = function (e) {
+                var cursor = e.target.result;
+                if (cursor) {
+                    entries[cursor.key] = cursor.value;
+                    cursor.continue();
+                } else {
+                    resolve(entries);
+                }
+            };
+            cursorReq.onerror = function (e) { reject(e.target.error); };
+        });
+    });
+}
+
 function primeGameStateForStage(recipe, stageId) {
     if (recipe && recipe.playerData) {
         gameState.spDamage = recipe.playerData.spDamage;
@@ -472,10 +513,12 @@ export class BootScene extends Phaser.Scene {
                 }
 
                 var nextScene = showTitle ? "PhaserTitleScene" : "PhaserGameScene";
-                setTimeout(function () {
-                    game.scene.stop("BootScene");
-                    game.scene.start(nextScene);
-                }, 50);
+                self._loadCustomAudio(function () {
+                    setTimeout(function () {
+                        game.scene.stop("BootScene");
+                        game.scene.start(nextScene);
+                    }, 50);
+                });
             }
 
             // If Firebase level includes atlas image + frames, merge with local atlas
@@ -580,14 +623,102 @@ export class BootScene extends Phaser.Scene {
             nextSceneKey = debugScene;
         }
 
-        // Phaser 4 RC6: the scene-level plugin (this.scene.start) and
-        // this.time.delayedCall do not work reliably from create().
-        // Use the game-level scene manager via setTimeout instead.
-        var game = this.game;
-        setTimeout(function () {
-            game.scene.stop("BootScene");
-            game.scene.start(nextSceneKey);
-        }, 50);
+        // Load custom audio overrides from IndexedDB before transitioning
+        var self = this;
+        this._loadCustomAudio(function () {
+            // Phaser 4 RC6: the scene-level plugin (this.scene.start) and
+            // this.time.delayedCall do not work reliably from create().
+            // Use the game-level scene manager via setTimeout instead.
+            var game = self.game;
+            setTimeout(function () {
+                game.scene.stop("BootScene");
+                game.scene.start(nextSceneKey);
+            }, 50);
+        });
+    }
+
+    _loadCustomAudio(callback) {
+        if (gameState.lowModeFlg) {
+            callback();
+            return;
+        }
+
+        var self = this;
+
+        // Collect custom audio from all available sources, then load them
+        self._collectCustomAudioEntries().then(function (entries) {
+            var keys = Object.keys(entries);
+            if (keys.length === 0) {
+                callback();
+                return;
+            }
+
+            console.log("Loading " + keys.length + " custom audio override(s)…");
+            var blobURLs = [];
+
+            for (var i = 0; i < keys.length; i++) {
+                var key = keys[i];
+                var data = entries[key];
+
+                // data may be a Blob (IndexedDB) or ArrayBuffer (Electron IPC)
+                var blob = data instanceof Blob ? data : new Blob([data], { type: "audio/mpeg" });
+                var url = URL.createObjectURL(blob);
+                blobURLs.push(url);
+
+                // Remove previously cached audio so Phaser re-decodes
+                if (self.cache.audio.exists(key)) {
+                    self.cache.audio.remove(key);
+                }
+                self.load.audio(key, url);
+            }
+
+            self.load.once("complete", function () {
+                // Revoke blob URLs to free memory
+                for (var j = 0; j < blobURLs.length; j++) {
+                    URL.revokeObjectURL(blobURLs[j]);
+                }
+                callback();
+            });
+
+            self.load.start();
+        }).catch(function (err) {
+            console.warn("Custom audio load failed:", err);
+            callback();
+        });
+    }
+
+    _collectCustomAudioEntries() {
+        var entries = {};
+
+        // Source 1: IndexedDB (browser / level editor flow)
+        var idbPromise = getAllCustomAudioEntries().then(function (idbEntries) {
+            var keys = Object.keys(idbEntries);
+            for (var i = 0; i < keys.length; i++) {
+                entries[keys[i]] = idbEntries[keys[i]];
+            }
+        }).catch(function () {});
+
+        // Source 2: Electron filesystem (AppImage / Steam)
+        // Reads from <userData>/custom-audio/*.mp3 via preload bridge
+        var electronPromise;
+        if (typeof window !== "undefined" && window.electronAudio &&
+            typeof window.electronAudio.loadCustomAudio === "function") {
+            electronPromise = window.electronAudio.loadCustomAudio().then(function (diskEntries) {
+                var keys = Object.keys(diskEntries);
+                for (var i = 0; i < keys.length; i++) {
+                    // Electron entries override IndexedDB (disk is authoritative)
+                    entries[keys[i]] = diskEntries[keys[i]];
+                }
+            }).catch(function (err) {
+                console.warn("Electron custom audio load failed:", err);
+            });
+        } else {
+            electronPromise = Promise.resolve();
+        }
+
+        return Promise.all([idbPromise, electronPromise]).then(function () {
+            return entries;
+        });
     }
 }
 

@@ -279,6 +279,68 @@
             font-family: 'Orbitron', sans-serif; transition: background 0.15s;
         }
         .title-image-slot .slot-reset-btn:hover { background: #7f1d1d; color: #fca5a5; }
+
+        /* Audio Editor */
+        .audio-filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; align-items: center; }
+        .audio-filter-pill {
+            padding: 4px 10px; border-radius: 12px; font-size: 11px; cursor: pointer;
+            border: 1px solid #475569; background: #1e293b; color: #94a3b8;
+            font-family: 'Orbitron', sans-serif; transition: background 0.15s;
+        }
+        .audio-filter-pill.on { background: #4d8bc4; color: #fff; border-color: #4d8bc4; }
+        .audio-filter-pill:hover { background: #334155; color: #e2e8f0; }
+        .audio-filter-pill.on:hover { background: #5a9ad5; }
+        .audio-search-input {
+            flex: 1; min-width: 120px; padding: 4px 10px; border-radius: 12px;
+            border: 1px solid #475569; background: #0f172a; color: #e2e8f0;
+            font-size: 11px; font-family: monospace; outline: none;
+        }
+        .audio-search-input:focus { border-color: #4d8bc4; }
+        .audio-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 8px; max-height: 55vh; overflow-y: auto; padding: 2px;
+        }
+        .audio-slot {
+            border: 1px solid #333; border-radius: 8px; padding: 10px;
+            background: #111; display: flex; flex-direction: column; gap: 6px;
+        }
+        .audio-slot.has-custom { border-color: #22c55e; background: #0a1f0a; }
+        .audio-slot-label {
+            font-size: 11px; font-weight: 700; color: #ccc;
+            font-family: monospace; word-break: break-all;
+        }
+        .audio-slot-category {
+            font-size: 9px; color: #666; text-transform: uppercase;
+            font-family: 'Orbitron', sans-serif;
+        }
+        .audio-slot-badge {
+            font-size: 9px; padding: 2px 6px; border-radius: 4px;
+            font-family: 'Orbitron', sans-serif; display: inline-block; width: fit-content;
+        }
+        .audio-slot-badge.default { background: #1e293b; color: #64748b; }
+        .audio-slot-badge.custom { background: #14532d; color: #4ade80; }
+        .audio-slot-actions { display: flex; gap: 4px; flex-wrap: wrap; }
+        .audio-slot-actions label, .audio-slot-actions button {
+            flex: 1; min-width: 50px; padding: 4px 6px; border-radius: 4px;
+            font-size: 10px; cursor: pointer; text-align: center;
+            font-family: 'Orbitron', sans-serif; border: 1px solid #475569;
+            transition: background 0.15s;
+        }
+        .audio-btn-upload { background: #1e293b; color: #94a3b8; }
+        .audio-btn-upload:hover { background: #334155; color: #e2e8f0; }
+        .audio-btn-play { background: #1e293b; color: #94a3b8; border: 1px solid #475569; }
+        .audio-btn-play:hover { background: #334155; color: #e2e8f0; }
+        .audio-btn-reset { background: #1c0a0a; color: #f87171; border: 1px solid #7f1d1d; }
+        .audio-btn-reset:hover { background: #7f1d1d; color: #fca5a5; }
+        .audio-clear-all-btn {
+            background: #7f1d1d; color: #fca5a5; border: none; border-radius: 6px;
+            padding: 6px 14px; font-size: 11px; cursor: pointer;
+            font-family: 'Orbitron', sans-serif; transition: background 0.15s;
+        }
+        .audio-clear-all-btn:hover { background: #991b1b; }
+        .audio-stats {
+            font-size: 10px; color: #64748b; font-family: monospace;
+        }
     </style>
 </head>
 <body>
@@ -374,6 +436,7 @@
             <button class="menu-btn" onclick="showStoryEditor()">📖 Story Editor</button>
             <button class="menu-btn" onclick="showAtlasManager()">🎨 Atlas Manager</button>
             <button class="menu-btn" onclick="showTitleEditor()">🖼 Title Editor</button>
+            <button class="menu-btn" onclick="showAudioEditor()">🔊 Audio Editor</button>
         </div>
         <div id="status" style="font-size:11px;color:#666;margin-top:16px;">No directory loaded</div>
     </div>
@@ -471,6 +534,27 @@
             <div class="picker-title">TITLE EDITOR</div>
             <div style="font-size:11px;color:#888;margin-bottom:12px;font-family:monospace;">Customize title screen logo, subtitle, and background</div>
             <div id="title-editor-slots" class="story-images-row"></div>
+        </div>
+    </div>
+
+    <!-- AUDIO EDITOR MODAL -->
+    <div id="audio-editor-modal" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+        <div class="picker-panel" style="max-height:85vh;max-width:800px;">
+            <div class="picker-title">AUDIO EDITOR</div>
+            <div style="font-size:11px;color:#888;margin-bottom:12px;font-family:monospace;">Upload custom MP3 files to replace any game sound or music</div>
+            <div class="audio-filter-row">
+                <div class="audio-filter-pill on" data-audio-cat="all" onclick="setAudioFilter('all')">All</div>
+                <div class="audio-filter-pill" data-audio-cat="bgm" onclick="setAudioFilter('bgm')">BGM</div>
+                <div class="audio-filter-pill" data-audio-cat="sfx" onclick="setAudioFilter('sfx')">SFX</div>
+                <div class="audio-filter-pill" data-audio-cat="voice" onclick="setAudioFilter('voice')">Voice</div>
+                <div class="audio-filter-pill" data-audio-cat="ui" onclick="setAudioFilter('ui')">UI</div>
+                <input class="audio-search-input" id="audio-search" type="text" placeholder="Search by key..." oninput="renderAudioEditor()">
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <div class="audio-stats" id="audio-stats"></div>
+                <button class="audio-clear-all-btn" onclick="clearAllCustomAudioUI()">Clear All Custom</button>
+            </div>
+            <div class="audio-grid" id="audio-grid"></div>
         </div>
     </div>
 
@@ -2555,6 +2639,385 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
                                        updateToolUI();
                 }
             } catch (e) { console.warn('Auto-load atlas failed:', e); }
+        }
+
+        // ================== AUDIO EDITOR ==================
+        const AUDIO_KEYS = [
+            // UI
+            'se_decision', 'se_correct', 'se_cursor_sub', 'se_cursor', 'se_over',
+            // BGM
+            'adventure_bgm', 'boss_bison_bgm', 'boss_barlog_bgm', 'boss_sagat_bgm',
+            'boss_vega_bgm', 'boss_goki_bgm', 'boss_fang_bgm', 'bgm_continue', 'bgm_gameover',
+            // SFX
+            'se_explosion', 'se_shoot', 'se_shoot_b', 'se_sp', 'se_sp_explosion',
+            'se_damage', 'se_guard', 'se_finish_akebono', 'se_barrier_start', 'se_barrier_end',
+            // Voice
+            'voice_titlecall', 'voice_thankyou', 'g_adbenture_voice0',
+            'voice_round0', 'voice_round1', 'voice_round2', 'voice_round3',
+            'voice_fight', 'voice_ko', 'voice_another_fighter',
+            'g_stage_voice_0', 'g_stage_voice_1', 'g_stage_voice_2', 'g_stage_voice_3', 'g_stage_voice_4',
+            'g_damage_voice', 'g_powerup_voice', 'g_sp_voice',
+            'boss_bison_voice_add', 'boss_bison_voice_ko', 'boss_bison_voice_faint',
+            'boss_bison_voice_faint_punch', 'boss_bison_voice_punch',
+            'boss_barlog_voice_add', 'boss_barlog_voice_ko',
+            'boss_barlog_voice_projectile', 'boss_barlog_voice_barcelona',
+            'boss_sagat_voice_add', 'boss_sagat_voice_ko',
+            'boss_sagat_voice_projectile0', 'boss_sagat_voice_projectile1', 'boss_sagat_voice_kick',
+            'boss_vega_voice_add', 'boss_vega_voice_ko',
+            'boss_vega_voice_crusher', 'boss_vega_voice_warp',
+            'boss_vega_voice_projectile', 'boss_vega_voice_shoot',
+            'boss_fang_voice_add', 'boss_fang_voice_ko',
+            'boss_fang_voice_beam0', 'boss_fang_voice_beam1', 'boss_fang_voice_projectile',
+            'boss_goki_voice_add', 'boss_goki_voice_ko',
+            'boss_goki_voice_projectile0', 'boss_goki_voice_projectile1',
+            'boss_goki_voice_ashura', 'boss_goki_voice_syungokusatu0', 'boss_goki_voice_syungokusatu1',
+            'voice_countdown0', 'voice_countdown1', 'voice_countdown2', 'voice_countdown3',
+            'voice_countdown4', 'voice_countdown5', 'voice_countdown6', 'voice_countdown7',
+            'voice_countdown8', 'voice_countdown9', 'voice_gameover',
+            'g_continue_yes_voice0', 'g_continue_yes_voice1', 'g_continue_yes_voice2',
+            'g_continue_no_voice0', 'g_continue_no_voice1',
+            'voice_congra',
+        ];
+
+        const AUDIO_PATHS = {
+            voice_titlecall: "assets/sounds/scene_title/voice_titlecall.mp3",
+            se_decision: "assets/sounds/ui/se_decision.mp3",
+            se_correct: "assets/sounds/ui/se_correct.mp3",
+            se_cursor_sub: "assets/sounds/ui/se_cursor_sub.mp3",
+            se_cursor: "assets/sounds/ui/se_cursor.mp3",
+            se_over: "assets/sounds/ui/se_over.mp3",
+            adventure_bgm: "assets/sounds/scene_adventure/adventure_bgm.mp3",
+            g_adbenture_voice0: "assets/sounds/scene_adventure/g_adbenture_voice0.mp3",
+            voice_thankyou: "assets/sounds/voice_thankyou.mp3",
+            se_explosion: "assets/sounds/se_explosion.mp3",
+            se_shoot: "assets/sounds/se_shoot.mp3",
+            se_shoot_b: "assets/sounds/se_shoot_b.mp3",
+            se_sp: "assets/sounds/se_sp.mp3",
+            se_sp_explosion: "assets/sounds/se_sp_explosion.mp3",
+            se_damage: "assets/sounds/se_damage.mp3",
+            se_guard: "assets/sounds/se_guard.mp3",
+            se_finish_akebono: "assets/sounds/se_finish_akebono.mp3",
+            se_barrier_start: "assets/sounds/se_barrier_start.mp3",
+            se_barrier_end: "assets/sounds/se_barrier_end.mp3",
+            voice_round0: "assets/sounds/voice_round0.mp3",
+            voice_round1: "assets/sounds/voice_round1.mp3",
+            voice_round2: "assets/sounds/voice_round2.mp3",
+            voice_round3: "assets/sounds/voice_round3.mp3",
+            voice_fight: "assets/sounds/voice_fight.mp3",
+            voice_ko: "assets/sounds/voice_ko.mp3",
+            voice_another_fighter: "assets/sounds/voice_another_fighter.mp3",
+            g_stage_voice_0: "assets/sounds/scene_game/g_stage_voice_0.mp3",
+            g_stage_voice_1: "assets/sounds/scene_game/g_stage_voice_1.mp3",
+            g_stage_voice_2: "assets/sounds/scene_game/g_stage_voice_2.mp3",
+            g_stage_voice_3: "assets/sounds/scene_game/g_stage_voice_3.mp3",
+            g_stage_voice_4: "assets/sounds/scene_game/g_stage_voice_4.mp3",
+            g_damage_voice: "assets/sounds/g_damage_voice.mp3",
+            g_powerup_voice: "assets/sounds/g_powerup_voice.mp3",
+            g_sp_voice: "assets/sounds/g_sp_voice.mp3",
+            boss_bison_bgm: "assets/sounds/boss_bison_bgm.mp3",
+            boss_bison_voice_add: "assets/sounds/boss_bison_voice_add.mp3",
+            boss_bison_voice_ko: "assets/sounds/boss_bison_voice_ko.mp3",
+            boss_bison_voice_faint: "assets/sounds/boss_bison_voice_faint.mp3",
+            boss_bison_voice_faint_punch: "assets/sounds/boss_bison_voice_faint_punch.mp3",
+            boss_bison_voice_punch: "assets/sounds/boss_bison_voice_punch.mp3",
+            boss_barlog_bgm: "assets/sounds/boss_barlog_bgm.mp3",
+            boss_barlog_voice_add: "assets/sounds/boss_barlog_voice_add.mp3",
+            boss_barlog_voice_ko: "assets/sounds/boss_barlog_voice_ko.mp3",
+            boss_barlog_voice_projectile: "assets/sounds/boss_barlog_voice_projectile.mp3",
+            boss_barlog_voice_barcelona: "assets/sounds/boss_barlog_voice_barcelona.mp3",
+            boss_sagat_bgm: "assets/sounds/boss_sagat_bgm.mp3",
+            boss_sagat_voice_add: "assets/sounds/boss_sagat_voice_add.mp3",
+            boss_sagat_voice_ko: "assets/sounds/boss_sagat_voice_ko.mp3",
+            boss_sagat_voice_projectile0: "assets/sounds/boss_sagat_voice_projectile0.mp3",
+            boss_sagat_voice_projectile1: "assets/sounds/boss_sagat_voice_projectile1.mp3",
+            boss_sagat_voice_kick: "assets/sounds/boss_sagat_voice_kick.mp3",
+            boss_vega_bgm: "assets/sounds/boss_vega_bgm.mp3",
+            boss_vega_voice_add: "assets/sounds/boss_vega_voice_add.mp3",
+            boss_vega_voice_ko: "assets/sounds/boss_vega_voice_ko.mp3",
+            boss_vega_voice_crusher: "assets/sounds/boss_vega_voice_crusher.mp3",
+            boss_vega_voice_warp: "assets/sounds/boss_vega_voice_warp.mp3",
+            boss_vega_voice_projectile: "assets/sounds/boss_vega_voice_projectile.mp3",
+            boss_vega_voice_shoot: "assets/sounds/boss_vega_voice_shoot.mp3",
+            boss_goki_bgm: "assets/sounds/boss_goki_bgm.mp3",
+            boss_goki_voice_add: "assets/sounds/boss_goki_voice_add.mp3",
+            boss_goki_voice_ko: "assets/sounds/boss_goki_voice_ko.mp3",
+            boss_goki_voice_projectile0: "assets/sounds/boss_goki_voice_projectile0.mp3",
+            boss_goki_voice_projectile1: "assets/sounds/boss_goki_voice_projectile1.mp3",
+            boss_goki_voice_ashura: "assets/sounds/boss_goki_voice_ashura.mp3",
+            boss_goki_voice_syungokusatu0: "assets/sounds/boss_goki_voice_syungokusatu0.mp3",
+            boss_goki_voice_syungokusatu1: "assets/sounds/boss_goki_voice_syungokusatu1.mp3",
+            boss_fang_bgm: "assets/sounds/boss_fang_bgm.mp3",
+            boss_fang_voice_add: "assets/sounds/boss_fang_voice_add.mp3",
+            boss_fang_voice_ko: "assets/sounds/boss_fang_voice_ko.mp3",
+            boss_fang_voice_beam0: "assets/sounds/boss_fang_voice_beam0.mp3",
+            boss_fang_voice_beam1: "assets/sounds/boss_fang_voice_beam1.mp3",
+            boss_fang_voice_projectile: "assets/sounds/boss_fang_voice_projectile.mp3",
+            bgm_continue: "assets/sounds/scene_continue/bgm_continue.mp3",
+            bgm_gameover: "assets/sounds/scene_continue/bgm_gameover.mp3",
+            voice_countdown0: "assets/sounds/scene_continue/voice_countdown0.mp3",
+            voice_countdown1: "assets/sounds/scene_continue/voice_countdown1.mp3",
+            voice_countdown2: "assets/sounds/scene_continue/voice_countdown2.mp3",
+            voice_countdown3: "assets/sounds/scene_continue/voice_countdown3.mp3",
+            voice_countdown4: "assets/sounds/scene_continue/voice_countdown4.mp3",
+            voice_countdown5: "assets/sounds/scene_continue/voice_countdown5.mp3",
+            voice_countdown6: "assets/sounds/scene_continue/voice_countdown6.mp3",
+            voice_countdown7: "assets/sounds/scene_continue/voice_countdown7.mp3",
+            voice_countdown8: "assets/sounds/scene_continue/voice_countdown8.mp3",
+            voice_countdown9: "assets/sounds/scene_continue/voice_countdown9.mp3",
+            voice_gameover: "assets/sounds/scene_continue/voice_gameover.mp3",
+            g_continue_yes_voice0: "assets/sounds/scene_continue/g_continue_yes_voice0.mp3",
+            g_continue_yes_voice1: "assets/sounds/scene_continue/g_continue_yes_voice1.mp3",
+            g_continue_yes_voice2: "assets/sounds/scene_continue/g_continue_yes_voice2.mp3",
+            g_continue_no_voice0: "assets/sounds/scene_continue/g_continue_no_voice0.mp3",
+            g_continue_no_voice1: "assets/sounds/scene_continue/g_continue_no_voice1.mp3",
+            voice_congra: "assets/sounds/scene_clear/voice_congra.mp3",
+        };
+
+        function audioCategory(key) {
+            if (key.indexOf('_bgm') >= 0 || key.indexOf('bgm_') >= 0) return 'bgm';
+            if (key === 'adventure_bgm') return 'bgm';
+            if (key === 'se_decision' || key === 'se_correct' || key === 'se_cursor' ||
+                key === 'se_cursor_sub' || key === 'se_over') return 'ui';
+            if (key.indexOf('se_') === 0) return 'sfx';
+            return 'voice';
+        }
+
+        const AUDIO_DB_NAME = 'editorCustomAudio';
+        const AUDIO_DB_VERSION = 1;
+        const AUDIO_STORE_NAME = 'customAudio';
+
+        function openAudioDB() {
+            return new Promise(function(resolve, reject) {
+                var req = indexedDB.open(AUDIO_DB_NAME, AUDIO_DB_VERSION);
+                req.onupgradeneeded = function(e) {
+                    var db = e.target.result;
+                    if (!db.objectStoreNames.contains(AUDIO_STORE_NAME)) {
+                        db.createObjectStore(AUDIO_STORE_NAME);
+                    }
+                };
+                req.onsuccess = function(e) { resolve(e.target.result); };
+                req.onerror = function(e) { reject(e.target.error); };
+            });
+        }
+
+        function saveCustomAudio(key, blob) {
+            return openAudioDB().then(function(db) {
+                return new Promise(function(resolve, reject) {
+                    var tx = db.transaction(AUDIO_STORE_NAME, 'readwrite');
+                    tx.objectStore(AUDIO_STORE_NAME).put(blob, key);
+                    tx.oncomplete = function() { resolve(); };
+                    tx.onerror = function(e) { reject(e.target.error); };
+                });
+            });
+        }
+
+        function getCustomAudio(key) {
+            return openAudioDB().then(function(db) {
+                return new Promise(function(resolve, reject) {
+                    var tx = db.transaction(AUDIO_STORE_NAME, 'readonly');
+                    var req = tx.objectStore(AUDIO_STORE_NAME).get(key);
+                    req.onsuccess = function() { resolve(req.result || null); };
+                    req.onerror = function(e) { reject(e.target.error); };
+                });
+            });
+        }
+
+        function getAllCustomAudioKeys() {
+            return openAudioDB().then(function(db) {
+                return new Promise(function(resolve, reject) {
+                    var tx = db.transaction(AUDIO_STORE_NAME, 'readonly');
+                    var req = tx.objectStore(AUDIO_STORE_NAME).getAllKeys();
+                    req.onsuccess = function() { resolve(req.result || []); };
+                    req.onerror = function(e) { reject(e.target.error); };
+                });
+            });
+        }
+
+        function deleteCustomAudio(key) {
+            return openAudioDB().then(function(db) {
+                return new Promise(function(resolve, reject) {
+                    var tx = db.transaction(AUDIO_STORE_NAME, 'readwrite');
+                    tx.objectStore(AUDIO_STORE_NAME).delete(key);
+                    tx.oncomplete = function() { resolve(); };
+                    tx.onerror = function(e) { reject(e.target.error); };
+                });
+            });
+        }
+
+        function clearAllCustomAudio() {
+            return openAudioDB().then(function(db) {
+                return new Promise(function(resolve, reject) {
+                    var tx = db.transaction(AUDIO_STORE_NAME, 'readwrite');
+                    tx.objectStore(AUDIO_STORE_NAME).clear();
+                    tx.oncomplete = function() { resolve(); };
+                    tx.onerror = function(e) { reject(e.target.error); };
+                });
+            });
+        }
+
+        let audioFilterCat = 'all';
+        let audioCustomKeys = new Set();
+        let audioPreviewEl = null;
+
+        function setAudioFilter(cat) {
+            audioFilterCat = cat;
+            document.querySelectorAll('[data-audio-cat]').forEach(function(el) {
+                el.classList.toggle('on', el.getAttribute('data-audio-cat') === cat);
+            });
+            renderAudioEditor();
+        }
+
+        async function showAudioEditor() {
+            closeMenu();
+            try {
+                const keys = await getAllCustomAudioKeys();
+                audioCustomKeys = new Set(keys);
+            } catch (e) {
+                audioCustomKeys = new Set();
+            }
+            renderAudioEditor();
+            document.getElementById('audio-editor-modal').classList.remove('hidden');
+        }
+
+        function renderAudioEditor() {
+            const grid = document.getElementById('audio-grid');
+            const stats = document.getElementById('audio-stats');
+            const search = (document.getElementById('audio-search').value || '').toLowerCase().trim();
+            grid.innerHTML = '';
+
+            let filtered = AUDIO_KEYS.filter(function(key) {
+                if (audioFilterCat !== 'all' && audioCategory(key) !== audioFilterCat) return false;
+                if (search && key.toLowerCase().indexOf(search) < 0) return false;
+                return true;
+            });
+
+            stats.textContent = audioCustomKeys.size + ' custom / ' + AUDIO_KEYS.length + ' total — showing ' + filtered.length;
+
+            for (let i = 0; i < filtered.length; i++) {
+                const key = filtered[i];
+                const isCustom = audioCustomKeys.has(key);
+                const cat = audioCategory(key);
+
+                const slot = document.createElement('div');
+                slot.className = 'audio-slot' + (isCustom ? ' has-custom' : '');
+
+                const label = document.createElement('div');
+                label.className = 'audio-slot-label';
+                label.textContent = key;
+                slot.appendChild(label);
+
+                const catLabel = document.createElement('div');
+                catLabel.className = 'audio-slot-category';
+                catLabel.textContent = cat.toUpperCase();
+                slot.appendChild(catLabel);
+
+                const badge = document.createElement('div');
+                badge.className = 'audio-slot-badge ' + (isCustom ? 'custom' : 'default');
+                badge.textContent = isCustom ? 'Custom \u2713' : 'Default';
+                slot.appendChild(badge);
+
+                const actions = document.createElement('div');
+                actions.className = 'audio-slot-actions';
+
+                // Upload button
+                const uploadLabel = document.createElement('label');
+                uploadLabel.className = 'audio-btn-upload';
+                uploadLabel.textContent = 'Upload';
+                const fileInput = document.createElement('input');
+                fileInput.type = 'file';
+                fileInput.accept = 'audio/mpeg,audio/mp3,.mp3';
+                fileInput.style.display = 'none';
+                (function(capturedKey) {
+                    fileInput.onchange = function(e) {
+                        if (e.target.files[0]) handleAudioUpload(capturedKey, e.target.files[0]);
+                    };
+                })(key);
+                uploadLabel.appendChild(fileInput);
+                actions.appendChild(uploadLabel);
+
+                // Play button
+                const playBtn = document.createElement('button');
+                playBtn.className = 'audio-btn-play';
+                playBtn.textContent = '\u25B6 Play';
+                (function(capturedKey, capturedCustom) {
+                    playBtn.onclick = function() { previewAudio(capturedKey, capturedCustom); };
+                })(key, isCustom);
+                actions.appendChild(playBtn);
+
+                // Reset button (only for custom)
+                if (isCustom) {
+                    const resetBtn = document.createElement('button');
+                    resetBtn.className = 'audio-btn-reset';
+                    resetBtn.textContent = 'Reset';
+                    (function(capturedKey) {
+                        resetBtn.onclick = function() { resetCustomAudio(capturedKey); };
+                    })(key);
+                    actions.appendChild(resetBtn);
+                }
+
+                slot.appendChild(actions);
+                grid.appendChild(slot);
+            }
+        }
+
+        function handleAudioUpload(key, file) {
+            saveCustomAudio(key, file).then(function() {
+                audioCustomKeys.add(key);
+                renderAudioEditor();
+            }).catch(function(err) {
+                console.error('Failed to save custom audio:', err);
+                alert('Failed to save audio: ' + err.message);
+            });
+        }
+
+        function resetCustomAudio(key) {
+            deleteCustomAudio(key).then(function() {
+                audioCustomKeys.delete(key);
+                renderAudioEditor();
+            }).catch(function(err) {
+                console.error('Failed to delete custom audio:', err);
+            });
+        }
+
+        function clearAllCustomAudioUI() {
+            if (!confirm('Remove all custom audio overrides?')) return;
+            clearAllCustomAudio().then(function() {
+                audioCustomKeys.clear();
+                renderAudioEditor();
+            }).catch(function(err) {
+                console.error('Failed to clear custom audio:', err);
+            });
+        }
+
+        function previewAudio(key, isCustom) {
+            // Stop previous preview
+            if (audioPreviewEl) {
+                audioPreviewEl.pause();
+                if (audioPreviewEl._blobUrl) {
+                    URL.revokeObjectURL(audioPreviewEl._blobUrl);
+                }
+                audioPreviewEl = null;
+            }
+
+            if (isCustom) {
+                getCustomAudio(key).then(function(blob) {
+                    if (!blob) return;
+                    var url = URL.createObjectURL(blob);
+                    var audio = new Audio(url);
+                    audio._blobUrl = url;
+                    audio.onended = function() { URL.revokeObjectURL(url); audioPreviewEl = null; };
+                    audio.onerror = function() { URL.revokeObjectURL(url); audioPreviewEl = null; };
+                    audioPreviewEl = audio;
+                    audio.play().catch(function() {});
+                });
+            } else {
+                var path = AUDIO_PATHS[key];
+                if (!path) return;
+                var audio = new Audio(path);
+                audioPreviewEl = audio;
+                audio.onended = function() { audioPreviewEl = null; };
+                audio.play().catch(function() {});
+            }
         }
 
         // ================== INIT ==================
