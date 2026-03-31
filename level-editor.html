@@ -193,6 +193,23 @@
 
         .hidden { display: none !important; }
 
+        /* ===== ENEMY EDITOR TABS ===== */
+        .enemy-editor-tabs {
+            display: flex; gap: 0; margin-bottom: 12px; border-bottom: 2px solid #333;
+        }
+        .enemy-editor-tab {
+            padding: 8px 16px; font-size: 12px; font-weight: 600; cursor: pointer;
+            color: #888; border-bottom: 2px solid transparent; margin-bottom: -2px;
+            font-family: 'Orbitron', sans-serif; background: none; border-top: none;
+            border-left: none; border-right: none; transition: color 0.15s, border-color 0.15s;
+        }
+        .enemy-editor-tab:hover { color: #ccc; }
+        .enemy-editor-tab.active { color: #84cc16; border-bottom-color: #84cc16; }
+        .enemy-editor-tab .tab-count {
+            font-size: 10px; color: #666; margin-left: 4px; font-weight: 400;
+        }
+        .enemy-editor-tab.active .tab-count { color: #6b9e12; }
+
         /* ===== BOSS PATTERN ASSIGNMENT ===== */
         .boss-pattern-row {
             display: flex; align-items: center; gap: 10px; padding: 10px 12px;
@@ -434,7 +451,7 @@
         </div>
         <div class="menu-section">
             <div class="menu-section-title">Advanced</div>
-            <button class="menu-btn" onclick="showEnemyEditor()">👾 Enemy Editor</button>
+            <button class="menu-btn" onclick="showEnemyEditor()">👾 Enemy &amp; Boss Editor</button>
             <button class="menu-btn" onclick="showBossPatternEditor()">👹 Boss Patterns</button>
             <button class="menu-btn" onclick="showStoryEditor()">📖 Story Editor</button>
             <button class="menu-btn" onclick="showAtlasManager()">🎨 Atlas Manager</button>
@@ -447,11 +464,15 @@
     <!-- ENEMY EDITOR MODAL -->
     <div id="enemy-editor-modal" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
         <div class="picker-panel" style="max-height:80vh">
-            <div class="picker-title">ENEMY EDITOR</div>
+            <div class="picker-title">ENEMY &amp; BOSS EDITOR</div>
+            <div class="enemy-editor-tabs">
+                <button class="enemy-editor-tab active" data-tab="enemies" onclick="switchEditorTab('enemies')">Enemies <span class="tab-count" id="enemy-tab-count"></span></button>
+                <button class="enemy-editor-tab" data-tab="bosses" onclick="switchEditorTab('bosses')">Bosses <span class="tab-count" id="boss-tab-count"></span></button>
+            </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="enemy-list"></div>
             <input id="enemy-key" type="text" placeholder="Key (e.g. enemyA)" class="menu-input">
             <textarea id="enemy-json" rows="12" class="menu-input" style="font-family:monospace;font-size:11px;resize:vertical;"></textarea>
-            <button onclick="saveCurrentEnemy()" class="menu-btn" style="background:#84cc16;color:#000;font-weight:700;">Save Enemy</button>
+            <button onclick="saveCurrentEnemy()" class="menu-btn" style="background:#84cc16;color:#000;font-weight:700;">Save</button>
         </div>
     </div>
 
@@ -697,6 +718,7 @@
         let extraSprites = [];
         let replacedFrames = {};
         let currentEnemyKey = null;
+        let currentEditorTab = 'enemies'; // 'enemies' or 'bosses'
 
         // Tool state
         let selectedEnemyLetter = null;
@@ -825,7 +847,7 @@
         }
         function showEnemyEditor() {
             closeMenu();
-            renderEnemyList();
+            switchEditorTab(currentEditorTab);
             document.getElementById('enemy-editor-modal').classList.remove('hidden');
         }
         function showAtlasManager() {
@@ -1614,15 +1636,68 @@
         }
 
 
-        // ================== ENEMY EDITOR ==================
+        // ================== ENEMY & BOSS EDITOR ==================
+        function switchEditorTab(tab) {
+            currentEditorTab = tab;
+            document.querySelectorAll('.enemy-editor-tab').forEach(t => {
+                t.classList.toggle('active', t.dataset.tab === tab);
+            });
+            // Clear form when switching tabs
+            currentEnemyKey = null;
+            document.getElementById('enemy-key').value = '';
+            document.getElementById('enemy-json').value = '';
+            document.getElementById('enemy-key').placeholder = tab === 'bosses' ? 'Key (e.g. boss0)' : 'Key (e.g. enemyA)';
+            renderEnemyList();
+        }
+
         function renderEnemyList() {
             const c = document.getElementById('enemy-list');
             c.innerHTML = '';
-            Object.keys(enemyData).forEach(key => {
+            const enemyKeys = Object.keys(enemyData);
+            const bossKeys = Object.keys(bossData);
+            document.getElementById('enemy-tab-count').textContent = '(' + enemyKeys.length + ')';
+            document.getElementById('boss-tab-count').textContent = '(' + bossKeys.length + ')';
+
+            const keys = currentEditorTab === 'bosses' ? bossKeys : enemyKeys;
+            const data = currentEditorTab === 'bosses' ? bossData : enemyData;
+
+            if (!keys.length) {
+                c.innerHTML = '<div style="color:#666;font-size:11px;padding:8px;">No ' + currentEditorTab + ' loaded.</div>';
+                return;
+            }
+
+            keys.forEach(key => {
                 const b = document.createElement('button');
                 b.className = 'menu-btn';
-                b.style.cssText = 'display:inline-flex;padding:6px 10px;font-size:11px;';
-                b.textContent = key;
+                b.style.cssText = 'display:inline-flex;padding:6px 10px;font-size:11px;gap:6px;align-items:center;';
+                if (key === currentEnemyKey) b.style.borderColor = '#84cc16';
+
+                // Try to show a thumbnail
+                const entry = data[key];
+                let thumbFrame = null;
+                if (currentEditorTab === 'bosses' && entry && entry.anim && entry.anim.idle && entry.anim.idle[0]) {
+                    thumbFrame = entry.anim.idle[0];
+                } else if (entry && entry.texture && entry.texture[0]) {
+                    thumbFrame = entry.texture[0];
+                }
+                if (thumbFrame) {
+                    const url = getThumbURL(thumbFrame);
+                    if (url) {
+                        const img = document.createElement('img');
+                        img.src = url;
+                        img.style.cssText = 'width:20px;height:20px;image-rendering:pixelated;object-fit:contain;';
+                        b.appendChild(img);
+                    }
+                }
+
+                const label = document.createElement('span');
+                if (currentEditorTab === 'bosses') {
+                    label.textContent = (BOSS_PATTERN_NAMES[key] || entry.name || key);
+                } else {
+                    label.textContent = key;
+                }
+                b.appendChild(label);
+
                 b.onclick = () => editEnemy(key);
                 c.appendChild(b);
             });
@@ -1630,27 +1705,37 @@
 
         function editEnemy(key) {
             currentEnemyKey = key;
+            const data = currentEditorTab === 'bosses' ? bossData : enemyData;
             document.getElementById('enemy-key').value = key;
-            document.getElementById('enemy-json').value = JSON.stringify(enemyData[key], null, 2);
+            document.getElementById('enemy-json').value = JSON.stringify(data[key], null, 2);
+            renderEnemyList(); // refresh highlight
         }
 
         function syncEnemyEditorForm(showErrors = false) {
             const dk = document.getElementById('enemy-key').value.trim();
             const dj = document.getElementById('enemy-json').value.trim();
             if (!dk && !dj && !currentEnemyKey) return true;
-            if (!dk) { if (showErrors) alert('Enemy key required'); return false; }
+            if (!dk) { if (showErrors) alert('Key required'); return false; }
             let nd;
             try { nd = JSON.parse(dj || '{}'); } catch { if (showErrors) alert('Invalid JSON'); return false; }
-            if (currentEnemyKey && currentEnemyKey !== dk) delete enemyData[currentEnemyKey];
-            enemyData[dk] = nd;
-            gameData.enemyData = enemyData;
+
+            const data = currentEditorTab === 'bosses' ? bossData : enemyData;
+            if (currentEnemyKey && currentEnemyKey !== dk) delete data[currentEnemyKey];
+            data[dk] = nd;
+
+            if (currentEditorTab === 'bosses') {
+                gameData.bossData = bossData;
+                storeBossDataForViewers();
+            } else {
+                gameData.enemyData = enemyData;
+            }
             currentEnemyKey = dk;
             renderEnemyList();
             return true;
         }
 
         function saveCurrentEnemy() {
-            if (syncEnemyEditorForm(true)) alert('Enemy saved');
+            if (syncEnemyEditorForm(true)) alert(currentEditorTab === 'bosses' ? 'Boss saved' : 'Enemy saved');
         }
 
         // ================== ATLAS ==================
@@ -1867,6 +1952,7 @@
         function buildRuntimeRecipe() {
             const r = JSON.parse(JSON.stringify(gameData || {}));
             r.enemyData = JSON.parse(JSON.stringify(enemyData || {}));
+            r.bossData = JSON.parse(JSON.stringify(bossData || {}));
             r[currentStageKey] = r[currentStageKey] || {};
             r[currentStageKey].enemylist = normalizeGrid(currentGrid);
             return r;
