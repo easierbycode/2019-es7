@@ -2016,6 +2016,7 @@
         let logoDataURL = null;
         let subTitleDataURL = null;
         let titleStartTextDataURL = null;
+        let titleCopyrightDataURL = null;
 
         // Cached game_ui atlas for title editor preview
         let _titleEditorUiImage = null;
@@ -2073,9 +2074,11 @@
             if (type === 'subTitle' && subTitleDataURL) return subTitleDataURL;
             if (type === 'title_bg' && titleBgDataURL) return titleBgDataURL;
             if (type === 'titleStartText' && titleStartTextDataURL) return titleStartTextDataURL;
+            if (type === 'titleCopyright' && titleCopyrightDataURL) return titleCopyrightDataURL;
             if (type === 'logo') return _extractFrameDataURL('logo.gif');
             if (type === 'subTitle') return _extractFrameDataURL('subTitle.gif');
             if (type === 'titleStartText') return _extractFrameDataURL('titleStartText.gif');
+            if (type === 'titleCopyright') return _extractFrameDataURL('titleCopyright.gif');
             if (type === 'title_bg') return 'assets/img/title_bg.jpg';
             return null;
         }
@@ -2087,6 +2090,7 @@
                 { type: 'logo', label: 'Logo', hint: '256 x 88' },
                 { type: 'subTitle', label: 'Subtitle', hint: '256 x 28' },
                 { type: 'titleStartText', label: 'Start Text', hint: '256 x 16' },
+                { type: 'titleCopyright', label: 'Copyright', hint: '256 x 8' },
                 { type: 'title_bg', label: 'Title Background', hint: '256 x 480' },
             ];
             slots.forEach(s => {
@@ -2132,7 +2136,7 @@
                 uploadBtn.appendChild(fileInput);
                 slot.appendChild(uploadBtn);
 
-                const dataVar = capturedType === 'logo' ? logoDataURL : capturedType === 'subTitle' ? subTitleDataURL : capturedType === 'titleStartText' ? titleStartTextDataURL : titleBgDataURL;
+                const dataVar = capturedType === 'logo' ? logoDataURL : capturedType === 'subTitle' ? subTitleDataURL : capturedType === 'titleStartText' ? titleStartTextDataURL : capturedType === 'titleCopyright' ? titleCopyrightDataURL : titleBgDataURL;
                 if (dataVar) {
                     const resetBtn = document.createElement('button');
                     resetBtn.className = 'slot-reset-btn';
@@ -2141,6 +2145,7 @@
                         if (capturedType === 'logo') logoDataURL = null;
                         else if (capturedType === 'subTitle') subTitleDataURL = null;
                         else if (capturedType === 'titleStartText') titleStartTextDataURL = null;
+                        else if (capturedType === 'titleCopyright') titleCopyrightDataURL = null;
                         else titleBgDataURL = null;
                         renderTitleEditor();
                     };
@@ -2157,6 +2162,7 @@
                 if (type === 'logo') logoDataURL = reader.result;
                 else if (type === 'subTitle') subTitleDataURL = reader.result;
                 else if (type === 'titleStartText') titleStartTextDataURL = reader.result;
+                else if (type === 'titleCopyright') titleCopyrightDataURL = reader.result;
                 else titleBgDataURL = reader.result;
                 renderTitleEditor();
             };
@@ -2666,6 +2672,7 @@
                 if (logoDataURL) payload.logoDataURL = logoDataURL;
                 if (subTitleDataURL) payload.subTitleDataURL = subTitleDataURL;
                 if (titleStartTextDataURL) payload.titleStartTextDataURL = titleStartTextDataURL;
+                if (titleCopyrightDataURL) payload.titleCopyrightDataURL = titleCopyrightDataURL;
                 // Save atlas image + frame data so the game can load it
                 // If frames have been replaced, repack them into the saved atlas
                 if (atlasImage && atlasData) {
@@ -2720,6 +2727,7 @@
                 logoDataURL = d.logoDataURL || null;
                 subTitleDataURL = d.subTitleDataURL || null;
                 titleStartTextDataURL = d.titleStartTextDataURL || null;
+                titleCopyrightDataURL = d.titleCopyrightDataURL || null;
                 audioURLs = (d.customAudioURLs && typeof d.customAudioURLs === 'object') ? d.customAudioURLs : {};
                 // Restore atlas image + frame data so re-saving doesn't lose custom sprites
                 if (d.atlasImageDataURL && d.atlasFrames) {

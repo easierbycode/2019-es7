@@ -521,6 +521,19 @@ export class BootScene extends Phaser.Scene {
                     startTextImg.src = data.titleStartTextDataURL;
                 }
 
+                // Replace titleCopyright if Firebase provides a custom one
+                if (data.titleCopyrightDataURL) {
+                    var copyrightImg = new Image();
+                    copyrightImg.onload = function () {
+                        try {
+                            self.textures.addImage("custom_titleCopyright", copyrightImg);
+                        } catch (e) {
+                            console.warn("Failed to load custom titleCopyright:", e);
+                        }
+                    };
+                    copyrightImg.src = data.titleCopyrightDataURL;
+                }
+
                 gameState._phaserRecipe = baseRecipe;
                 gameState.hasCustomEnemies = !!data.enemyData;
 

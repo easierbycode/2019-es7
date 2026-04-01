@@ -68,7 +68,11 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.startText.setAlpha(0);
         this.startText.setInteractive({ useHandCursor: true });
 
-        this.copyright = this.add.sprite(0, 0, "game_ui", "titleCopyright.gif");
+        if (this.textures.exists("custom_titleCopyright")) {
+            this.copyright = this.add.sprite(0, 0, "custom_titleCopyright");
+        } else {
+            this.copyright = this.add.sprite(0, 0, "game_ui", "titleCopyright.gif");
+        }
         this.copyright.setOrigin(0, 0);
         this.copyright.y = GAME_DIMENSIONS.HEIGHT - this.copyright.height - 6;
 
