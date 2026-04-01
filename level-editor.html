@@ -1931,12 +1931,20 @@
 
         // ================== SAVE ==================
         function quickSave() {
-            if (dirHandle && gameData) saveAll();
-            else saveToFirebase();
+            if (dirHandle && gameData) {
+                saveAll();
+                // Also save to Firebase if a cloud game name is set
+                var fbName = document.getElementById('firebase-level-name').value.trim();
+                if (fbName) saveToFirebase();
+            } else {
+                saveToFirebase();
+            }
         }
 
         async function saveAll() {
             if (!dirHandle || !gameData) { alert("Load directory first"); return; }
+            // Sync any pending editor form changes into gameData before saving
+            syncEnemyEditorForm();
             gameData[currentStageKey] = gameData[currentStageKey] || {};
             gameData[currentStageKey].enemylist = normalizeGrid(currentGrid);
             try {
@@ -2607,6 +2615,8 @@
         }
 
         async function saveToFirebase() {
+            // Sync any pending editor form changes into bossData/enemyData before saving
+            syncEnemyEditorForm();
             initFirebase();
             if (!firebaseDb) { alert('Firebase not available'); return; }
             let name = document.getElementById('firebase-level-name').value.trim();
