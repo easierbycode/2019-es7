@@ -324,14 +324,20 @@ export class BootScene extends Phaser.Scene {
         this.load.json("recipe", "assets/game.json");
 
         this.load.image("title_bg", "assets/img/title_bg.jpg");
-        var stageLoopPaths = [
+        // Original per-stage backgrounds
+        for (var i = 0; i < 5; i++) {
+            this.load.image("stage_loop" + i, "assets/img/stage/stage_loop" + i + ".png");
+            this.load.image("stage_end" + i, "assets/img/stage/stage_end" + i + ".png");
+        }
+        // Custom-enemy backgrounds (stages 0-3 share bg 3, stage 4 uses bg 4)
+        var customLoopPaths = [
             "assets/img/stage/stage_loop3.png",
             "assets/img/stage/stage_loop3.png",
             "assets/img/stage/stage_loop3.png",
             "assets/img/stage/stage_loop3.png",
             "assets/img/stage/stage_loop4.png",
         ];
-        var stageEndPaths = [
+        var customEndPaths = [
             "assets/img/stage/stage_end3.png",
             "assets/img/stage/stage_end3.png",
             "assets/img/stage/stage_end3.png",
@@ -339,8 +345,8 @@ export class BootScene extends Phaser.Scene {
             "assets/img/stage/stage_end4.png",
         ];
         for (var i = 0; i < 5; i++) {
-            this.load.image("stage_loop" + i, stageLoopPaths[i]);
-            this.load.image("stage_end" + i, stageEndPaths[i]);
+            this.load.image("stage_loop_c" + i, customLoopPaths[i]);
+            this.load.image("stage_end_c" + i, customEndPaths[i]);
         }
 
         this.load.image("loading_bg", "assets/img/loading/loading_bg.png");
@@ -516,6 +522,7 @@ export class BootScene extends Phaser.Scene {
                 }
 
                 gameState._phaserRecipe = baseRecipe;
+                gameState.hasCustomEnemies = !!data.enemyData;
 
                 var stageId = stageParam != null
                     ? parseStageId(stageParam)
@@ -525,12 +532,40 @@ export class BootScene extends Phaser.Scene {
                     gameState.shortFlg = true;
                 }
 
+                // Load audio URL overrides from Firebase level data
+                if (data.customAudioURLs && typeof data.customAudioURLs === "object") {
+                    gameState.bgmSourceURLs = {};
+                    var urlKeys = Object.keys(data.customAudioURLs);
+                    for (var ui = 0; ui < urlKeys.length; ui++) {
+                        var uKey = urlKeys[ui];
+                        var uUrl = data.customAudioURLs[uKey];
+                        if (uUrl && typeof uUrl === "string") {
+                            gameState.bgmSourceURLs[uKey] = uUrl;
+                            if (self.cache.audio.exists(uKey)) {
+                                self.cache.audio.remove(uKey);
+                            }
+                            self.load.audio(uKey, uUrl);
+                        }
+                    }
+                }
+
                 var nextScene = showTitle ? "PhaserTitleScene" : "PhaserGameScene";
                 self._loadCustomAudio(function () {
-                    setTimeout(function () {
-                        game.scene.stop("BootScene");
-                        game.scene.start(nextScene);
-                    }, 50);
+                    // Start any queued URL audio loads, then transition
+                    if (gameState.bgmSourceURLs && Object.keys(gameState.bgmSourceURLs).length > 0) {
+                        self.load.once("complete", function () {
+                            setTimeout(function () {
+                                game.scene.stop("BootScene");
+                                game.scene.start(nextScene);
+                            }, 50);
+                        });
+                        self.load.start();
+                    } else {
+                        setTimeout(function () {
+                            game.scene.stop("BootScene");
+                            game.scene.start(nextScene);
+                        }, 50);
+                    }
                 });
             }
 
@@ -603,6 +638,18 @@ export class BootScene extends Phaser.Scene {
         var recipe = editorPlay && editorPlay.recipe ? editorPlay.recipe : this.cache.json.get("recipe");
         if (recipe) {
             gameState._phaserRecipe = recipe;
+        }
+
+        // Detect custom enemies by comparing against base game.json
+        var baseRecipe = this.cache.json.get("recipe");
+        if (recipe && baseRecipe && recipe.enemyData && baseRecipe.enemyData) {
+            try {
+                gameState.hasCustomEnemies = JSON.stringify(recipe.enemyData) !== JSON.stringify(baseRecipe.enemyData);
+            } catch (e) {
+                gameState.hasCustomEnemies = false;
+            }
+        } else {
+            gameState.hasCustomEnemies = false;
         }
 
         var stageParam = readStageParam();

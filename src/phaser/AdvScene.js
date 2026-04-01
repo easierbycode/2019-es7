@@ -131,7 +131,9 @@ export class PhaserAdvScene extends Phaser.Scene {
             }
         }
 
-        this.playBgm("adventure_bgm", 0.2);
+        if (!gameState.bgmContinuityActive) {
+            this.playBgm("adventure_bgm", 0.2);
+        }
 
         var bgKey = "advBg" + this.scenario[this.stageKey].part[this.partNum].background + ".gif";
         this.bgSprite = this.add.sprite(0, 0, "game_ui", bgKey);
@@ -300,7 +302,9 @@ export class PhaserAdvScene extends Phaser.Scene {
 
     goToNextScene() {
         this.playSound("se_correct", 0.9);
-        this.stopSound("adventure_bgm");
+        if (!gameState.bgmContinuityActive) {
+            this.stopSound("adventure_bgm");
+        }
 
         var nextScene = this.endingFlg ? "PhaserEndingScene" : "PhaserGameScene";
         var game = this.game;

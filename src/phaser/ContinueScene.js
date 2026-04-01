@@ -385,6 +385,8 @@ export class PhaserContinueScene extends Phaser.Scene {
         }
 
         gameState.secondLoop = true;
+        gameState.bgmContinuityActive = false;
+        gameState.currentBgmKey = null;
 
         this.stopAllSounds();
         var game = this.game;
@@ -395,6 +397,8 @@ export class PhaserContinueScene extends Phaser.Scene {
     }
 
     goNext() {
+        gameState.bgmContinuityActive = false;
+        gameState.currentBgmKey = null;
         var self = this;
         this.tweens.add({
             targets: this.cameras.main,
