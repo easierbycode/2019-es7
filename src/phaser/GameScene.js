@@ -156,10 +156,12 @@ export class PhaserGameScene extends Phaser.Scene {
             this.stageEnemyPositionList = [];
         }
 
-        this.stageBg = this.add.tileSprite(0, 0, GW, GH, "stage_loop" + stageId);
+        var bgSuffix = gameState.hasCustomEnemies ? "stage_loop_c" : "stage_loop";
+        var bgEndSuffix = gameState.hasCustomEnemies ? "stage_end_c" : "stage_end";
+        this.stageBg = this.add.tileSprite(0, 0, GW, GH, bgSuffix + stageId);
         this.stageBg.setOrigin(0, 0);
 
-        this.stageEndBg = this.add.image(0, 0, "stage_end" + stageId);
+        this.stageEndBg = this.add.image(0, 0, bgEndSuffix + stageId);
         this.stageEndBg.setOrigin(0, 0);
         this.stageEndBg.y = -this.stageEndBg.height;
         this.stageEndBg.setVisible(false);
@@ -491,7 +493,36 @@ export class PhaserGameScene extends Phaser.Scene {
 
         var game = this.game;
         this.time.delayedCall(2500, function () {
-            self.stopAllSounds();
+            // Check if next stage uses same custom audio URL for BGM continuity
+            var urls = gameState.bgmSourceURLs;
+            var currentKey = self.stageBgmName;
+            var nextStageId = gameState.stageId + 1;
+            var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
+            var nextBossName = bossNames[nextStageId] || "";
+            var nextKey = nextBossName ? "boss_" + nextBossName + "_bgm" : "";
+            var sameBgm = urls && currentKey && nextKey &&
+                urls[currentKey] && urls[nextKey] &&
+                urls[currentKey] === urls[nextKey];
+
+            if (sameBgm) {
+                // Pause current BGM instead of stopping, stop everything else
+                try {
+                    var sounds = self.sound.getAll();
+                    for (var si = 0; si < sounds.length; si++) {
+                        if (sounds[si].key === currentKey) {
+                            sounds[si].pause();
+                        } else if (sounds[si].isPlaying) {
+                            sounds[si].stop();
+                        }
+                    }
+                } catch (e) { self.stopAllSounds(); }
+                gameState.bgmContinuityActive = true;
+                gameState.currentBgmKey = currentKey;
+            } else {
+                self.stopAllSounds();
+                gameState.bgmContinuityActive = false;
+            }
+
             gameState.stageId++;
             setTimeout(function () {
                 game.scene.stop("PhaserGameScene");
@@ -501,6 +532,8 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     timeoverComplete() {
+        gameState.bgmContinuityActive = false;
+        gameState.currentBgmKey = null;
         gameState.score = this.scoreCount;
         gameState.maxCombo = Math.max(gameState.maxCombo || 0, this.maxCombo);
 
@@ -782,6 +815,23 @@ export class PhaserGameScene extends Phaser.Scene {
         var name = bossNames[stageId] || "bison";
         var key = "boss_" + name + "_bgm";
         this.stageBgmName = key;
+
+        // Resume paused BGM if same custom audio URL carries over
+        if (gameState.bgmContinuityActive && gameState.currentBgmKey) {
+            try {
+                var paused = this.sound.get(gameState.currentBgmKey);
+                if (paused && paused.isPaused) {
+                    paused.resume();
+                    this.stageBgmName = gameState.currentBgmKey;
+                    gameState.bgmContinuityActive = false;
+                    gameState.currentBgmKey = null;
+                    return;
+                }
+            } catch (e) {}
+            gameState.bgmContinuityActive = false;
+            gameState.currentBgmKey = null;
+        }
+
         this.playBgm(key, 0.4);
     }
 

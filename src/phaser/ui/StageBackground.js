@@ -1,4 +1,5 @@
 import { GAME_DIMENSIONS } from "../../constants.js";
+import { gameState } from "../../gameState.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
 var GH = GAME_DIMENSIONS.HEIGHT;
@@ -7,10 +8,12 @@ export class PhaserStageBackground {
     constructor(scene, stageId) {
         this.scene = scene;
 
-        this.stageBg = scene.add.tileSprite(0, 0, GW, GH, "stage_loop" + stageId);
+        var bgPrefix = gameState.hasCustomEnemies ? "stage_loop_c" : "stage_loop";
+        var bgEndPrefix = gameState.hasCustomEnemies ? "stage_end_c" : "stage_end";
+        this.stageBg = scene.add.tileSprite(0, 0, GW, GH, bgPrefix + stageId);
         this.stageBg.setOrigin(0, 0);
 
-        this.stageEndBg = scene.add.image(0, 0, "stage_end" + stageId);
+        this.stageEndBg = scene.add.image(0, 0, bgEndPrefix + stageId);
         this.stageEndBg.setOrigin(0, 0);
         this.stageEndBg.y = -this.stageEndBg.height;
         this.stageEndBg.setVisible(false);

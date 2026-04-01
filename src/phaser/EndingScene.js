@@ -199,6 +199,8 @@ export class PhaserEndingScene extends Phaser.Scene {
             self.gotoTitleBtn.disableInteractive();
             self.cameras.main.fadeOut(1500, 0, 0, 0);
             self.cameras.main.once("camerafadeoutcomplete", function () {
+                gameState.bgmContinuityActive = false;
+                gameState.currentBgmKey = null;
                 self.stopAllSounds();
                 setTimeout(function () {
                     game.scene.stop("PhaserEndingScene");

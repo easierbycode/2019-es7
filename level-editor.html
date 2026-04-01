@@ -345,8 +345,19 @@
             font-family: 'Orbitron', sans-serif; border: 1px solid #475569;
             transition: background 0.15s;
         }
-        .audio-btn-upload { background: #1e293b; color: #94a3b8; }
+        .audio-btn-upload { background: #1e293b; color: #94a3b8; min-width: 28px; }
         .audio-btn-upload:hover { background: #334155; color: #e2e8f0; }
+        .audio-url-row { display: flex; gap: 3px; align-items: center; margin-top: 3px; }
+        .audio-url-input {
+            flex: 1; min-width: 0; background: #0f172a; color: #e2e8f0; border: 1px solid #475569;
+            border-radius: 4px; padding: 2px 5px; font-size: 9px; font-family: monospace;
+            outline: none;
+        }
+        .audio-url-input::placeholder { color: #475569; }
+        .audio-url-input:focus { border-color: #60a5fa; }
+        .audio-btn-url { background: #1e293b; color: #60a5fa; min-width: 22px; font-size: 10px; }
+        .audio-btn-url:hover { background: #334155; color: #93c5fd; }
+        .audio-slot-badge.url { background: #1e3a5f; color: #60a5fa; }
         .audio-btn-play { background: #1e293b; color: #94a3b8; border: 1px solid #475569; }
         .audio-btn-play:hover { background: #334155; color: #e2e8f0; }
         .audio-btn-reset { background: #1c0a0a; color: #f87171; border: 1px solid #7f1d1d; }
@@ -2645,6 +2656,10 @@
                     storyData: (gameData && gameData.storyData) || null,
                     width: 8, savedAt: firebase.database.ServerValue.TIMESTAMP
                 };
+                // Save audio URL overrides
+                var urlEntries = {};
+                for (var ak in audioURLs) { if (audioURLs[ak]) urlEntries[ak] = audioURLs[ak]; }
+                if (Object.keys(urlEntries).length > 0) payload.customAudioURLs = urlEntries;
                 const thumbs = buildFrameThumbnailsForSave();
                 if (thumbs) payload.frameThumbnails = thumbs;
                 if (titleBgDataURL) payload.titleBgDataURL = titleBgDataURL;
@@ -2705,6 +2720,7 @@
                 logoDataURL = d.logoDataURL || null;
                 subTitleDataURL = d.subTitleDataURL || null;
                 titleStartTextDataURL = d.titleStartTextDataURL || null;
+                audioURLs = (d.customAudioURLs && typeof d.customAudioURLs === 'object') ? d.customAudioURLs : {};
                 // Restore atlas image + frame data so re-saving doesn't lose custom sprites
                 if (d.atlasImageDataURL && d.atlasFrames) {
                     const decodedFrames = {};
@@ -3022,6 +3038,7 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
 
         let audioFilterCat = 'all';
         let audioCustomKeys = new Set();
+        let audioURLs = {};
         let audioPreviewEl = null;
 
         function setAudioFilter(cat) {
@@ -3076,18 +3093,20 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
                 catLabel.textContent = cat.toUpperCase();
                 slot.appendChild(catLabel);
 
+                const hasURL = !!audioURLs[key];
                 const badge = document.createElement('div');
-                badge.className = 'audio-slot-badge ' + (isCustom ? 'custom' : 'default');
-                badge.textContent = isCustom ? 'Custom \u2713' : 'Default';
+                badge.className = 'audio-slot-badge ' + (hasURL ? 'url' : (isCustom ? 'custom' : 'default'));
+                badge.textContent = hasURL ? 'URL' : (isCustom ? 'Custom \u2713' : 'Default');
                 slot.appendChild(badge);
 
                 const actions = document.createElement('div');
                 actions.className = 'audio-slot-actions';
 
-                // Upload button
+                // Upload icon button
                 const uploadLabel = document.createElement('label');
                 uploadLabel.className = 'audio-btn-upload';
-                uploadLabel.textContent = 'Upload';
+                uploadLabel.textContent = '\uD83D\uDCC1';
+                uploadLabel.title = 'Upload MP3 file';
                 const fileInput = document.createElement('input');
                 fileInput.type = 'file';
                 fileInput.accept = 'audio/mpeg,audio/mp3,.mp3';
@@ -3104,13 +3123,13 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
                 const playBtn = document.createElement('button');
                 playBtn.className = 'audio-btn-play';
                 playBtn.textContent = '\u25B6 Play';
-                (function(capturedKey, capturedCustom) {
-                    playBtn.onclick = function() { previewAudio(capturedKey, capturedCustom); };
-                })(key, isCustom);
+                (function(capturedKey, capturedCustom, capturedHasURL) {
+                    playBtn.onclick = function() { previewAudio(capturedKey, capturedCustom || capturedHasURL); };
+                })(key, isCustom, hasURL);
                 actions.appendChild(playBtn);
 
-                // Reset button (only for custom)
-                if (isCustom) {
+                // Reset button (only for custom or URL)
+                if (isCustom || hasURL) {
                     const resetBtn = document.createElement('button');
                     resetBtn.className = 'audio-btn-reset';
                     resetBtn.textContent = 'Reset';
@@ -3120,6 +3139,34 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
                     actions.appendChild(resetBtn);
                 }
 
+                // URL input row
+                const urlRow = document.createElement('div');
+                urlRow.className = 'audio-url-row';
+                const urlInput = document.createElement('input');
+                urlInput.type = 'text';
+                urlInput.className = 'audio-url-input';
+                urlInput.placeholder = 'https://...';
+                urlInput.value = audioURLs[key] || '';
+                const urlBtn = document.createElement('button');
+                urlBtn.className = 'audio-btn-url';
+                urlBtn.textContent = '\u2197';
+                urlBtn.title = 'Load from URL';
+                (function(capturedKey, capturedInput) {
+                    urlBtn.onclick = function() {
+                        var url = capturedInput.value.trim();
+                        if (url) handleAudioURL(capturedKey, url);
+                    };
+                    capturedInput.onkeydown = function(e) {
+                        if (e.key === 'Enter') {
+                            var url = capturedInput.value.trim();
+                            if (url) handleAudioURL(capturedKey, url);
+                        }
+                    };
+                })(key, urlInput);
+                urlRow.appendChild(urlInput);
+                urlRow.appendChild(urlBtn);
+                actions.appendChild(urlRow);
+
                 slot.appendChild(actions);
                 grid.appendChild(slot);
             }
@@ -3128,6 +3175,7 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
         function handleAudioUpload(key, file) {
             saveCustomAudio(key, file).then(function() {
                 audioCustomKeys.add(key);
+                delete audioURLs[key];
                 renderAudioEditor();
             }).catch(function(err) {
                 console.error('Failed to save custom audio:', err);
@@ -3135,7 +3183,26 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
             });
         }
 
+        function handleAudioURL(key, url) {
+            // Store URL for Firebase save, and fetch blob for local preview/IndexedDB
+            audioURLs[key] = url;
+            fetch(url).then(function(resp) {
+                if (!resp.ok) throw new Error('HTTP ' + resp.status);
+                return resp.blob();
+            }).then(function(blob) {
+                return saveCustomAudio(key, blob);
+            }).then(function() {
+                audioCustomKeys.add(key);
+                renderAudioEditor();
+            }).catch(function(err) {
+                console.warn('Could not fetch audio URL for preview cache:', err);
+                // URL is still saved for Firebase even if fetch fails (CORS etc.)
+                renderAudioEditor();
+            });
+        }
+
         function resetCustomAudio(key) {
+            delete audioURLs[key];
             deleteCustomAudio(key).then(function() {
                 audioCustomKeys.delete(key);
                 renderAudioEditor();
@@ -3146,6 +3213,7 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
 
         function clearAllCustomAudioUI() {
             if (!confirm('Remove all custom audio overrides?')) return;
+            audioURLs = {};
             clearAllCustomAudio().then(function() {
                 audioCustomKeys.clear();
                 renderAudioEditor();
