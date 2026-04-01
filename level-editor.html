@@ -1735,7 +1735,23 @@
         }
 
         function saveCurrentEnemy() {
-            if (syncEnemyEditorForm(true)) alert(currentEditorTab === 'bosses' ? 'Boss saved' : 'Enemy saved');
+            if (syncEnemyEditorForm(true)) {
+                const isBoss = currentEditorTab === 'bosses';
+                // Persist to Firebase RTDB if a cloud game name is set
+                const fbName = document.getElementById('firebase-level-name').value.trim();
+                if (fbName) {
+                    initFirebase();
+                    if (firebaseDb) {
+                        const dataKey = isBoss ? 'bossData' : 'enemyData';
+                        const dataVal = isBoss ? (bossData || {}) : (enemyData || {});
+                        firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${fbName}/${dataKey}`).set(dataVal)
+                            .then(() => alert((isBoss ? 'Boss' : 'Enemy') + ' saved to cloud!'))
+                            .catch(e => alert((isBoss ? 'Boss' : 'Enemy') + ' saved locally but cloud save failed: ' + e.message));
+                        return;
+                    }
+                }
+                alert(isBoss ? 'Boss saved' : 'Enemy saved');
+            }
         }
 
         // ================== ATLAS ==================
