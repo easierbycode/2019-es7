@@ -12,13 +12,13 @@
 
     <platform name="android">
         <source-file src="src/android/SpriteShareActivity.kt"
-                     target-dir="app/src/main/java/com/easierbycode/spriteshare" />
+                     target-dir="app/src/main/kotlin/com/easierbycode/spriteshare" />
 
         <!-- Register the share-receiver Activity in AndroidManifest -->
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
             <activity android:name="com.easierbycode.spriteshare.SpriteShareActivity"
                       android:label="Sprite Share"
-                      android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+                      android:theme="@android:style/Theme.DeviceDefault.NoActionBar"
                       android:screenOrientation="portrait"
                       android:exported="true"
                       xmlns:android="http://schemas.android.com/apk/res/android">
@@ -30,10 +30,10 @@
             </activity>
         </config-file>
 
-        <!-- Copy picker UI assets into the APK's www/sprite-share/ directory -->
-        <asset src="www/sprite-picker.html"    target="www/sprite-share/sprite-picker.html" />
-        <asset src="www/sprite-picker.css"     target="www/sprite-share/sprite-picker.css" />
-        <asset src="www/sprite-picker-app.js"  target="www/sprite-share/sprite-picker-app.js" />
-        <asset src="www/sprite-detect.js"      target="www/sprite-share/sprite-detect.js" />
+        <!-- Copy picker UI assets into the APK's assets/www/sprite-share/ directory -->
+        <resource-file src="www/sprite-picker.html"   target="app/src/main/assets/www/sprite-share/sprite-picker.html" />
+        <resource-file src="www/sprite-picker.css"    target="app/src/main/assets/www/sprite-share/sprite-picker.css" />
+        <resource-file src="www/sprite-picker-app.js" target="app/src/main/assets/www/sprite-share/sprite-picker-app.js" />
+        <resource-file src="www/sprite-detect.js"     target="app/src/main/assets/www/sprite-share/sprite-detect.js" />
     </platform>
 </plugin>
