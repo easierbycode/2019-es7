@@ -328,11 +328,18 @@
             pc.style.width = Math.floor(256 * scale) + "px";
             pc.style.height = Math.floor(480 * scale) + "px";
 
-            // Apply canvas position class from gameState
+            // Apply canvas position class from gameState (fall back to
+            // localStorage directly in case the game module hasn't loaded yet)
             var container = document.getElementById("phaser-canvas");
             if (container) {
                 var gs = window.__GAME_STATE__;
-                var pos = (gs && gs.canvasPosition === "bottom") ? "bottom" : "center";
+                var pos = (gs && typeof gs.canvasPosition === "string")
+                    ? gs.canvasPosition
+                    : null;
+                if (!pos) {
+                    try { pos = localStorage.getItem("canvasPosition"); } catch (e) {}
+                }
+                if (!pos) pos = "bottom";
                 container.classList.toggle("canvas-bottom", pos === "bottom");
             }
 

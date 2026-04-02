@@ -31,6 +31,11 @@
     <hook type="after_prepare" src="hooks/after_prepare.js" />
 
     <platform name="android">
+        <!-- Required for navigator.vibrate() haptic feedback (was previously
+             provided by cordova-plugin-vibration, now removed) -->
+        <config-file target="AndroidManifest.xml" parent="/*">
+            <uses-permission android:name="android.permission.VIBRATE" xmlns:android="http://schemas.android.com/apk/res/android" />
+        </config-file>
         <icon density="ldpi" src="res/android/ldpi.png" />
         <icon density="mdpi" src="res/android/mdpi.png" />
         <icon density="hdpi" src="res/android/hdpi.png" />
