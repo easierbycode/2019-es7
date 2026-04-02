@@ -685,7 +685,7 @@ export function bossDie(scene, boss) {
                 var ex = startX + Math.random() * bw - bw / 2;
                 var ey = startY + Math.random() * bh - bh / 2;
                 showBossExplosion(scene, ex, ey);
-                scene.playSound("se_explosion", 0.35);
+                scene.playSound("se_explosion", 0.175);
             });
         })(ei);
     }
