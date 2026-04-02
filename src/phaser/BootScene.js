@@ -533,18 +533,22 @@ export class BootScene extends Phaser.Scene {
                 }
 
                 // Load audio URL overrides from Firebase level data
+                // Prefer locally downloaded copies (assets/custom-bgm/) over remote URLs
                 if (data.customAudioURLs && typeof data.customAudioURLs === "object") {
                     gameState.bgmSourceURLs = {};
                     var urlKeys = Object.keys(data.customAudioURLs);
+                    var baseUrl = (document.getElementById("baseUrl") ? document.getElementById("baseUrl").textContent.trim() : "./");
                     for (var ui = 0; ui < urlKeys.length; ui++) {
                         var uKey = urlKeys[ui];
                         var uUrl = data.customAudioURLs[uKey];
                         if (uUrl && typeof uUrl === "string") {
+                            var localPath = baseUrl + "assets/custom-bgm/" + uKey + ".mp3";
                             gameState.bgmSourceURLs[uKey] = uUrl;
                             if (self.cache.audio.exists(uKey)) {
                                 self.cache.audio.remove(uKey);
                             }
-                            self.load.audio(uKey, uUrl);
+                            // Try local file first, fall back to remote URL
+                            self.load.audio(uKey, [localPath, uUrl]);
                         }
                     }
                 }
