@@ -390,7 +390,7 @@ export class PhaserTitleScene extends Phaser.Scene {
         gameState.maxCombo = 0;
         gameState.score = 0;
         gameState.spgage = 0;
-        gameState.stageId = gameState.stageId || 0;
+        gameState.stageId = 0;
         gameState.continueCnt = 0;
         gameState.akebonoCnt = 0;
         gameState.shortFlg = false;

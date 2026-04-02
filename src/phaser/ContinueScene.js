@@ -416,6 +416,7 @@ export class PhaserContinueScene extends Phaser.Scene {
                         gameState.shootMode = recipe.playerData.defaultShootName;
                         gameState.shootSpeed = recipe.playerData.defaultShootSpeed;
                     }
+                    gameState.stageId = 0;
                     gameState.continueCnt = Number(gameState.continueCnt || 0) + 1;
                     gameState.score = gameState.continueCnt;
                     nextScene = "PhaserGameScene";
