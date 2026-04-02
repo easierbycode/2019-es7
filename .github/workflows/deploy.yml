@@ -96,7 +96,7 @@ jobs:
 
       - name: Install Cordova plugins
         working-directory: cordova
-        run: cordova plugin add ../plugins/cordova-plugin-sprite-share --nosave --nofetch
+        run: cordova plugin add ../plugins/cordova-plugin-sprite-share --nosave
 
       - name: Prepare Cordova Android
         working-directory: cordova
@@ -153,7 +153,7 @@ jobs:
 
       - name: Prepare Cordova Android (phaser-game)
         working-directory: cordova
-        run: cordova prepare android
+        run: cordova prepare android --nofetch
 
       - name: Build Cordova Android (phaser-game APK)
         working-directory: cordova
