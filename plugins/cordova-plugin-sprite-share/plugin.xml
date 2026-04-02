@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        id="cordova-plugin-sprite-share"
+        version="1.0.0">
+
+    <name>Sprite Share</name>
+    <description>Receive shared images via Android intent, auto-detect sprites, and add/replace them in game atlases.</description>
+
+    <js-module src="www/sprite-share.js" name="SpriteShare">
+        <clobbers target="SpriteShare" />
+    </js-module>
+
+    <platform name="android">
+        <source-file src="src/android/SpriteShareActivity.kt"
+                     target-dir="app/src/main/java/com/easierbycode/spriteshare" />
+
+        <!-- Register the share-receiver Activity in AndroidManifest -->
+        <config-file target="AndroidManifest.xml" parent="/manifest/application">
+            <activity android:name="com.easierbycode.spriteshare.SpriteShareActivity"
+                      android:label="Sprite Share"
+                      android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+                      android:screenOrientation="portrait"
+                      android:exported="true"
+                      xmlns:android="http://schemas.android.com/apk/res/android">
+                <intent-filter>
+                    <action android:name="android.intent.action.SEND" />
+                    <category android:name="android.intent.category.DEFAULT" />
+                    <data android:mimeType="image/*" />
+                </intent-filter>
+            </activity>
+        </config-file>
+
+        <!-- Copy picker UI assets into the APK's www/sprite-share/ directory -->
+        <asset src="www/sprite-picker.html"    target="www/sprite-share/sprite-picker.html" />
+        <asset src="www/sprite-picker.css"     target="www/sprite-share/sprite-picker.css" />
+        <asset src="www/sprite-picker-app.js"  target="www/sprite-share/sprite-picker-app.js" />
+        <asset src="www/sprite-detect.js"      target="www/sprite-share/sprite-detect.js" />
+    </platform>
+</plugin>
