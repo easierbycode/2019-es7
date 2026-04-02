@@ -80,9 +80,9 @@ function ensureRuntimeState(state) {
     if (typeof state.canvasPosition !== "string") {
         try {
             var saved = localStorage.getItem("canvasPosition");
-            state.canvasPosition = (saved === "bottom") ? "bottom" : "center";
+            state.canvasPosition = (saved === "center") ? "center" : "bottom";
         } catch (e) {
-            state.canvasPosition = "center";
+            state.canvasPosition = "bottom";
         }
     }
 }
