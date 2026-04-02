@@ -101,4 +101,9 @@
          Exposes window.TapticEngine (impact/notification/selection).
          Installed via `cordova plugin add` in CI workflows (path is
          relative to the Cordova project, not this file). -->
+
+    <!-- Android sprite share: receive images via share intent, auto-detect
+         sprites, and add/replace them in game atlases.
+         Plugin source: plugins/cordova-plugin-sprite-share -->
+    <plugin name="cordova-plugin-sprite-share" spec="plugins/cordova-plugin-sprite-share" />
 </widget>
