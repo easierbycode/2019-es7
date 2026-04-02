@@ -104,6 +104,10 @@ jobs:
       - name: Copy hooks
         run: cp -r hooks cordova/hooks
 
+      - name: Install iOS haptics plugin
+        working-directory: cordova
+        run: cordova plugin add ../plugins/cordova-plugin-ios-haptics
+
       # ── Bundle ES modules for Cordova (WKWebView doesn't support ES module imports) ──
       - name: Bundle JS modules with esbuild
         run: |

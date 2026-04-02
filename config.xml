@@ -89,4 +89,9 @@
          are incompatible with cordova-android 13+ (Kotlin-based MainActivity).
          Status bar hiding is handled natively via hooks/after_prepare.js.
          Vibration is available via the Web Vibration API (navigator.vibrate). -->
+
+    <!-- iOS-only haptic feedback: plugins/cordova-plugin-ios-haptics
+         Exposes window.TapticEngine (impact/notification/selection).
+         Installed via `cordova plugin add` in CI workflows (path is
+         relative to the Cordova project, not this file). -->
 </widget>
