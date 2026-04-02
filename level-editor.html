@@ -1755,7 +1755,7 @@
                     if (firebaseDb) {
                         const dataKey = isBoss ? 'bossData' : 'enemyData';
                         const dataVal = isBoss ? (bossData || {}) : (enemyData || {});
-                        firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${fbName}/${dataKey}`).set(dataVal)
+                        firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${fbName}/${dataKey}`).update(dataVal)
                             .then(() => alert((isBoss ? 'Boss' : 'Enemy') + ' saved to cloud!'))
                             .catch(e => alert((isBoss ? 'Boss' : 'Enemy') + ' saved locally but cloud save failed: ' + e.message));
                         return;
@@ -2694,7 +2694,7 @@
                         payload.atlasFrames = encodedFrames;
                     } catch (e) { console.warn('Could not save atlas to Firebase:', e); }
                 }
-                await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${name}`).set(payload);
+                await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${name}`).update(payload);
                 document.getElementById('firebase-level-name').value = name;
                 alert(`Game "${name}" saved!\nIncludes: title, story, sprites, levels, enemies & bosses`);
             } catch (e) { alert('Save failed: ' + e.message); }
@@ -2709,8 +2709,9 @@
                 const d = snap.val();
                 if (!d) { alert(`"${name}" not found`); return false; }
                 currentGrid = normalizeGrid(d.enemylist || []);
-                if (d.enemyData && typeof d.enemyData === 'object') enemyData = d.enemyData;
-                if (d.bossData && typeof d.bossData === 'object') { bossData = d.bossData; storeBossDataForViewers(); }
+                enemyData = (d.enemyData && typeof d.enemyData === 'object') ? d.enemyData : {};
+                bossData = (d.bossData && typeof d.bossData === 'object') ? d.bossData : {};
+                storeBossDataForViewers();
                 if (d.storyData && typeof d.storyData === 'object') {
                     if (!gameData) gameData = {};
                     gameData.storyData = d.storyData;
@@ -2734,7 +2735,7 @@
                 document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Game: ${name} (cloud)</span>`;
 // Restore sprite thumbnails from Firebase data
                 if (d.frameThumbnails) restoreFrameThumbnails(d.frameThumbnails);
-                renderGrid(); renderPreview(); updateToolUI();
+                renderGrid(); renderPreview(); updateToolUI(); renderEnemyList();
                 return true;
             } catch (e) { alert('Load failed: ' + e.message); return false; }
         }
@@ -3254,8 +3255,10 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
         }
 
         // ================== INIT ==================
-        window.onload = () => {
+        window.onload = async () => {
             updateToolUI();
+            // Auto-load local data first so Firebase can override it
+            await autoLoadFromServer();
             const urlLevel = new URLSearchParams(window.location.search).get('level');
             if (urlLevel) {
                 document.getElementById('firebase-level-name').value = urlLevel;
@@ -3263,8 +3266,6 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
                 const tryLoad = () => { initFirebase(); loadFromFirebase(urlLevel); };
                 firebaseDb ? tryLoad() : setTimeout(tryLoad, 1000);
             }
-            // Auto-load atlas and game data from server
-            autoLoadFromServer();
         };
     </script>
 </body>
