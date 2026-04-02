@@ -90,8 +90,8 @@
          Status bar hiding is handled natively via hooks/after_prepare.js.
          Vibration is available via the Web Vibration API (navigator.vibrate). -->
 
-    <!-- iOS-only haptic feedback using UIFeedbackGenerator APIs.
+    <!-- iOS-only haptic feedback: plugins/cordova-plugin-ios-haptics
          Exposes window.TapticEngine (impact/notification/selection).
-         No Android footprint — safe with cordova-android 13+ Kotlin. -->
-    <plugin name="cordova-plugin-ios-haptics" spec="plugins/cordova-plugin-ios-haptics" />
+         Installed via `cordova plugin add` in CI workflows (path is
+         relative to the Cordova project, not this file). -->
 </widget>

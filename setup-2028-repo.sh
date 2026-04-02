@@ -81,6 +81,7 @@ cp "$SRC/favicon.ico"    "$DST/favicon.ico" 2>/dev/null || true
 cp "$SRC/config.xml"     "$DST/config.xml"
 mkdir -p "$DST/hooks"
 cp "$SRC/hooks/after_prepare.js" "$DST/hooks/after_prepare.js"
+cp -r "$SRC/plugins" "$DST/plugins"
 
 # Electron
 mkdir -p "$DST/electron"
