@@ -96,11 +96,11 @@ jobs:
 
       - name: Install Cordova plugins
         working-directory: cordova
-        run: cordova plugin add ../plugins/cordova-plugin-sprite-share
+        run: cordova plugin add ../plugins/cordova-plugin-sprite-share --nosave --nofetch
 
       - name: Prepare Cordova Android
         working-directory: cordova
-        run: cordova prepare android
+        run: cordova prepare android --nofetch
 
       - name: Force compileSdkVersion 35 for Cordova Android 14
         run: |
