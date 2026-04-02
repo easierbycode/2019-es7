@@ -78,6 +78,9 @@ jobs:
       - name: Copy hooks into Cordova project
         run: cp -r hooks cordova/hooks
 
+      - name: Download custom BGM from Firebase
+        run: node scripts/download-custom-bgm.js
+
       - name: Prepare Cordova www
         run: |
           rm -rf cordova/www/*
@@ -178,6 +181,9 @@ jobs:
         with:
           node-version: 20
 
+      - name: Download custom BGM from Firebase
+        run: node scripts/download-custom-bgm.js
+
       - name: Prepare Electron app
         run: |
           cd electron
@@ -249,6 +255,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Download custom BGM from Firebase
+        run: node scripts/download-custom-bgm.js
 
       - name: Build for GitHub Pages
         run: |
