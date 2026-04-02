@@ -41,6 +41,10 @@
             padding-left: env(safe-area-inset-left, 0px);
             padding-right: env(safe-area-inset-right, 0px);
         }
+        /* Canvas pinned to bottom — avoids iOS notch covering top buttons */
+        #phaser-canvas.canvas-bottom {
+            align-items: flex-end;
+        }
         #phaser-canvas canvas {
             image-rendering: pixelated;
             image-rendering: crisp-edges;
@@ -324,6 +328,14 @@
             pc.style.width = Math.floor(256 * scale) + "px";
             pc.style.height = Math.floor(480 * scale) + "px";
 
+            // Apply canvas position class from gameState
+            var container = document.getElementById("phaser-canvas");
+            if (container) {
+                var gs = window.__GAME_STATE__;
+                var pos = (gs && gs.canvasPosition === "bottom") ? "bottom" : "center";
+                container.classList.toggle("canvas-bottom", pos === "bottom");
+            }
+
             // Sync Phaser's input coordinate mapping with the CSS-scaled
             // canvas.  refresh() recalculates displayScale from the actual
             // canvas BCR so pointer→game-coord transforms are correct.
@@ -338,6 +350,21 @@
         }
         window.addEventListener("resize", fitCanvas);
         window.__fitCanvas = fitCanvas;
+
+        // Toggle canvas position between "center" and "bottom".
+        // Persists to localStorage; returns the new position string.
+        window.__toggleCanvasPosition = function () {
+            var gs = window.__GAME_STATE__ || {};
+            gs.canvasPosition = (gs.canvasPosition === "bottom") ? "center" : "bottom";
+            try { localStorage.setItem("canvasPosition", gs.canvasPosition); } catch (e) {}
+            fitCanvas();
+            // Refresh Phaser input mapping after layout shift
+            var game = window.__PHASER_4_GAME__;
+            if (game && game.scale && typeof game.scale.refresh === "function") {
+                game.scale.refresh();
+            }
+            return gs.canvasPosition;
+        };
 
         // Watch for Phaser canvas creation and auto-fit
         (function observeCanvas() {
