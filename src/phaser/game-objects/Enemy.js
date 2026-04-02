@@ -214,7 +214,7 @@ export function enemyDie(scene, enemy, isSp) {
     triggerHaptic("kill");
     scene.showExplosion(enemy.x, enemy.y);
     scene.showScorePopup(enemy.x, enemy.y, score, ratio);
-    scene.playSound("se_explosion", 0.35);
+    scene.playSound("se_explosion", 0.175);
 
     var idx = scene.enemies.indexOf(enemy);
     if (idx >= 0) scene.enemies.splice(idx, 1);

@@ -66,7 +66,7 @@ export function spExplosions(scene) {
                 });
 
                 if (idx % 16 === 0) {
-                    scene.playSound("se_sp_explosion", 0.3);
+                    scene.playSound("se_sp_explosion", 0.15);
                 }
             });
         })(n);

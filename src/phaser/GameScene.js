@@ -1161,7 +1161,7 @@ export class PhaserGameScene extends Phaser.Scene {
                             this.showScorePopup(eBullet.x, eBullet.y, ebScore, ebRatio);
                         }
                         this.showExplosion(eBullet.x, eBullet.y);
-                        this.playSound("se_explosion", 0.35);
+                        this.playSound("se_explosion", 0.175);
                         eBullet.destroy();
                         this.enemyBullets.splice(eb, 1);
                         ebDestroyed = true;
