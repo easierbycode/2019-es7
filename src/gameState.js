@@ -75,6 +75,16 @@ function ensureRuntimeState(state) {
     if (typeof state.vibrateFlg !== "boolean") {
         state.vibrateFlg = true;
     }
+
+    // Canvas position: "center" (default) or "bottom" (avoids iOS notch on top buttons)
+    if (typeof state.canvasPosition !== "string") {
+        try {
+            var saved = localStorage.getItem("canvasPosition");
+            state.canvasPosition = (saved === "bottom") ? "bottom" : "center";
+        } catch (e) {
+            state.canvasPosition = "center";
+        }
+    }
 }
 
 export const gameState = ensureGameState();
@@ -87,6 +97,12 @@ export function syncRuntimeFlagsFromLocation(state = gameState) {
     }
 
     state.vibrateFlg = readBooleanSearchParam("vibrate", typeof state.vibrateFlg === "boolean" ? state.vibrateFlg : true);
+
+    var canvasPosParam = readSearchParam("canvasPosition");
+    if (canvasPosParam === "bottom" || canvasPosParam === "center") {
+        state.canvasPosition = canvasPosParam;
+        try { localStorage.setItem("canvasPosition", canvasPosParam); } catch (e) {}
+    }
 
     var secondLoopParam = readSearchParam("secondLoop");
     if (secondLoopParam != null && secondLoopParam !== "") {
@@ -158,6 +174,12 @@ export function saveHighScore(cookieKey = "afc2019_highScore") {
         + String(oneYearSeconds);
 
     return highScore;
+}
+
+export function toggleCanvasPosition(state = gameState) {
+    state.canvasPosition = (state.canvasPosition === "bottom") ? "center" : "bottom";
+    try { localStorage.setItem("canvasPosition", state.canvasPosition); } catch (e) {}
+    return state.canvasPosition;
 }
 
 export default gameState;
