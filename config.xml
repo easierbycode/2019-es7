@@ -64,6 +64,8 @@
         <preference name="MediaTypesRequiringUserActionForPlayback" value="none" />
         <!-- Remote debugging: make WKWebView inspectable via Safari/chrome://inspect -->
         <preference name="InspectableWebview" value="true" />
+        <!-- Swift version required for cordova-plugin-ios-haptics -->
+        <preference name="SwiftVersion" value="5.0" />
 
         <icon src="icons/ios/icon-20.png" width="20" height="20" />
         <icon src="icons/ios/icon-20@2x.png" width="40" height="40" />
