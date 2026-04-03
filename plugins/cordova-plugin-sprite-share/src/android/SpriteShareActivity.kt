@@ -71,24 +71,31 @@ class SpriteShareActivity : Activity() {
     private fun readSharedImage(): String? {
         if (intent?.action != Intent.ACTION_SEND) return null
 
-        // Try EXTRA_STREAM first, then fall back to clipData, then intent.data
-        val imageUri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        // Try EXTRA_STREAM first
+        var imageUri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
         } else {
             @Suppress("DEPRECATION")
-            intent.getParcelableExtra(Intent.EXTRA_STREAM)
-        } ?: intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
-          ?: intent.data
+            intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
+        }
+        // Fall back to clipData, then intent.data
+        if (imageUri == null) {
+            imageUri = intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
+        }
+        if (imageUri == null) {
+            imageUri = intent.data
+        }
 
         if (imageUri == null) return null
 
-        // Ensure we have permission to read the shared content URI
+        // Grant read access — the temporary grant from ACTION_SEND is usually
+        // sufficient, but explicitly request it as a best-effort fallback.
         try {
             val flags = intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
             if (flags != 0) {
                 contentResolver.takePersistableUriPermission(imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-        } catch (_: SecurityException) {
+        } catch (_: Exception) {
             // Persistable permission not available — temporary grant is usually sufficient
         }
 
