@@ -52,11 +52,10 @@ class SpriteShareActivity : Activity() {
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
-                    // Pass the shared image to JS once the page is loaded
-                    sharedImageDataUrl?.let { dataUrl ->
-                        val escaped = dataUrl.replace("'", "\\'")
-                        view?.evaluateJavascript("receiveSharedImage('$escaped')", null)
-                    }
+                    // Signal JS to pull the image via the bridge — avoids
+                    // passing a multi-MB base64 string through evaluateJavascript
+                    // which crashes the WebView on large images.
+                    view?.evaluateJavascript("receiveSharedImage()", null)
                 }
             }
 
@@ -212,6 +211,16 @@ class SpriteShareActivity : Activity() {
             val jsonFile = File(filesDir, "assets/_${atlasName}.json")
             val pngFile = File(filesDir, "assets/img/_${atlasName}.png")
             return jsonFile.exists() && pngFile.exists()
+        }
+
+        /**
+         * Return the shared image as a base64 data URL.
+         * Called from JS instead of inlining the data in evaluateJavascript,
+         * which crashes the WebView for large images.
+         */
+        @JavascriptInterface
+        fun getSharedImage(): String {
+            return sharedImageDataUrl ?: ""
         }
 
         /**

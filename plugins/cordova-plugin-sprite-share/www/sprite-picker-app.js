@@ -96,6 +96,17 @@
     setStatus("loading", "Running sprite detection...");
 
     try {
+      // Pull image data from the bridge if not passed directly — avoids
+      // the WebView crash that occurs when a multi-MB base64 string is
+      // inlined via evaluateJavascript.
+      if (!dataURL && typeof Android !== "undefined") {
+        dataURL = Android.getSharedImage();
+      }
+      if (!dataURL) {
+        setStatus("error", "No image data received.");
+        return;
+      }
+
       const img = new Image();
       img.src = dataURL;
       await new Promise((resolve, reject) => {
