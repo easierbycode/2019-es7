@@ -111,6 +111,8 @@ async function main() {
 
     var manifest = {};
     var failed = [];
+    // Track URLs already downloaded to avoid downloading the same MP3 twice
+    var urlToFilename = {};
 
     for (var i = 0; i < keys.length; i++) {
         var key = keys[i];
@@ -118,12 +120,28 @@ async function main() {
         var filename = key + ".mp3";
         var dest = path.join(OUTPUT_DIR, filename);
 
+        if (urlToFilename[url]) {
+            // Same URL already downloaded — copy instead of re-downloading
+            var srcFile = path.join(OUTPUT_DIR, urlToFilename[url]);
+            console.log("Copying " + key + " (same URL as " + urlToFilename[url].replace(".mp3", "") + ")");
+            try {
+                fs.copyFileSync(srcFile, dest);
+                manifest[key] = filename;
+                console.log("  -> copied " + filename);
+            } catch (err) {
+                console.error("  -> FAILED to copy: " + err.message);
+                failed.push(key);
+            }
+            continue;
+        }
+
         console.log("Downloading " + key + " from " + url + " ...");
         try {
             await downloadFile(url, dest);
             var stat = fs.statSync(dest);
             console.log("  -> saved " + filename + " (" + (stat.size / 1024).toFixed(1) + " KB)");
             manifest[key] = filename;
+            urlToFilename[url] = filename;
         } catch (err) {
             console.error("  -> FAILED: " + err.message);
             failed.push(key);
