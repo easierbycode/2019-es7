@@ -22,14 +22,16 @@ import java.io.FileOutputStream
 class SpriteShareActivity : Activity() {
 
     private lateinit var webView: WebView
-    private var sharedImageDataUrl: String? = null
+    private var sharedImageFile: File? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Read the shared image from the intent
-        sharedImageDataUrl = readSharedImage()
-        if (sharedImageDataUrl == null) {
+        // Save the shared image to a temp file — avoids passing multi-MB
+        // base64 strings through evaluateJavascript or the Binder IPC
+        // bridge, both of which crash on large payloads.
+        sharedImageFile = saveSharedImageToFile()
+        if (sharedImageFile == null) {
             finish()
             return
         }
@@ -52,10 +54,13 @@ class SpriteShareActivity : Activity() {
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
-                    // Signal JS to pull the image via the bridge — avoids
-                    // passing a multi-MB base64 string through evaluateJavascript
-                    // which crashes the WebView on large images.
-                    view?.evaluateJavascript("receiveSharedImage()", null)
+                    // Pass only the file path — the WebView loads the image
+                    // directly from the filesystem, no large IPC transfers.
+                    sharedImageFile?.let { file ->
+                        view?.evaluateJavascript(
+                            "receiveSharedImage('file://${file.absolutePath}')", null
+                        )
+                    }
                 }
             }
 
@@ -66,9 +71,12 @@ class SpriteShareActivity : Activity() {
     }
 
     /**
-     * Read the shared image URI from the intent, convert to a base64 data URL.
+     * Save the shared image to a temp file and return the File handle.
+     * Using a file avoids passing multi-MB base64 data through
+     * evaluateJavascript (URL length crash) or @JavascriptInterface
+     * return values (Binder TransactionTooLargeException).
      */
-    private fun readSharedImage(): String? {
+    private fun saveSharedImageToFile(): File? {
         if (intent?.action != Intent.ACTION_SEND) return null
 
         // Try EXTRA_STREAM first
@@ -88,33 +96,18 @@ class SpriteShareActivity : Activity() {
 
         if (imageUri == null) return null
 
-        // Grant read access — the temporary grant from ACTION_SEND is usually
-        // sufficient, but explicitly request it as a best-effort fallback.
-        try {
-            val flags = intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
-            if (flags != 0) {
-                contentResolver.takePersistableUriPermission(imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-        } catch (_: Exception) {
-            // Persistable permission not available — temporary grant is usually sufficient
-        }
-
         return try {
             val inputStream = contentResolver.openInputStream(imageUri) ?: return null
-            val buffer = ByteArrayOutputStream()
-            val chunk = ByteArray(8192)
-            var bytesRead: Int
-            while (inputStream.read(chunk).also { bytesRead = it } != -1) {
-                buffer.write(chunk, 0, bytesRead)
+            val tempFile = File(cacheDir, "shared_sprite_input.png")
+            FileOutputStream(tempFile).use { out ->
+                val chunk = ByteArray(8192)
+                var bytesRead: Int
+                while (inputStream.read(chunk).also { bytesRead = it } != -1) {
+                    out.write(chunk, 0, bytesRead)
+                }
             }
             inputStream.close()
-
-            val bytes = buffer.toByteArray()
-            val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-
-            // Detect MIME type from intent or fall back to png
-            val mimeType = intent.type ?: "image/png"
-            "data:$mimeType;base64,$base64"
+            tempFile
         } catch (e: Exception) {
             e.printStackTrace()
             null
@@ -218,16 +211,6 @@ class SpriteShareActivity : Activity() {
             val jsonFile = File(filesDir, "assets/_${atlasName}.json")
             val pngFile = File(filesDir, "assets/img/_${atlasName}.png")
             return jsonFile.exists() && pngFile.exists()
-        }
-
-        /**
-         * Return the shared image as a base64 data URL.
-         * Called from JS instead of inlining the data in evaluateJavascript,
-         * which crashes the WebView for large images.
-         */
-        @JavascriptInterface
-        fun getSharedImage(): String {
-            return sharedImageDataUrl ?: ""
         }
 
         /**
