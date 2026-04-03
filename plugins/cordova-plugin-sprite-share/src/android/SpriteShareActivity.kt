@@ -72,14 +72,26 @@ class SpriteShareActivity : Activity() {
     private fun readSharedImage(): String? {
         if (intent?.action != Intent.ACTION_SEND) return null
 
+        // Try EXTRA_STREAM first, then fall back to clipData, then intent.data
         val imageUri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
         } else {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra(Intent.EXTRA_STREAM)
-        }
+        } ?: intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
+          ?: intent.data
 
         if (imageUri == null) return null
+
+        // Ensure we have permission to read the shared content URI
+        try {
+            val flags = intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
+            if (flags != 0) {
+                contentResolver.takePersistableUriPermission(imageUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+        } catch (_: SecurityException) {
+            // Persistable permission not available — temporary grant is usually sufficient
+        }
 
         return try {
             val inputStream = contentResolver.openInputStream(imageUri) ?: return null
