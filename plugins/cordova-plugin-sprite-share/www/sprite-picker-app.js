@@ -92,23 +92,17 @@
 
   // ── Entry point called from Kotlin ──
 
-  window.receiveSharedImage = async function (dataURL) {
+  window.receiveSharedImage = async function (imageURL) {
     setStatus("loading", "Running sprite detection...");
 
     try {
-      // Pull image data from the bridge if not passed directly — avoids
-      // the WebView crash that occurs when a multi-MB base64 string is
-      // inlined via evaluateJavascript.
-      if (!dataURL && typeof Android !== "undefined") {
-        dataURL = Android.getSharedImage();
-      }
-      if (!dataURL) {
+      if (!imageURL) {
         setStatus("error", "No image data received.");
         return;
       }
 
       const img = new Image();
-      img.src = dataURL;
+      img.src = imageURL;
       await new Promise((resolve, reject) => {
         img.onload = resolve;
         img.onerror = reject;
