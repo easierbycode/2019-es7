@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Base64
+import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
@@ -21,80 +22,72 @@ import java.io.FileOutputStream
  */
 class SpriteShareActivity : Activity() {
 
-    private lateinit var webView: WebView
+    private var webView: WebView? = null
     private var sharedImageFile: File? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Save the shared image to a temp file — avoids passing multi-MB
-        // base64 strings through evaluateJavascript or the Binder IPC
-        // bridge, both of which crash on large payloads.
-        sharedImageFile = saveSharedImageToFile()
-        if (sharedImageFile == null) {
-            finish()
-            return
-        }
+        try {
+            // Save the shared image to a temp file — avoids passing multi-MB
+            // base64 through evaluateJavascript (crashes WebView) or the
+            // @JavascriptInterface bridge (Binder TransactionTooLargeException).
+            sharedImageFile = saveSharedImageToFile()
+            if (sharedImageFile == null) {
+                Log.e(TAG, "Failed to read shared image from intent")
+                finish()
+                return
+            }
 
-        // Set up the WebView
-        webView = WebView(this).apply {
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.allowFileAccess = true
-            settings.allowFileAccessFromFileURLs = true
-            settings.allowUniversalAccessFromFileURLs = true
-            settings.useWideViewPort = true
-            settings.loadWithOverviewMode = true
-            settings.builtInZoomControls = true
-            settings.displayZoomControls = false
+            val imagePath = "file://${sharedImageFile!!.absolutePath}"
 
-            addJavascriptInterface(SpriteShareBridge(), "Android")
+            // Set up the WebView
+            val wv = WebView(this)
+            webView = wv
 
-            webChromeClient = WebChromeClient()
-            webViewClient = object : WebViewClient() {
+            wv.settings.javaScriptEnabled = true
+            wv.settings.domStorageEnabled = true
+            @Suppress("DEPRECATION")
+            wv.settings.allowFileAccess = true
+            @Suppress("DEPRECATION")
+            wv.settings.allowFileAccessFromFileURLs = true
+            @Suppress("DEPRECATION")
+            wv.settings.allowUniversalAccessFromFileURLs = true
+            wv.settings.useWideViewPort = true
+            wv.settings.loadWithOverviewMode = true
+            wv.settings.builtInZoomControls = true
+            wv.settings.displayZoomControls = false
+
+            wv.addJavascriptInterface(SpriteShareBridge(), "Android")
+
+            wv.webChromeClient = WebChromeClient()
+            wv.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
-                    // Pass only the file path — the WebView loads the image
-                    // directly from the filesystem, no large IPC transfers.
-                    sharedImageFile?.let { file ->
-                        view?.evaluateJavascript(
-                            "receiveSharedImage('file://${file.absolutePath}')", null
-                        )
-                    }
+                    // Pass only the short file path — the WebView loads the
+                    // image directly from the filesystem.
+                    view?.evaluateJavascript(
+                        "if(typeof receiveSharedImage==='function')receiveSharedImage('$imagePath')",
+                        null
+                    )
                 }
             }
 
-            loadUrl("file:///android_asset/www/sprite-share/sprite-picker.html")
+            wv.loadUrl("file:///android_asset/www/sprite-share/sprite-picker.html")
+            setContentView(wv)
+        } catch (e: Exception) {
+            Log.e(TAG, "onCreate failed", e)
+            finish()
         }
-
-        setContentView(webView)
     }
 
     /**
      * Save the shared image to a temp file and return the File handle.
-     * Using a file avoids passing multi-MB base64 data through
-     * evaluateJavascript (URL length crash) or @JavascriptInterface
-     * return values (Binder TransactionTooLargeException).
      */
     private fun saveSharedImageToFile(): File? {
         if (intent?.action != Intent.ACTION_SEND) return null
 
-        // Try EXTRA_STREAM first
-        var imageUri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
-        } else {
-            @Suppress("DEPRECATION")
-            intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
-        }
-        // Fall back to clipData, then intent.data
-        if (imageUri == null) {
-            imageUri = intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri
-        }
-        if (imageUri == null) {
-            imageUri = intent.data
-        }
-
-        if (imageUri == null) return null
+        val imageUri: Uri = getImageUri() ?: return null
 
         return try {
             val inputStream = contentResolver.openInputStream(imageUri) ?: return null
@@ -109,9 +102,33 @@ class SpriteShareActivity : Activity() {
             inputStream.close()
             tempFile
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Failed to save shared image", e)
             null
         }
+    }
+
+    /**
+     * Extract the shared image URI from the intent, trying multiple sources.
+     */
+    private fun getImageUri(): Uri? {
+        // 1. EXTRA_STREAM (standard share path)
+        val fromExtra: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
+        }
+        if (fromExtra != null) return fromExtra
+
+        // 2. ClipData (some apps use this instead of EXTRA_STREAM)
+        val clip = intent.clipData
+        if (clip != null && clip.itemCount > 0) {
+            val uri = clip.getItemAt(0).uri
+            if (uri != null) return uri
+        }
+
+        // 3. Intent data URI
+        return intent.data
     }
 
     /**
@@ -119,23 +136,15 @@ class SpriteShareActivity : Activity() {
      */
     inner class SpriteShareBridge {
 
-        /**
-         * Read an atlas JSON file from bundled www/assets/.
-         * @param atlasName e.g. "game_asset" → reads "assets/game_asset.json"
-         *                  Also checks for editor-repacked "_game_asset.json" in internal storage first.
-         */
         @JavascriptInterface
         fun getAtlasJson(atlasName: String): String {
-            // Check internal storage first (editor-repacked version)
             val internalFile = File(filesDir, "assets/_${atlasName}.json")
             if (internalFile.exists()) {
                 return internalFile.readText()
             }
-            // Fall back to bundled assets
             return try {
                 assets.open("www/assets/$atlasName.json").bufferedReader().readText()
             } catch (e: Exception) {
-                // Try without www/ prefix
                 try {
                     assets.open("www/assets/${atlasName}.json").bufferedReader().readText()
                 } catch (e2: Exception) {
@@ -144,19 +153,14 @@ class SpriteShareActivity : Activity() {
             }
         }
 
-        /**
-         * Read an atlas PNG image and return as a base64 data URL.
-         */
         @JavascriptInterface
         fun getAtlasImageBase64(atlasName: String): String {
-            // Check internal storage first
             val internalFile = File(filesDir, "assets/img/_${atlasName}.png")
             if (internalFile.exists()) {
                 val bytes = internalFile.readBytes()
                 val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
                 return "data:image/png;base64,$base64"
             }
-            // Fall back to bundled assets
             return try {
                 val inputStream = assets.open("www/assets/img/$atlasName.png")
                 val buffer = ByteArrayOutputStream()
@@ -173,39 +177,29 @@ class SpriteShareActivity : Activity() {
             }
         }
 
-        /**
-         * Save a repacked atlas (PNG + JSON) to internal storage.
-         * Uses the _ prefix convention so Phaser picks up repacked atlases.
-         */
         @JavascriptInterface
         fun saveAtlas(atlasName: String, pngBase64: String, jsonString: String): Boolean {
             return try {
-                // Ensure directories exist
                 val imgDir = File(filesDir, "assets/img")
                 imgDir.mkdirs()
                 val jsonDir = File(filesDir, "assets")
                 jsonDir.mkdirs()
 
-                // Save PNG (strip data URL prefix if present)
                 val pngData = pngBase64.substringAfter("base64,", pngBase64)
                 val pngBytes = Base64.decode(pngData, Base64.DEFAULT)
                 FileOutputStream(File(imgDir, "_${atlasName}.png")).use { it.write(pngBytes) }
 
-                // Save JSON
                 FileOutputStream(File(jsonDir, "_${atlasName}.json")).use {
                     it.write(jsonString.toByteArray())
                 }
 
                 true
             } catch (e: Exception) {
-                e.printStackTrace()
+                Log.e(TAG, "Failed to save atlas", e)
                 false
             }
         }
 
-        /**
-         * Check if an editor-repacked atlas exists in internal storage.
-         */
         @JavascriptInterface
         fun hasRepackedAtlas(atlasName: String): Boolean {
             val jsonFile = File(filesDir, "assets/_${atlasName}.json")
@@ -213,20 +207,29 @@ class SpriteShareActivity : Activity() {
             return jsonFile.exists() && pngFile.exists()
         }
 
-        /**
-         * Close the sprite picker Activity.
-         */
         @JavascriptInterface
         fun closeActivity() {
             runOnUiThread { finish() }
         }
     }
 
+    @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        if (webView.canGoBack()) {
-            webView.goBack()
+        val wv = webView
+        if (wv != null && wv.canGoBack()) {
+            wv.goBack()
         } else {
             super.onBackPressed()
         }
+    }
+
+    override fun onDestroy() {
+        webView?.destroy()
+        webView = null
+        super.onDestroy()
+    }
+
+    companion object {
+        private const val TAG = "SpriteShare"
     }
 }
