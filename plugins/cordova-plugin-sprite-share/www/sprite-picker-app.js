@@ -102,21 +102,29 @@
       }
 
       const img = new Image();
-      img.src = imageURL;
       await new Promise((resolve, reject) => {
         img.onload = resolve;
-        img.onerror = reject;
+        img.onerror = () => reject(new Error("Failed to load image"));
+        img.src = imageURL;
       });
 
-      const w = img.naturalWidth;
-      const h = img.naturalHeight;
+      let w = img.naturalWidth;
+      let h = img.naturalHeight;
 
-      // Draw to source canvas
+      // Scale down large images to prevent WebView OOM crashes
+      const MAX_DIM = 2048;
+      if (w > MAX_DIM || h > MAX_DIM) {
+        const scale = MAX_DIM / Math.max(w, h);
+        w = Math.round(w * scale);
+        h = Math.round(h * scale);
+      }
+
+      // Draw to source canvas (possibly scaled)
       srcCanvas.width = w;
       srcCanvas.height = h;
       const ctx = srcCanvas.getContext("2d", { willReadFrequently: true });
       ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(img, 0, 0);
+      ctx.drawImage(img, 0, 0, w, h);
       sourceCanvas = srcCanvas;
 
       // Set up overlay canvas
@@ -297,10 +305,10 @@
       const imgDataUrl = Android.getAtlasImageBase64(atlasName);
       if (imgDataUrl) {
         atlasImage = new Image();
-        atlasImage.src = imgDataUrl;
         await new Promise((resolve, reject) => {
           atlasImage.onload = resolve;
-          atlasImage.onerror = reject;
+          atlasImage.onerror = () => reject(new Error("Failed to load atlas image"));
+          atlasImage.src = imgDataUrl;
         });
       } else {
         atlasImage = null;
@@ -342,8 +350,7 @@
         const box = selectedBoxes[idx];
 
         const img = new Image();
-        img.src = dataURL;
-        await new Promise((r) => (img.onload = r));
+        await new Promise((r) => { img.onload = r; img.src = dataURL; });
 
         const cv = document.createElement("canvas");
         cv.width = img.width;
