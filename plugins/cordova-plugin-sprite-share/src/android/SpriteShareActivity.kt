@@ -2,6 +2,8 @@ package com.easierbycode.spriteshare
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -14,6 +16,7 @@ import android.webkit.WebViewClient
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.math.roundToInt
 
 /**
  * Activity that receives shared images via ACTION_SEND intent,
@@ -88,32 +91,122 @@ class SpriteShareActivity : Activity() {
      * Save the shared image to a temp file and return the File handle.
      */
     private fun saveSharedImageToFile(): File? {
-        if (intent?.action != Intent.ACTION_SEND) return null
-
         val imageUri: Uri = getImageUri() ?: return null
 
         return try {
             val inputStream = contentResolver.openInputStream(imageUri) ?: return null
             val tempFile = File(cacheDir, "shared_sprite_input.png")
-            FileOutputStream(tempFile).use { out ->
-                val chunk = ByteArray(8192)
-                var bytesRead: Int
-                while (inputStream.read(chunk).also { bytesRead = it } != -1) {
-                    out.write(chunk, 0, bytesRead)
+            inputStream.close()
+
+            when (saveSharedImageBitmapToFile(imageUri, tempFile)) {
+                SaveResult.SUCCESS -> tempFile
+                SaveResult.DECODE_FAILED -> {
+                    if (copySharedImageToFile(imageUri, tempFile)) tempFile else null
+                }
+                SaveResult.OUT_OF_MEMORY -> {
+                    Log.e(TAG, "Shared image was too large to decode safely")
+                    null
                 }
             }
-            inputStream.close()
-            tempFile
         } catch (e: Exception) {
             Log.e(TAG, "Failed to save shared image", e)
             null
         }
     }
 
+    private fun saveSharedImageBitmapToFile(imageUri: Uri, outputFile: File): SaveResult {
+        return try {
+            val bounds = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+
+            contentResolver.openInputStream(imageUri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, bounds)
+            } ?: return SaveResult.DECODE_FAILED
+
+            if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+                return SaveResult.DECODE_FAILED
+            }
+
+            val decodeOptions = BitmapFactory.Options().apply {
+                inSampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, MAX_IMAGE_DIMENSION)
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+
+            val decoded = contentResolver.openInputStream(imageUri)?.use { input ->
+                BitmapFactory.decodeStream(input, null, decodeOptions)
+            } ?: return SaveResult.DECODE_FAILED
+
+            val scaled = scaleBitmapIfNeeded(decoded, MAX_IMAGE_DIMENSION)
+
+            FileOutputStream(outputFile).use { out ->
+                if (!scaled.compress(Bitmap.CompressFormat.PNG, 100, out)) {
+                    if (scaled !== decoded) scaled.recycle()
+                    decoded.recycle()
+                    return SaveResult.DECODE_FAILED
+                }
+            }
+
+            if (scaled !== decoded) scaled.recycle()
+            decoded.recycle()
+            SaveResult.SUCCESS
+        } catch (oom: OutOfMemoryError) {
+            SaveResult.OUT_OF_MEMORY
+        } catch (e: Exception) {
+            Log.w(TAG, "Falling back to raw shared image copy", e)
+            SaveResult.DECODE_FAILED
+        }
+    }
+
+    private fun copySharedImageToFile(imageUri: Uri, outputFile: File): Boolean {
+        return try {
+            contentResolver.openInputStream(imageUri)?.use { input ->
+                FileOutputStream(outputFile).use { out ->
+                    val chunk = ByteArray(8192)
+                    var bytesRead: Int
+                    while (input.read(chunk).also { bytesRead = it } != -1) {
+                        out.write(chunk, 0, bytesRead)
+                    }
+                }
+            } ?: false
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to copy shared image", e)
+            false
+        }
+    }
+
+    private fun calculateInSampleSize(width: Int, height: Int, maxDimension: Int): Int {
+        var sampleSize = 1
+        var largest = maxOf(width, height)
+        while (largest / sampleSize > maxDimension) {
+            sampleSize *= 2
+        }
+        return sampleSize.coerceAtLeast(1)
+    }
+
+    private fun scaleBitmapIfNeeded(bitmap: Bitmap, maxDimension: Int): Bitmap {
+        val largest = maxOf(bitmap.width, bitmap.height)
+        if (largest <= maxDimension) {
+            return bitmap
+        }
+
+        val scale = maxDimension.toFloat() / largest.toFloat()
+        val scaledWidth = (bitmap.width * scale).roundToInt().coerceAtLeast(1)
+        val scaledHeight = (bitmap.height * scale).roundToInt().coerceAtLeast(1)
+        return Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, false)
+    }
+
     /**
      * Extract the shared image URI from the intent, trying multiple sources.
      */
     private fun getImageUri(): Uri? {
+        val shareAction = intent?.action
+        if (shareAction != Intent.ACTION_SEND &&
+            shareAction != Intent.ACTION_SEND_MULTIPLE &&
+            shareAction != Intent.ACTION_VIEW) {
+            Log.w(TAG, "Unexpected share intent action: $shareAction")
+        }
+
         // 1. EXTRA_STREAM (standard share path)
         val fromExtra: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
@@ -122,6 +215,17 @@ class SpriteShareActivity : Activity() {
             intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
         }
         if (fromExtra != null) return fromExtra
+
+        // 1b. EXTRA_STREAM as a list (some apps send ACTION_SEND_MULTIPLE)
+        val fromExtraList: List<Uri>? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM)
+        }
+        if (!fromExtraList.isNullOrEmpty()) {
+            return fromExtraList.firstOrNull()
+        }
 
         // 2. ClipData (some apps use this instead of EXTRA_STREAM)
         val clip = intent.clipData
@@ -235,5 +339,12 @@ class SpriteShareActivity : Activity() {
 
     companion object {
         private const val TAG = "SpriteShare"
+        private const val MAX_IMAGE_DIMENSION = 2048
+    }
+
+    private enum class SaveResult {
+        SUCCESS,
+        DECODE_FAILED,
+        OUT_OF_MEMORY
     }
 }
