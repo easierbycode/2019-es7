@@ -609,9 +609,21 @@ export class BootScene extends Phaser.Scene {
                             var decodedName = fname.replace(/\u2024/g, ".");
                             var fd = data.atlasFrames[fname];
                             if (fd && fd.frame) {
-                                mergedFrameMap[decodedName] = {
+                                var frameData = {
                                     frame: { x: fd.frame.x, y: fd.frame.y + localH, w: fd.frame.w, h: fd.frame.h }
                                 };
+                                mergedFrameMap[decodedName] = frameData;
+                                // Firebase frames stored as .png should also overwrite matching .gif
+                                // local frames (and vice versa) so animations find the replacements
+                                var altName = null;
+                                if (decodedName.endsWith(".png")) {
+                                    altName = decodedName.slice(0, -4) + ".gif";
+                                } else if (decodedName.endsWith(".gif")) {
+                                    altName = decodedName.slice(0, -4) + ".png";
+                                }
+                                if (altName && mergedFrameMap[altName]) {
+                                    mergedFrameMap[altName] = frameData;
+                                }
                             }
                         }
 
