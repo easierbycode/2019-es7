@@ -40,6 +40,9 @@ class SpriteShareActivity : Activity() {
             }
 
             val imagePath = "file://${sharedImageFile!!.absolutePath}"
+                .replace("\\", "\\\\")
+                .replace("'", "\\'")
+                .replace("\n", "")
 
             // Set up the WebView
             val wv = WebView(this)
@@ -226,6 +229,7 @@ class SpriteShareActivity : Activity() {
     override fun onDestroy() {
         webView?.destroy()
         webView = null
+        try { sharedImageFile?.delete() } catch (_: Exception) {}
         super.onDestroy()
     }
 
