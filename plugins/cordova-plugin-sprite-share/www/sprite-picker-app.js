@@ -1,9 +1,9 @@
 /**
- * Sprite Picker App — Android Share edition
+ * Sprite Picker App — Share edition (Android + iOS)
  *
- * Receives a shared image from SpriteShareActivity (Kotlin),
- * runs sprite detection, lets user select sprites, and saves
- * them into a game atlas via the Android JS bridge.
+ * Receives a shared image from SpriteShareActivity (Android/Kotlin) or
+ * ShareViewController (iOS/Swift), runs sprite detection, lets user
+ * select sprites, and saves them into a game atlas via the native bridge.
  *
  * Reuses:
  *  - SpriteDetect (sprite-detect.js) — verbatim from Chrome extension
@@ -11,6 +11,54 @@
  */
 (function () {
   "use strict";
+
+  // ── Native Bridge (cross-platform) ──
+
+  const NativeBridge = (function () {
+    // Android: synchronous @JavascriptInterface, wrapped in Promises
+    if (typeof Android !== "undefined") {
+      return {
+        getAtlasJson: (name) => Promise.resolve(Android.getAtlasJson(name)),
+        getAtlasImageBase64: (name) => Promise.resolve(Android.getAtlasImageBase64(name)),
+        saveAtlas: (name, png, json) => Promise.resolve(Android.saveAtlas(name, png, json)),
+        hasRepackedAtlas: (name) => Promise.resolve(Android.hasRepackedAtlas(name)),
+        close: () => { Android.closeActivity(); },
+      };
+    }
+
+    // iOS: async WKScriptMessageHandler with callback pattern
+    if (window.webkit && window.webkit.messageHandlers &&
+        window.webkit.messageHandlers.spriteBridge) {
+      let callId = 0;
+      const pending = {};
+
+      window._bridgeCallback = (id, result) => {
+        if (pending[id]) {
+          pending[id](result);
+          delete pending[id];
+        }
+      };
+
+      const call = (method, args) =>
+        new Promise((resolve) => {
+          const id = ++callId;
+          pending[id] = resolve;
+          window.webkit.messageHandlers.spriteBridge.postMessage({
+            id: id, method: method, args: args || [],
+          });
+        });
+
+      return {
+        getAtlasJson: (name) => call("getAtlasJson", [name]),
+        getAtlasImageBase64: (name) => call("getAtlasImageBase64", [name]),
+        saveAtlas: (name, png, json) => call("saveAtlas", [name, png, json]),
+        hasRepackedAtlas: (name) => call("hasRepackedAtlas", [name]),
+        close: () => { call("close"); },
+      };
+    }
+
+    return null;
+  })();
 
   // ── State ──
 
@@ -44,7 +92,7 @@
   // ── Init ──
 
   closeBtn.addEventListener("click", () => {
-    if (typeof Android !== "undefined") Android.closeActivity();
+    if (NativeBridge) NativeBridge.close();
   });
 
   modeSelect.addEventListener("change", () => {
@@ -90,7 +138,7 @@
     touchStartPos = null;
   });
 
-  // ── Entry point called from Kotlin ──
+  // ── Entry point called from native (Kotlin/Swift) ──
 
   window.receiveSharedImage = async function (imageURL) {
     setStatus("loading", "Running sprite detection...");
@@ -257,7 +305,7 @@
 
     try {
       const atlasName = atlasSelect.value;
-      const jsonStr = Android.getAtlasJson(atlasName);
+      const jsonStr = await NativeBridge.getAtlasJson(atlasName);
       const data = JSON.parse(jsonStr);
       const frames = Object.keys(data.frames || {});
 
@@ -299,10 +347,10 @@
 
     try {
       // Load current atlas
-      const jsonStr = Android.getAtlasJson(atlasName);
+      const jsonStr = await NativeBridge.getAtlasJson(atlasName);
       atlasData = JSON.parse(jsonStr);
 
-      const imgDataUrl = Android.getAtlasImageBase64(atlasName);
+      const imgDataUrl = await NativeBridge.getAtlasImageBase64(atlasName);
       if (imgDataUrl) {
         atlasImage = new Image();
         await new Promise((resolve, reject) => {
@@ -401,7 +449,7 @@
       const pngBase64 = result.canvas.toDataURL("image/png");
       const jsonString = JSON.stringify(finalJson, null, 2);
 
-      const ok = Android.saveAtlas(atlasName, pngBase64, jsonString);
+      const ok = await NativeBridge.saveAtlas(atlasName, pngBase64, jsonString);
 
       if (ok) {
         setStatus("success", "Atlas saved! " + entries.length + " sprite(s) added.");
