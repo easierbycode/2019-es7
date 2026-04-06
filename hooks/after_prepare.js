@@ -3,9 +3,12 @@
 /**
  * Cordova after_prepare hook
  *
- * Patches MainActivity.kt (cordova-android 13+) to enable Android immersive
- * sticky mode.  This replaces the old cordova-plugin-fullscreen which only
- * supported Java-based CordovaActivity projects.
+ * 1. Patches MainActivity.kt (cordova-android 13+) to enable Android immersive
+ *    sticky mode.  This replaces the old cordova-plugin-fullscreen which only
+ *    supported Java-based CordovaActivity projects.
+ *
+ * 2. Copies SpriteShareActivity.java into the Android platform so the app can
+ *    receive images shared from other apps (ACTION_SEND with image/*).
  *
  * The patched activity:
  *  - Hides both status bar and navigation bar on launch.
@@ -99,9 +102,79 @@ function patchIOSWebViewInspectable(context) {
     }
 }
 
+/**
+ * Copy SpriteShareActivity.java into the Android platform and register it
+ * in AndroidManifest.xml so the app can receive shared images.
+ */
+function installSpriteShareActivity(context) {
+    const platformRoot = path.join(
+        context.opts.projectRoot, "platforms", "android"
+    );
+    if (!fs.existsSync(platformRoot)) return;
+
+    // ── Copy Java source ────────────────────────────────────────────
+    const srcFile = path.join(
+        context.opts.projectRoot, "src", "android", "SpriteShareActivity.java"
+    );
+    if (!fs.existsSync(srcFile)) {
+        console.warn("after_prepare hook: SpriteShareActivity.java not found – skipping");
+        return;
+    }
+
+    const destDir = path.join(
+        platformRoot, "app", "src", "main", "java",
+        "com", "easierbycode", "spriteshare"
+    );
+    fs.mkdirSync(destDir, { recursive: true });
+
+    const destFile = path.join(destDir, "SpriteShareActivity.java");
+    fs.copyFileSync(srcFile, destFile);
+    console.log("after_prepare hook: copied SpriteShareActivity.java to " + destDir);
+
+    // ── Register in AndroidManifest.xml ─────────────────────────────
+    const manifestPath = path.join(
+        platformRoot, "app", "src", "main", "AndroidManifest.xml"
+    );
+    if (!fs.existsSync(manifestPath)) {
+        console.warn("after_prepare hook: AndroidManifest.xml not found – skipping SpriteShare manifest patch");
+        return;
+    }
+
+    let manifest = fs.readFileSync(manifestPath, "utf8");
+
+    if (manifest.includes("SpriteShareActivity")) {
+        console.log("after_prepare hook: SpriteShareActivity already in manifest");
+        return;
+    }
+
+    const activityBlock = `
+        <activity
+            android:name="com.easierbycode.spriteshare.SpriteShareActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>`;
+
+    // Insert before the closing </application> tag
+    manifest = manifest.replace(
+        /(\s*)<\/application>/,
+        activityBlock + "\n$1</application>"
+    );
+
+    fs.writeFileSync(manifestPath, manifest, "utf8");
+    console.log("after_prepare hook: added SpriteShareActivity to AndroidManifest.xml");
+}
+
 module.exports = function (context) {
     // ── iOS: enable WKWebView remote inspection ─────────────────────
     patchIOSWebViewInspectable(context);
+
+    // ── Android: SpriteShareActivity (receive shared images) ────────
+    installSpriteShareActivity(context);
 
     // ── Android: immersive sticky mode ──────────────────────────────
     const platformRoot = path.join(
