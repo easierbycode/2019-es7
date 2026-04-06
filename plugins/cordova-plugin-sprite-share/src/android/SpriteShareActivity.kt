@@ -2,6 +2,7 @@ package com.easierbycode.spriteshare
 
 import android.app.Activity
 import android.content.Intent
+import android.graphics.Color
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
@@ -9,14 +10,23 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Base64
 import android.util.Log
+import android.util.TypedValue
+import android.view.Gravity
 import android.webkit.JavascriptInterface
+import android.webkit.ConsoleMessage
+import android.webkit.RenderProcessGoneDetail
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
+import android.widget.TextView
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 /**
  * Activity that receives shared images via ACTION_SEND intent,
@@ -27,9 +37,11 @@ class SpriteShareActivity : Activity() {
 
     private var webView: WebView? = null
     private var sharedImageFile: File? = null
+    private var tempSourceFile: File? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        showStatusView("Loading shared image...")
 
         try {
             // Save the shared image to a temp file — avoids passing multi-MB
@@ -38,7 +50,7 @@ class SpriteShareActivity : Activity() {
             sharedImageFile = saveSharedImageToFile()
             if (sharedImageFile == null) {
                 Log.e(TAG, "Failed to read shared image from intent")
-                finish()
+                showFatalError("Could not read the shared image.", null)
                 return
             }
 
@@ -66,7 +78,18 @@ class SpriteShareActivity : Activity() {
 
             wv.addJavascriptInterface(SpriteShareBridge(), "Android")
 
-            wv.webChromeClient = WebChromeClient()
+            wv.webChromeClient = object : WebChromeClient() {
+                override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                    if (consoleMessage != null) {
+                        Log.d(
+                            TAG,
+                            "JS ${consoleMessage.messageLevel()}: ${consoleMessage.message()} " +
+                                "@${consoleMessage.sourceId()}:${consoleMessage.lineNumber()}"
+                        )
+                    }
+                    return super.onConsoleMessage(consoleMessage)
+                }
+            }
             wv.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
                     super.onPageFinished(view, url)
@@ -77,13 +100,40 @@ class SpriteShareActivity : Activity() {
                         null
                     )
                 }
+
+                override fun onReceivedError(
+                    view: WebView?,
+                    request: WebResourceRequest?,
+                    error: WebResourceError?
+                ) {
+                    super.onReceivedError(view, request, error)
+                    if (request?.isForMainFrame == true) {
+                        val description = error?.description?.toString() ?: "unknown error"
+                        Log.e(TAG, "WebView failed to load: $description")
+                        showFatalError("Failed to load the Sprite Share UI.", null)
+                    }
+                }
+
+                override fun onRenderProcessGone(
+                    view: WebView?,
+                    detail: RenderProcessGoneDetail?
+                ): Boolean {
+                    Log.e(TAG, "WebView render process gone. didCrash=${detail?.didCrash()}")
+                    webView?.destroy()
+                    webView = null
+                    showFatalError("The Sprite Share WebView crashed while loading the image.", null)
+                    return true
+                }
             }
 
-            wv.loadUrl("file:///android_asset/www/sprite-share/sprite-picker.html")
             setContentView(wv)
+            wv.loadUrl("file:///android_asset/www/sprite-share/sprite-picker.html")
         } catch (e: Exception) {
             Log.e(TAG, "onCreate failed", e)
-            finish()
+            showFatalError("Sprite Share failed during startup.", e)
+        } catch (t: Throwable) {
+            Log.e(TAG, "onCreate failed with fatal error", t)
+            showFatalError("Sprite Share hit a fatal error during startup.", t)
         }
     }
 
@@ -94,14 +144,18 @@ class SpriteShareActivity : Activity() {
         val imageUri: Uri = getImageUri() ?: return null
 
         return try {
-            val inputStream = contentResolver.openInputStream(imageUri) ?: return null
-            val tempFile = File(cacheDir, "shared_sprite_input.png")
-            inputStream.close()
+            val sourceFile = copySharedImageToTempFile(imageUri) ?: return null
+            tempSourceFile = sourceFile
+            val normalizedFile = File(cacheDir, "shared_sprite_input.png")
 
-            when (saveSharedImageBitmapToFile(imageUri, tempFile)) {
-                SaveResult.SUCCESS -> tempFile
+            when (saveSharedImageBitmapToFile(sourceFile, normalizedFile)) {
+                SaveResult.SUCCESS -> {
+                    try { sourceFile.delete() } catch (_: Exception) {}
+                    tempSourceFile = null
+                    normalizedFile
+                }
                 SaveResult.DECODE_FAILED -> {
-                    if (copySharedImageToFile(imageUri, tempFile)) tempFile else null
+                    sourceFile
                 }
                 SaveResult.OUT_OF_MEMORY -> {
                     Log.e(TAG, "Shared image was too large to decode safely")
@@ -114,30 +168,31 @@ class SpriteShareActivity : Activity() {
         }
     }
 
-    private fun saveSharedImageBitmapToFile(imageUri: Uri, outputFile: File): SaveResult {
+    private fun copySharedImageToTempFile(imageUri: Uri): File? {
+        val sourceFile = File(cacheDir, "shared_sprite_input_source.img")
+        return if (copySharedImageToFile(imageUri, sourceFile)) sourceFile else null
+    }
+
+    private fun saveSharedImageBitmapToFile(sourceFile: File, outputFile: File): SaveResult {
         return try {
             val bounds = BitmapFactory.Options().apply {
                 inJustDecodeBounds = true
             }
-
-            contentResolver.openInputStream(imageUri)?.use { input ->
-                BitmapFactory.decodeStream(input, null, bounds)
-            } ?: return SaveResult.DECODE_FAILED
+            BitmapFactory.decodeFile(sourceFile.absolutePath, bounds)
 
             if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
                 return SaveResult.DECODE_FAILED
             }
 
             val decodeOptions = BitmapFactory.Options().apply {
-                inSampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, MAX_IMAGE_DIMENSION)
+                inSampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight)
                 inPreferredConfig = Bitmap.Config.ARGB_8888
             }
 
-            val decoded = contentResolver.openInputStream(imageUri)?.use { input ->
-                BitmapFactory.decodeStream(input, null, decodeOptions)
-            } ?: return SaveResult.DECODE_FAILED
+            val decoded = BitmapFactory.decodeFile(sourceFile.absolutePath, decodeOptions)
+                ?: return SaveResult.DECODE_FAILED
 
-            val scaled = scaleBitmapIfNeeded(decoded, MAX_IMAGE_DIMENSION)
+            val scaled = scaleBitmapIfNeeded(decoded)
 
             FileOutputStream(outputFile).use { out ->
                 if (!scaled.compress(Bitmap.CompressFormat.PNG, 100, out)) {
@@ -175,25 +230,69 @@ class SpriteShareActivity : Activity() {
         }
     }
 
-    private fun calculateInSampleSize(width: Int, height: Int, maxDimension: Int): Int {
+    private fun calculateInSampleSize(width: Int, height: Int): Int {
         var sampleSize = 1
-        var largest = maxOf(width, height)
-        while (largest / sampleSize > maxDimension) {
+        while (maxOf(width, height) / sampleSize > MAX_IMAGE_DIMENSION ||
+            (width.toLong() / sampleSize) * (height.toLong() / sampleSize) > MAX_IMAGE_PIXELS) {
             sampleSize *= 2
         }
         return sampleSize.coerceAtLeast(1)
     }
 
-    private fun scaleBitmapIfNeeded(bitmap: Bitmap, maxDimension: Int): Bitmap {
+    private fun scaleBitmapIfNeeded(bitmap: Bitmap): Bitmap {
         val largest = maxOf(bitmap.width, bitmap.height)
-        if (largest <= maxDimension) {
+        val totalPixels = bitmap.width.toLong() * bitmap.height.toLong()
+        if (largest <= MAX_IMAGE_DIMENSION && totalPixels <= MAX_IMAGE_PIXELS) {
             return bitmap
         }
 
-        val scale = maxDimension.toFloat() / largest.toFloat()
+        val dimensionScale = MAX_IMAGE_DIMENSION.toFloat() / largest.toFloat()
+        val pixelScale = sqrt(MAX_IMAGE_PIXELS.toDouble() / totalPixels.toDouble()).toFloat()
+        val scale = minOf(1f, dimensionScale, pixelScale)
         val scaledWidth = (bitmap.width * scale).roundToInt().coerceAtLeast(1)
         val scaledHeight = (bitmap.height * scale).roundToInt().coerceAtLeast(1)
         return Bitmap.createScaledBitmap(bitmap, scaledWidth, scaledHeight, false)
+    }
+
+    private fun showStatusView(message: String) {
+        val root = FrameLayout(this).apply {
+            setBackgroundColor(Color.parseColor("#10142A"))
+        }
+        val textView = TextView(this).apply {
+            text = message
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setPadding(48, 48, 48, 48)
+        }
+        root.addView(
+            textView,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
+        )
+        setContentView(root)
+    }
+
+    private fun showFatalError(message: String, error: Throwable?) {
+        val details = buildString {
+            append(message)
+            append("\n\n")
+            append("Action: ")
+            append(intent?.action ?: "(none)")
+            append("\nType: ")
+            append(intent?.type ?: "(none)")
+            append("\nUri: ")
+            append(getImageUri()?.toString() ?: "(none)")
+            if (error != null) {
+                append("\n\n")
+                append(error::class.java.simpleName)
+                append(": ")
+                append(error.message ?: "(no message)")
+            }
+        }
+        showStatusView(details)
     }
 
     /**
@@ -334,12 +433,14 @@ class SpriteShareActivity : Activity() {
         webView?.destroy()
         webView = null
         try { sharedImageFile?.delete() } catch (_: Exception) {}
+        try { tempSourceFile?.delete() } catch (_: Exception) {}
         super.onDestroy()
     }
 
     companion object {
         private const val TAG = "SpriteShare"
-        private const val MAX_IMAGE_DIMENSION = 2048
+        private const val MAX_IMAGE_DIMENSION = 1536
+        private const val MAX_IMAGE_PIXELS = 1_250_000L
     }
 
     private enum class SaveResult {

@@ -160,9 +160,12 @@
       let h = img.naturalHeight;
 
       // Scale down large images to prevent WebView OOM crashes
-      const MAX_DIM = 2048;
-      if (w > MAX_DIM || h > MAX_DIM) {
-        const scale = MAX_DIM / Math.max(w, h);
+      const MAX_DIM = 1536;
+      const MAX_PIXELS = 1250000;
+      const dimScale = MAX_DIM / Math.max(w, h);
+      const pixelScale = Math.sqrt(MAX_PIXELS / (w * h));
+      const scale = Math.min(1, dimScale, pixelScale);
+      if (scale < 1) {
         w = Math.round(w * scale);
         h = Math.round(h * scale);
       }
