@@ -12,7 +12,7 @@
 
     <platform name="android">
         <source-file src="src/android/SpriteShareActivity.kt"
-                     target-dir="app/src/main/kotlin/com/easierbycode/spriteshare" />
+                     target-dir="app/src/main/java/com/easierbycode/spriteshare" />
 
         <!-- Register the share-receiver Activity in AndroidManifest -->
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
