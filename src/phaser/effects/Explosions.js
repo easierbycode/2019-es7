@@ -15,7 +15,7 @@ export function showExplosion(scene, x, y) {
                 zeroPad: 2,
                 suffix: ".gif",
             }),
-            frameRate: 48,
+            frameRate: 18,  //48,
             repeat: 0,
         });
     }
@@ -103,7 +103,7 @@ export function flashEnemyTint(scene, enemy) {
     if (!enemy || !enemy.active) return;
     var existing = enemy.getData("_tintTween");
     if (existing) existing.stop();
-    enemy.setTint(0xFF0000);
+    enemy.setTint(0xFF8080);
     var tw = scene.tweens.addCounter({
         from: 0, to: 1, duration: 100, delay: 100,
         onComplete: function () {
