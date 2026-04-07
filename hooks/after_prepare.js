@@ -3,12 +3,9 @@
 /**
  * Cordova after_prepare hook
  *
- * 1. Patches MainActivity.kt (cordova-android 13+) to enable Android immersive
- *    sticky mode.  This replaces the old cordova-plugin-fullscreen which only
- *    supported Java-based CordovaActivity projects.
- *
- * 2. Copies SpriteShareActivity.java into the Android platform so the app can
- *    receive images shared from other apps (ACTION_SEND with image/*).
+ * Patches MainActivity.kt (cordova-android 13+) to enable Android immersive
+ * sticky mode.  This replaces the old cordova-plugin-fullscreen which only
+ * supported Java-based CordovaActivity projects.
  *
  * The patched activity:
  *  - Hides both status bar and navigation bar on launch.
@@ -16,6 +13,9 @@
  *    gesture momentarily reveals the bars).
  *  - Uses the modern WindowInsetsController API (API 30+) with a legacy
  *    fallback for older devices.
+ *
+ * Note: SpriteShareActivity (for receiving shared images) is installed by
+ * the cordova-plugin-sprite-share plugin via plugin.xml, not by this hook.
  */
 
 const fs   = require("fs");
@@ -103,186 +103,42 @@ function patchIOSWebViewInspectable(context) {
 }
 
 /**
- * Write SpriteShareActivity.java into the Android platform and register it
- * in AndroidManifest.xml so the app can receive images shared from other apps.
- *
- * The Java source is embedded here (same pattern as the immersive-mode patch)
- * so there are no external file dependencies — works in CI where the Cordova
- * project directory structure differs from the repo layout.
+ * Remove any stale Java SpriteShareActivity.java left behind in the Android
+ * platform directory by earlier versions of this hook. The real Kotlin
+ * SpriteShareActivity is copied in by the cordova-plugin-sprite-share plugin;
+ * if a leftover .java file of the same class is still present, the Kotlin and
+ * Java compilers will both emit com.easierbycode.spriteshare.SpriteShareActivity
+ * and Gradle will fail with a duplicate-class error — or, worse, the stub .java
+ * (which just forwards to the main game without showing the sprite picker) can
+ * end up in the APK and shadow the real picker activity.
  */
-function installSpriteShareActivity(context) {
+function removeStaleSpriteShareJavaStub(context) {
     const platformRoot = path.join(
         context.opts.projectRoot, "platforms", "android"
     );
     if (!fs.existsSync(platformRoot)) return;
 
-    // ── Write Java source ───────────────────────────────────────────
-    const javaSrc = `package com.easierbycode.spriteshare;
-
-import android.app.Activity;
-import android.content.Intent;
-import android.net.Uri;
-import android.os.Bundle;
-import android.util.Log;
-
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.OutputStream;
-
-/**
- * Handles images shared to the app via Android ACTION_SEND intents.
- *
- * When a user shares an image to this app, this activity:
- *   1. Copies the shared image to internal storage
- *   2. Launches the main Cordova activity with a query parameter pointing
- *      to the saved image so the web layer can load it as a custom sprite
- */
-public class SpriteShareActivity extends Activity {
-
-    private static final String TAG = "SpriteShare";
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-
-        Intent intent = getIntent();
-        String action = intent.getAction();
-        String type = intent.getType();
-
-        Uri imageUri = null;
-
-        if (Intent.ACTION_SEND.equals(action) && type != null && type.startsWith("image/")) {
-            imageUri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
-        } else if (Intent.ACTION_VIEW.equals(action)) {
-            imageUri = intent.getData();
-        }
-
-        if (imageUri != null) {
-            File saved = copyToInternal(imageUri);
-            if (saved != null) {
-                launchGame(saved.getAbsolutePath());
-                return;
-            }
-            Log.w(TAG, "Failed to copy shared image");
-        }
-
-        // No valid image — just launch the game normally
-        launchGame(null);
-    }
-
-    /**
-     * Copies the shared image URI to an internal file so the WebView can
-     * access it regardless of the source app's permission grants.
-     */
-    private File copyToInternal(Uri uri) {
-        try {
-            InputStream in = getContentResolver().openInputStream(uri);
-            if (in == null) return null;
-
-            File outDir = new File(getFilesDir(), "shared_sprites");
-            if (!outDir.exists()) outDir.mkdirs();
-
-            File outFile = new File(outDir, "sprite_" + System.currentTimeMillis() + ".png");
-            OutputStream out = new FileOutputStream(outFile);
-
-            byte[] buf = new byte[8192];
-            int len;
-            while ((len = in.read(buf)) > 0) {
-                out.write(buf, 0, len);
-            }
-            out.close();
-            in.close();
-
-            Log.i(TAG, "Saved shared sprite to " + outFile.getAbsolutePath());
-            return outFile;
-        } catch (Exception e) {
-            Log.e(TAG, "Error copying shared image", e);
-            return null;
-        }
-    }
-
-    /**
-     * Launches the main Cordova activity. If a sprite path is provided it is
-     * passed as an extra so the web layer can pick it up.
-     */
-    private void launchGame(String spritePath) {
-        Intent launch = getPackageName() != null
-                ? getPackageManager().getLaunchIntentForPackage(getPackageName())
-                : null;
-
-        if (launch == null) {
-            launch = new Intent(Intent.ACTION_MAIN);
-            launch.setPackage(getPackageName());
-            launch.addCategory(Intent.CATEGORY_LAUNCHER);
-        }
-
-        launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-
-        if (spritePath != null) {
-            launch.putExtra("shared_sprite_path", spritePath);
-        }
-
-        startActivity(launch);
-        finish();
-    }
-}
-`;
-
-    const destDir = path.join(
+    const stalePath = path.join(
         platformRoot, "app", "src", "main", "java",
-        "com", "easierbycode", "spriteshare"
+        "com", "easierbycode", "spriteshare", "SpriteShareActivity.java"
     );
-    fs.mkdirSync(destDir, { recursive: true });
-
-    const destFile = path.join(destDir, "SpriteShareActivity.java");
-    fs.writeFileSync(destFile, javaSrc, "utf8");
-    console.log("after_prepare hook: wrote SpriteShareActivity.java to " + destDir);
-
-    // ── Register in AndroidManifest.xml ─────────────────────────────
-    const manifestPath = path.join(
-        platformRoot, "app", "src", "main", "AndroidManifest.xml"
-    );
-    if (!fs.existsSync(manifestPath)) {
-        console.warn("after_prepare hook: AndroidManifest.xml not found – skipping SpriteShare manifest patch");
-        return;
+    if (fs.existsSync(stalePath)) {
+        try {
+            fs.unlinkSync(stalePath);
+            console.log("after_prepare hook: removed stale SpriteShareActivity.java stub at " + stalePath);
+        } catch (e) {
+            console.warn("after_prepare hook: failed to remove stale SpriteShareActivity.java", e);
+        }
     }
-
-    let manifest = fs.readFileSync(manifestPath, "utf8");
-
-    if (manifest.includes("SpriteShareActivity")) {
-        console.log("after_prepare hook: SpriteShareActivity already in manifest");
-        return;
-    }
-
-    const activityBlock = `
-        <activity
-            android:name="com.easierbycode.spriteshare.SpriteShareActivity"
-            android:exported="true"
-            android:theme="@android:style/Theme.NoDisplay">
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="image/*" />
-            </intent-filter>
-        </activity>`;
-
-    // Insert before the closing </application> tag
-    manifest = manifest.replace(
-        /(\s*)<\/application>/,
-        activityBlock + "\n$1</application>"
-    );
-
-    fs.writeFileSync(manifestPath, manifest, "utf8");
-    console.log("after_prepare hook: added SpriteShareActivity to AndroidManifest.xml");
 }
 
 module.exports = function (context) {
     // ── iOS: enable WKWebView remote inspection ─────────────────────
     patchIOSWebViewInspectable(context);
 
-    // ── Android: SpriteShareActivity (receive shared images) ────────
-    installSpriteShareActivity(context);
+    // ── Android: remove any stale Java SpriteShareActivity stub ─────
+    // (the real Kotlin activity is installed by cordova-plugin-sprite-share)
+    removeStaleSpriteShareJavaStub(context);
 
     // ── Android: immersive sticky mode ──────────────────────────────
     const platformRoot = path.join(
