@@ -3,8 +3,8 @@
   "configurations": [
     {
       "name": "dev",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["serve", "--no-clipboard", "."],
+      "runtimeExecutable": "cmd.exe",
+      "runtimeArgs": ["/c", "npx", "serve", "--no-clipboard", "."],
       "port": 3000,
       "autoPort": true,
       "url": "/phaser-game.html?lowmode=1"

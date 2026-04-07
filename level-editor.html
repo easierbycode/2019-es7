@@ -6,6 +6,7 @@
     <title>2028.ai Level Editor</title>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js"></script>
     <style>
         @font-face {
             font-family: 'Orbitron';
@@ -2563,13 +2564,15 @@
             appId: "1:149257705855:web:3f048481dfc66cef61224a",
         };
         const FIREBASE_LEVELS_PATH = "levels";
-        let firebaseApp = null, firebaseDb = null;
+        let firebaseApp = null, firebaseDb = null, firebaseStorage = null;
 
         function initFirebase() {
             if (firebaseDb) return;
             if (typeof firebase === 'undefined') return;
             firebaseApp = (!firebase.apps || !firebase.apps.length) ? firebase.initializeApp(FIREBASE_CONFIG) : firebase.apps[0];
             firebaseDb = firebase.database();
+            try { firebaseStorage = firebase.storage ? firebase.storage() : null; }
+            catch (e) { console.warn('Firebase Storage unavailable:', e); firebaseStorage = null; }
         }
 
         function sanitizeLevelName(n) { return n.replace(/[.#$/\[\]]/g, '_').trim(); }
@@ -2650,6 +2653,35 @@
             if (!name) { name = prompt('Level name:'); if (!name) return; }
             name = sanitizeLevelName(name);
             try {
+                // Upload any custom audio blobs that only live in IndexedDB up to Firebase Storage,
+                // so they're shared with every player who loads this level.
+                if (firebaseStorage && audioCustomKeys && audioCustomKeys.size > 0) {
+                    var pendingKeys = [];
+                    audioCustomKeys.forEach(function(k) { if (!audioURLs[k]) pendingKeys.push(k); });
+                    for (var pi = 0; pi < pendingKeys.length; pi++) {
+                        var pKey = pendingKeys[pi];
+                        try {
+                            var blob = await getCustomAudio(pKey);
+                            if (!blob) continue;
+                            var storagePath = 'levels/' + name + '/audio/' + pKey + '.mp3';
+                            var ref = firebaseStorage.ref(storagePath);
+                            var snap = await ref.put(blob, { contentType: 'audio/mpeg' });
+                            var downloadURL = await snap.ref.getDownloadURL();
+                            audioURLs[pKey] = downloadURL;
+                        } catch (err) {
+                            console.error('Failed to upload custom audio "' + pKey + '" to Firebase Storage:', err);
+                            alert('Failed to upload custom audio "' + pKey + '":\n' + err.message +
+                                '\n\nMake sure Firebase Storage is enabled for this project.');
+                            return;
+                        }
+                    }
+                } else if (!firebaseStorage && audioCustomKeys && audioCustomKeys.size > 0) {
+                    var hasPending = false;
+                    audioCustomKeys.forEach(function(k) { if (!audioURLs[k]) hasPending = true; });
+                    if (hasPending) {
+                        console.warn('Firebase Storage not loaded; custom audio blobs will not be shared with other players.');
+                    }
+                }
                 const payload = {
                     name, stageKey: currentStageKey, enemylist: normalizeGrid(currentGrid),
                     enemyData: enemyData || {}, bossData: bossData || {},
