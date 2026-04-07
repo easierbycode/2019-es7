@@ -188,16 +188,16 @@ export function playerDamage(scene, amount) {
     // Original: each step is 150ms, with 50ms gaps between cycles 2-4
     var steps = [
         // Cycle 1: down+red
-        { y: baseY + 2, alpha: 0.2, tint: 0xFF0000, dur: 150, delay: 0 },
+        { y: baseY + 2, alpha: 0.2, tint: 0xFF8080, dur: 150, delay: 0 },
         { y: baseY - 2, alpha: 1, tint: null, dur: 150, delay: 150 },
         // Cycle 2: down+red (50ms gap)
-        { y: baseY + 2, alpha: 0.2, tint: 0xFF0000, dur: 150, delay: 350 },
+        { y: baseY + 2, alpha: 0.2, tint: 0xFF8080, dur: 150, delay: 350 },
         { y: baseY - 2, alpha: 1, tint: null, dur: 150, delay: 500 },
         // Cycle 3: down+red (50ms gap)
-        { y: baseY + 2, alpha: 0.2, tint: 0xFF0000, dur: 150, delay: 700 },
+        { y: baseY + 2, alpha: 0.2, tint: 0xFF8080, dur: 150, delay: 700 },
         { y: baseY, alpha: 1, tint: null, dur: 150, delay: 850 },
         // Cycle 4: down+red (50ms gap)
-        { y: baseY + 2, alpha: 0.2, tint: 0xFF0000, dur: 150, delay: 1050 },
+        { y: baseY + 2, alpha: 0.2, tint: 0xFF8080, dur: 150, delay: 1050 },
         { y: baseY, alpha: 1, tint: null, dur: 150, delay: 1200 },
     ];
 
