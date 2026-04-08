@@ -38,6 +38,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
     <div id="nav">
         <span class="title">BOSS ATTACK VIEWER</span>
         <span id="custom-data-badge" style="display:none;color:#f59e0b;font-size:11px;font-weight:bold;letter-spacing:1px">CUSTOM DATA</span>
+        <span id="custom-audio-badge" style="display:none;color:#a78bfa;font-size:11px;font-weight:bold;letter-spacing:1px;margin-left:8px">CUSTOM AUDIO</span>
         <a href="boss-viewer.html">Boss Viewer</a>
         <a href="level-editor.html">Level Editor</a>
         <a href="phaser-game.html">Play Game</a>
@@ -72,6 +73,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
     var scene = null;
     var customAtlasImageURL = null;
     var customAtlasFrames = null;
+    var customAudioEntries = {}; // key -> blobURL from editorCustomAudio IndexedDB
     var looping = false;
     var speedIdx = 1;
     var speeds = [0.5, 1, 2];
@@ -563,7 +565,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 this.load.atlas("game_asset", "assets/img/game_asset.png", "assets/game_asset.json");
             }
             this.load.json("recipe", "assets/game.json");
-            // Boss attack voice clips
+            // Boss attack voice clips — prefer custom audio from editor IndexedDB
             var bossSounds = [
                 "boss_bison_voice_add",
                 "boss_bison_voice_punch",
@@ -588,8 +590,21 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 "boss_goki_voice_projectile1",
                 "boss_goki_voice_ashura"
             ];
+            var loadedKeys = {};
             for (var bs = 0; bs < bossSounds.length; bs++) {
-                this.load.audio(bossSounds[bs], "assets/sounds/" + bossSounds[bs] + ".mp3");
+                var sndKey = bossSounds[bs];
+                loadedKeys[sndKey] = true;
+                if (customAudioEntries[sndKey]) {
+                    this.load.audio(sndKey, customAudioEntries[sndKey]);
+                } else {
+                    this.load.audio(sndKey, "assets/sounds/" + sndKey + ".mp3");
+                }
+            }
+            // Load any additional custom audio entries (e.g. boss sounds not in the default list)
+            for (var cKey in customAudioEntries) {
+                if (!loadedKeys[cKey]) {
+                    this.load.audio(cKey, customAudioEntries[cKey]);
+                }
             }
         }
 
@@ -605,6 +620,9 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 document.getElementById("custom-data-badge").style.display = "";
             } else {
                 bossData = recipe.bossData;
+            }
+            if (Object.keys(customAudioEntries).length > 0) {
+                document.getElementById("custom-audio-badge").style.display = "";
             }
             scene = this;
 
@@ -1061,12 +1079,50 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
         });
     }
 
+    // Load custom audio overrides from level editor IndexedDB
+    function loadCustomAudioFromIDB() {
+        return new Promise(function(resolve) {
+            try {
+                var req = indexedDB.open('editorCustomAudio', 1);
+                req.onupgradeneeded = function(e) {
+                    var db = e.target.result;
+                    if (!db.objectStoreNames.contains('customAudio')) {
+                        db.createObjectStore('customAudio');
+                    }
+                };
+                req.onsuccess = function(e) {
+                    var db = e.target.result;
+                    if (!db.objectStoreNames.contains('customAudio')) { resolve(); return; }
+                    var tx = db.transaction('customAudio', 'readonly');
+                    var store = tx.objectStore('customAudio');
+                    var cursorReq = store.openCursor();
+                    cursorReq.onsuccess = function(ce) {
+                        var cursor = ce.target.result;
+                        if (cursor) {
+                            var blob = cursor.value instanceof Blob ? cursor.value : new Blob([cursor.value], { type: 'audio/mpeg' });
+                            customAudioEntries[cursor.key] = URL.createObjectURL(blob);
+                            cursor.continue();
+                        } else {
+                            resolve();
+                        }
+                    };
+                    cursorReq.onerror = function() { resolve(); };
+                };
+                req.onerror = function() { resolve(); };
+            } catch (e) { resolve(); }
+        });
+    }
+
+    function startGame() {
+        loadCustomAudioFromIDB().then(createGame).catch(function() { createGame(); });
+    }
+
     // Load custom atlas from editor before creating Phaser
     function loadEditorAtlasThenStart() {
         var framesRaw = null;
         try { framesRaw = sessionStorage.getItem('editorAtlasFrames'); } catch (e) {}
-        if (!framesRaw) { createGame(); return; }
-        try { customAtlasFrames = JSON.parse(framesRaw); } catch (e) { createGame(); return; }
+        if (!framesRaw) { startGame(); return; }
+        try { customAtlasFrames = JSON.parse(framesRaw); } catch (e) { startGame(); return; }
 
         try {
             var req = indexedDB.open('editorViewerBridge', 1);
@@ -1081,12 +1137,12 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                     } else {
                         customAtlasFrames = null;
                     }
-                    createGame();
+                    startGame();
                 };
-                getReq.onerror = function() { customAtlasFrames = null; createGame(); };
+                getReq.onerror = function() { customAtlasFrames = null; startGame(); };
             };
-            req.onerror = function() { customAtlasFrames = null; createGame(); };
-        } catch (e) { customAtlasFrames = null; createGame(); }
+            req.onerror = function() { customAtlasFrames = null; startGame(); };
+        } catch (e) { customAtlasFrames = null; startGame(); }
     }
 
     loadEditorAtlasThenStart();
