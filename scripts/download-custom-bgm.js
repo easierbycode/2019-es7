@@ -19,6 +19,13 @@ const FIREBASE_DB_URL = "https://evil-invaders-default-rtdb.firebaseio.com";
 const LEVELS_PATH = "levels";
 const OUTPUT_DIR = path.resolve(__dirname, "..", "assets", "custom-bgm");
 
+// Hardcoded URL overrides: keys listed here are always fetched from these
+// URLs instead of the value stored in Firebase (e.g. Notion-hosted files
+// that redirect or expire). Keyed by customAudioURLs key.
+const URL_OVERRIDES = {
+    title_voicecall: "https://easierbycode.com/assets/sounds/title_voicecall.mp3",
+};
+
 const levelName = process.argv[2] || "foo";
 
 function fetchJSON(url) {
@@ -117,6 +124,10 @@ async function main() {
     for (var i = 0; i < keys.length; i++) {
         var key = keys[i];
         var url = audioURLs[key];
+        if (URL_OVERRIDES[key]) {
+            console.log("Overriding " + key + " URL: " + url + " -> " + URL_OVERRIDES[key]);
+            url = URL_OVERRIDES[key];
+        }
         var filename = key + ".mp3";
         var dest = path.join(OUTPUT_DIR, filename);
 
