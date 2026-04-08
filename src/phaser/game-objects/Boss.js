@@ -119,6 +119,16 @@ export function bossAdd(scene) {
         scene.fangAnimShoot = bossData.anim.shoot || [];
     }
 
+    // Store pyramid animation sets for pattern use (any boss dispatched to
+    // bossPatternPyramid — stageId 0 or attackPattern "boss0"). Matches PIXI
+    // Pyramid.onIdle / onWarp / onAttack / onPsychoFieldAttack texture swaps.
+    if (bossData.anim) {
+        scene.pyramidAnimIdle = bossData.anim.idle || [];
+        scene.pyramidAnimAttack = bossData.anim.attack || [];
+        scene.pyramidAnimShoot = bossData.anim.shoot || [];
+        scene.pyramidAnimWarp = bossData.anim.warp || [];
+    }
+
     scene.enemies.push(scene.bossSprite);
 
     var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
