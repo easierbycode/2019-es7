@@ -6,14 +6,19 @@
  * so offline builds (GitHub Pages, Cordova, Electron) can use local files
  * instead of relying on external URLs at runtime.
  *
+ * Files are named by the SHA-1 hash of their source URL, so multiple keys
+ * pointing at the same URL share a single file on disk. The manifest maps
+ * each audio key to its (possibly shared) filename.
+ *
  * Usage:  node scripts/download-custom-bgm.js [levelName]
- * Output: assets/custom-bgm/<key>.mp3  +  assets/custom-bgm/manifest.json
+ * Output: assets/custom-bgm/<sha1>.mp3  +  assets/custom-bgm/manifest.json
  */
 
 const https = require("https");
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const FIREBASE_DB_URL = "https://evil-invaders-default-rtdb.firebaseio.com";
 const LEVELS_PATH = "levels";
@@ -111,37 +116,45 @@ async function main() {
 
     var manifest = {};
     var failed = [];
-    // Track URLs already downloaded to avoid downloading the same MP3 twice
+    // Map each unique URL to its on-disk filename so duplicate URLs are
+    // downloaded once and shared by every key that references them.
     var urlToFilename = {};
+    var downloadedCount = 0;
+    var sharedCount = 0;
 
     for (var i = 0; i < keys.length; i++) {
         var key = keys[i];
         var url = audioURLs[key];
-        var filename = key + ".mp3";
-        var dest = path.join(OUTPUT_DIR, filename);
+        var filename = urlToFilename[url];
 
-        if (urlToFilename[url]) {
-            // Same URL already downloaded — copy instead of re-downloading
-            var srcFile = path.join(OUTPUT_DIR, urlToFilename[url]);
-            console.log("Copying " + key + " (same URL as " + urlToFilename[url].replace(".mp3", "") + ")");
-            try {
-                fs.copyFileSync(srcFile, dest);
-                manifest[key] = filename;
-                console.log("  -> copied " + filename);
-            } catch (err) {
-                console.error("  -> FAILED to copy: " + err.message);
-                failed.push(key);
-            }
+        if (filename) {
+            // Same URL already mapped — reuse the shared file, no copy needed
+            console.log("Sharing " + key + " -> " + filename + " (same URL as previous key)");
+            manifest[key] = filename;
+            sharedCount++;
             continue;
         }
 
-        console.log("Downloading " + key + " from " + url + " ...");
+        // Derive filename from URL hash so identical URLs collapse to one file
+        filename = crypto.createHash("sha1").update(url).digest("hex").slice(0, 16) + ".mp3";
+        var dest = path.join(OUTPUT_DIR, filename);
+
+        if (fs.existsSync(dest)) {
+            // Already on disk from an earlier run with the same URL
+            console.log("Reusing existing " + filename + " for " + key);
+            manifest[key] = filename;
+            urlToFilename[url] = filename;
+            continue;
+        }
+
+        console.log("Downloading " + key + " from " + url + " -> " + filename + " ...");
         try {
             await downloadFile(url, dest);
             var stat = fs.statSync(dest);
             console.log("  -> saved " + filename + " (" + (stat.size / 1024).toFixed(1) + " KB)");
             manifest[key] = filename;
             urlToFilename[url] = filename;
+            downloadedCount++;
         } catch (err) {
             console.error("  -> FAILED: " + err.message);
             failed.push(key);
@@ -152,7 +165,10 @@ async function main() {
     var manifestPath = path.join(OUTPUT_DIR, "manifest.json");
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
     console.log("\nManifest written to " + manifestPath);
-    console.log("Downloaded " + Object.keys(manifest).length + "/" + keys.length + " files.");
+    var uniqueFiles = Object.keys(urlToFilename).length;
+    console.log("Mapped " + Object.keys(manifest).length + "/" + keys.length + " keys to " +
+        uniqueFiles + " unique file(s) (" + downloadedCount + " downloaded, " +
+        sharedCount + " shared duplicates).");
 
     if (failed.length > 0) {
         console.warn("Failed: " + failed.join(", "));

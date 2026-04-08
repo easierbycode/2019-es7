@@ -221,6 +221,12 @@ export class BootScene extends Phaser.Scene {
         // Auto-hide audio load errors after 6.7s
         // Phaser may render "ERR:" text on canvas or add DOM elements
         this.load.on("loaderror", function (file) {
+            // The custom-bgm manifest is optional (only present in production
+            // builds where scripts/download-custom-bgm.js has run). A 404 here
+            // is expected on dev servers and should not be reported.
+            if (file.key === "custom-bgm-manifest") {
+                return;
+            }
             console.warn("Load error:", file.key, file.src);
             if (file.type === "audio") {
                 failedAudioFiles.push({ key: file.key, src: file.src || file.url });
@@ -243,6 +249,10 @@ export class BootScene extends Phaser.Scene {
         this.load.on("filecomplete-image-loading0", ensureLoadingPreview);
 
         this.load.on("loaderror", function (file) {
+            // Optional custom-bgm manifest — see note above.
+            if (file.key === "custom-bgm-manifest") {
+                return;
+            }
             console.error("LOAD ERROR:", file.key, file.type, file.src || file.url);
             // Show visible error on screen for Cordova debugging
             var el = document.getElementById("loadError");
@@ -322,6 +332,10 @@ export class BootScene extends Phaser.Scene {
         this.load.spritesheet("cyber-liberty", "https://easierbycode.com/assets/spritesheets/cyber-liberty.png", { frameWidth: 32, frameHeight: 32 });
 
         this.load.json("recipe", "assets/game.json");
+        // Optional manifest produced by scripts/download-custom-bgm.js. Maps each
+        // customAudioURL key to its on-disk filename so duplicate URLs share a
+        // single mp3. Missing on dev servers — the loaderror handler ignores it.
+        this.load.json("custom-bgm-manifest", "assets/custom-bgm/manifest.json");
 
         this.load.image("title_bg", "assets/img/title_bg.jpg");
         // Original per-stage backgrounds
@@ -533,16 +547,23 @@ export class BootScene extends Phaser.Scene {
                 }
 
                 // Load audio URL overrides from Firebase level data
-                // Prefer locally downloaded copies (assets/custom-bgm/) over remote URLs
+                // Prefer locally downloaded copies (assets/custom-bgm/) over remote URLs.
+                // The build-time manifest maps each key to a (possibly shared) filename
+                // so multiple keys pointing at the same URL reuse one on-disk mp3.
                 if (data.customAudioURLs && typeof data.customAudioURLs === "object") {
                     gameState.bgmSourceURLs = {};
                     var urlKeys = Object.keys(data.customAudioURLs);
                     var baseUrl = (document.getElementById("baseUrl") ? document.getElementById("baseUrl").textContent.trim() : "./");
+                    var bgmManifest = self.cache.json.exists("custom-bgm-manifest")
+                        ? (self.cache.json.get("custom-bgm-manifest") || {})
+                        : {};
                     for (var ui = 0; ui < urlKeys.length; ui++) {
                         var uKey = urlKeys[ui];
                         var uUrl = data.customAudioURLs[uKey];
                         if (uUrl && typeof uUrl === "string") {
-                            var localPath = baseUrl + "assets/custom-bgm/" + uKey + ".mp3";
+                            // Manifest filename wins (deduped); fall back to legacy <key>.mp3
+                            var localFilename = bgmManifest[uKey] || (uKey + ".mp3");
+                            var localPath = baseUrl + "assets/custom-bgm/" + localFilename;
                             gameState.bgmSourceURLs[uKey] = uUrl;
                             if (self.cache.audio.exists(uKey)) {
                                 self.cache.audio.remove(uKey);
