@@ -619,22 +619,45 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 var raw = sessionStorage.getItem('editorBossData');
                 if (raw) storedBossData = JSON.parse(raw);
             } catch (e) {}
-            if (storedBossData && Object.keys(storedBossData).length > 0) {
-                bossData = storedBossData;
-                document.getElementById("custom-data-badge").style.display = "";
-            } else if (firebaseBossData) {
-                // Merge Firebase bossData over local recipe (keeps local anim/texture
-                // as fallback but applies Firebase overrides like attackPattern)
+            var hasStored = storedBossData && Object.keys(storedBossData).length > 0;
+            // When ?level= is in the URL, Firebase data wins over any stale
+            // sessionStorage editor data so attackPattern (and other level
+            // overrides) actually take effect on the patterns shown.
+            if (firebaseBossData) {
+                // Start from the local recipe so every boss keeps its local
+                // anim textures as a fallback, then deep-merge the Firebase
+                // level data on top. attackPattern and other scalar overrides
+                // win; anim sub-keys win individually (so a partial anim in
+                // Firebase doesn't wipe the rest of the local anim set).
                 bossData = JSON.parse(JSON.stringify(recipe.bossData));
                 for (var fbKey in firebaseBossData) {
-                    if (!bossData[fbKey]) { bossData[fbKey] = firebaseBossData[fbKey]; continue; }
-                    for (var prop in firebaseBossData[fbKey]) {
-                        bossData[fbKey][prop] = firebaseBossData[fbKey][prop];
+                    var fbBoss = firebaseBossData[fbKey];
+                    if (!bossData[fbKey]) { bossData[fbKey] = fbBoss; continue; }
+                    for (var prop in fbBoss) {
+                        if (prop === "anim" && fbBoss.anim && typeof fbBoss.anim === "object") {
+                            bossData[fbKey].anim = bossData[fbKey].anim || {};
+                            for (var animKey in fbBoss.anim) {
+                                if (fbBoss.anim[animKey]) {
+                                    bossData[fbKey].anim[animKey] = fbBoss.anim[animKey];
+                                }
+                            }
+                        } else {
+                            bossData[fbKey][prop] = fbBoss[prop];
+                        }
                     }
                 }
                 var levelBadge = document.getElementById("firebase-level-badge");
                 levelBadge.textContent = "LEVEL: " + readLevelParam();
                 levelBadge.style.display = "";
+                if (hasStored) {
+                    // Surface that local editor data existed but was shadowed
+                    // by the Firebase level load — useful when debugging
+                    // stale sessionStorage.
+                    document.getElementById("custom-data-badge").style.display = "";
+                }
+            } else if (hasStored) {
+                bossData = storedBossData;
+                document.getElementById("custom-data-badge").style.display = "";
             } else {
                 bossData = recipe.bossData;
             }
