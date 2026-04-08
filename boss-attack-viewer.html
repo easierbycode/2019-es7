@@ -87,6 +87,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
         var baseY = 80, downY = GH - 60;
         if (seed < 0.6) {
             var targetX = clamp(Math.random() * GW, 30, GW - 30);
+            sc.playSound("boss_bison_voice_punch", 0.7);
             sc.tweens.add({ targets: boss, x: targetX, duration: 300, onComplete: function() {
                 if (!sc._bossAlive()) return;
                 sc.tweens.add({ targets: boss, y: baseY - 10, duration: 500, onComplete: function() {
@@ -102,9 +103,11 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
         } else if (seed < 0.8) {
             var steps = [{x:30,y:baseY-20,d:400},{x:GW-60,y:baseY,d:400},{x:30,y:baseY+30,d:400},{x:GW-60,y:baseY+60,d:400}];
             var idx = 0;
+            sc.playSound("boss_bison_voice_faint", 0.7);
             var runStep = function() {
                 if (!sc._bossAlive() || idx >= steps.length) {
                     if (!sc._bossAlive()) return;
+                    sc.playSound("boss_bison_voice_faint_punch", 0.7);
                     sc.tweens.add({ targets: boss, y: downY, duration: 300, onComplete: function() {
                         if (!sc._bossAlive()) return;
                         sc.tweens.add({ targets: boss, y: baseY, duration: 200, onComplete: function() {
@@ -122,9 +125,11 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
         } else {
             var steps2 = [{x:GW-30,y:baseY-20,d:400},{x:60,y:baseY,d:400},{x:GW-30,y:baseY+30,d:400},{x:60,y:baseY+60,d:400}];
             var idx2 = 0;
+            sc.playSound("boss_bison_voice_faint", 0.7);
             var runStep2 = function() {
                 if (!sc._bossAlive() || idx2 >= steps2.length) {
                     if (!sc._bossAlive()) return;
+                    sc.playSound("boss_bison_voice_faint_punch", 0.7);
                     sc.tweens.add({ targets: boss, y: downY, duration: 300, onComplete: function() {
                         if (!sc._bossAlive()) return;
                         sc.tweens.add({ targets: boss, y: baseY, duration: 200, onComplete: function() {
@@ -158,6 +163,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 playBossAnim(sc, "shoot");
                 sc.time.delayedCall(300, function() {
                     if (!sc._bossAlive()) return;
+                    sc.playSound("boss_barlog_voice_projectile", 0.7);
                     sc.bossShootStraight(sc.bossProjData);
                     playBossAnim(sc, "idle");
                     sc.time.delayedCall(600, function() { sc.bossShootStart(); });
@@ -172,6 +178,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                     playBossAnim(sc, "shoot");
                     sc.time.delayedCall(300, function() {
                         if (!sc._bossAlive()) return;
+                        sc.playSound("boss_barlog_voice_projectile", 0.7);
                         sc.bossShootStraight(sc.bossProjData);
                         playBossAnim(sc, "idle");
                         sc.time.delayedCall(500, function() { sc.bossShootStart(); });
@@ -186,6 +193,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 sc.time.delayedCall(700, function() {
                     if (!sc._bossAlive()) return;
                     playBossAnim(sc, "attack");
+                    sc.playSound("boss_barlog_voice_barcelona", 0.7);
                     sc.tweens.add({ targets: boss, y: baseY - 70, duration: 300, onComplete: function() {
                         if (!sc._bossAlive()) return;
                         sc.tweens.add({ targets: boss, y: diveY, duration: 600, onComplete: function() {
@@ -222,6 +230,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 sc.tweens.add({ targets: boss, x: px, duration: 250, onComplete: function() {
                     if (!sc._bossAlive()) return;
                     playBossAnim(sc, "shoot");
+                    sc.playSound("boss_sagat_voice_projectile0", 0.7);
                     sc.bossShootStraight(projA);
                     sc.time.delayedCall(250, sweepStep);
                 }});
@@ -238,6 +247,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                     sc.time.delayedCall(200, function() {
                         if (!sc._bossAlive()) return;
                         playBossAnim(sc, "shoot");
+                        sc.playSound("boss_sagat_voice_projectile0", 0.7);
                         sc.bossShootStraight(projA);
                         shotCount++;
                         if (shotCount >= 6) {
@@ -255,6 +265,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 sc.time.delayedCall(1300, function() {
                     if (!sc._bossAlive()) return;
                     playBossAnim(sc, "shoot");
+                    sc.playSound("boss_sagat_voice_projectile1", 0.7);
                     sc.bossShootStraight(projB);
                     sc.time.delayedCall(300, function() {
                         playBossAnim(sc, "idle");
@@ -267,6 +278,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             sc.tweens.add({ targets: boss, x: px5, y: baseY - 20, duration: 400, onComplete: function() {
                 if (!sc._bossAlive()) return;
                 playBossAnim(sc, "attack");
+                sc.playSound("boss_sagat_voice_kick", 0.7);
                 sc.time.delayedCall(500, function() {
                     if (!sc._bossAlive()) return;
                     sc.tweens.add({ targets: boss, y: diveY, duration: 300, onComplete: function() {
@@ -290,6 +302,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             // Warp — no anim change, just voice
             var warpPositions = [30, GW - 30, clamp(Math.random() * GW, 30, GW - 30)];
             var wi = 0;
+            sc.playSound("boss_vega_voice_warp", 0.7);
             var warpStep = function() {
                 if (!sc._bossAlive() || wi >= warpPositions.length) {
                     if (sc._bossAlive()) sc.time.delayedCall(500, function() { sc.bossShootStart(); });
@@ -316,6 +329,9 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 sc.tweens.add({ targets: boss, alpha: 0, duration: 100, onComplete: function() {
                     if (!sc._bossAlive()) return;
                     boss.x = shotPositions[si];
+                    if (si === 0 || si === 3 || si === 6) {
+                        sc.playSound("boss_vega_voice_projectile", 0.7);
+                    }
                     si++;
                     sc.tweens.add({ targets: boss, alpha: 1, duration: 100, onComplete: function() {
                         if (!sc._bossAlive()) return;
@@ -330,6 +346,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             sc.tweens.add({ targets: boss, x: GCX, y: baseY + 10, duration: 300, onComplete: function() {
                 if (!sc._bossAlive()) return;
                 _playBossAnim(sc, "shoot");
+                sc.playSound("boss_vega_voice_shoot", 0.7);
                 var fieldCount = 0;
                 sc.time.delayedCall(500, function fireField() {
                     if (!sc._bossAlive()) return;
@@ -352,6 +369,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 sc.tweens.add({ targets: boss, alpha: 1, y: baseY - 20, duration: 200, onComplete: function() {
                     if (!sc._bossAlive()) return;
                     _playBossAnim(sc, "attack");
+                    sc.playSound("boss_vega_voice_crusher", 0.7);
                     sc.bossShootSpread(projA, 3, 30);
                     sc.tweens.add({ targets: boss, y: diveY, duration: 900, onComplete: function() {
                         if (!sc._bossAlive()) return;
@@ -385,15 +403,18 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                     return;
                 }
                 _playBossAnim(sc, "shoot");
+                sc.playSound("boss_fang_voice_beam0", 0.7);
                 sc.bossShootBeam(projA, beamAngles[beamIdx]);
                 beamIdx++;
                 sc.time.delayedCall(500, beamStep);
             });
         } else if (seed < 0.7) {
+            sc.playSound("boss_fang_voice_beam1", 0.7);
             sc.bossShootRadial(projC || projA, 8);
             sc.time.delayedCall(1500, function() { sc.bossShootStart(); });
         } else {
             var smokeCount = 0, smokeTotal = 12;
+            sc.playSound("boss_fang_voice_projectile", 0.7);
             sc.time.addEvent({ delay: 300, repeat: smokeTotal - 1, callback: function() {
                 if (!sc._bossAlive()) return;
                 boss.x = clamp(boss.x + (Math.random() - 0.5) * 20, 30, GW - 30);
@@ -428,6 +449,9 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                         return;
                     }
                     _playBossAnim(sc, "shootA");
+                    if (volleys % 2 === 0) {
+                        sc.playSound("boss_goki_voice_projectile0", 0.7);
+                    }
                     volleys++;
                     sc.time.delayedCall(200, function() {
                         if (!sc._bossAlive()) return;
@@ -442,6 +466,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             sc.tweens.add({ targets: boss, x: px2, duration: 400, onComplete: function() {
                 if (!sc._bossAlive()) return;
                 _playBossAnim(sc, "shootB");
+                sc.playSound("boss_goki_voice_projectile1", 0.7);
                 sc.time.delayedCall(500, function() {
                     if (!sc._bossAlive()) return;
                     sc.bossShootStraight(projB);
@@ -453,6 +478,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             }});
         } else if (seed < 0.9) {
             _playBossAnim(sc, "syngoku");
+            sc.playSound("boss_goki_voice_ashura", 0.7);
             sc.tweens.add({ targets: boss, y: GH - 20, duration: 1200, onComplete: function() {
                 if (!sc._bossAlive()) return;
                 var nx = Math.random() * (GW - 60) + 30;
@@ -464,6 +490,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             }});
         } else {
             _playBossAnim(sc, "syngoku");
+            sc.playSound("boss_goki_voice_ashura", 0.7);
             var nx2 = Math.random() * (GW - 60) + 30;
             var ny = Math.random() > 0.5 ? 60 : GH / 4;
             sc.tweens.add({ targets: boss, x: nx2, y: ny, duration: 700, onComplete: function() {
@@ -536,6 +563,34 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 this.load.atlas("game_asset", "assets/img/game_asset.png", "assets/game_asset.json");
             }
             this.load.json("recipe", "assets/game.json");
+            // Boss attack voice clips
+            var bossSounds = [
+                "boss_bison_voice_add",
+                "boss_bison_voice_punch",
+                "boss_bison_voice_faint",
+                "boss_bison_voice_faint_punch",
+                "boss_barlog_voice_add",
+                "boss_barlog_voice_projectile",
+                "boss_barlog_voice_barcelona",
+                "boss_sagat_voice_add",
+                "boss_sagat_voice_projectile0",
+                "boss_sagat_voice_projectile1",
+                "boss_sagat_voice_kick",
+                "boss_vega_voice_warp",
+                "boss_vega_voice_projectile",
+                "boss_vega_voice_shoot",
+                "boss_vega_voice_crusher",
+                "boss_fang_voice_add",
+                "boss_fang_voice_beam0",
+                "boss_fang_voice_beam1",
+                "boss_fang_voice_projectile",
+                "boss_goki_voice_projectile0",
+                "boss_goki_voice_projectile1",
+                "boss_goki_voice_ashura"
+            ];
+            for (var bs = 0; bs < bossSounds.length; bs++) {
+                this.load.audio(bossSounds[bs], "assets/sounds/" + bossSounds[bs] + ".mp3");
+            }
         }
 
         create() {
@@ -726,7 +781,14 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             }
         }
 
-        playSound() { /* no-op in viewer */ }
+        playSound(key, volume) {
+            try {
+                var vol = typeof volume === "number" ? volume : 0.7;
+                if (this.cache.audio.exists(key)) {
+                    this.sound.play(key, { volume: vol });
+                }
+            } catch (e) {}
+        }
 
         bossShootStraight(projData) {
             if (!projData || !this.bossSprite) return;
