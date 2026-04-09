@@ -506,12 +506,125 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
         }
     }
 
+    // Pyramid pattern — ported from src/phaser/bosses/BossPyramid.js.
+    // The live game dispatches stage 0 (boss0) to bossPatternPyramid, not
+    // bossPatternBison, so the viewer needs to match that for boss0.
+    // Phase names map 1:1 onto the PATTERNS.boss0 button labels below.
+    function patternPyramid(sc, seed) {
+        var boss = sc.bossSprite;
+        var baseY = 80;
+        var projA = sc.bossProjDataA || sc.bossProjData;
+        var projB = sc.bossProjDataB || sc.bossProjData;
+        var halfW = (boss.width || 40) / 2;
+
+        if (seed < 0.1) {
+            // Teleport (Pyramid.Warp) — 3 warp positions, no firing
+            _playBossAnim(sc, "warp");
+            var warpPositions = [
+                halfW,
+                GW - (boss.width || 40) + halfW,
+                Math.floor(Math.random() * Math.max(1, GW - (boss.width || 40))) + halfW,
+            ];
+            var wi = 0;
+            var warpStep = function() {
+                if (!sc._bossAlive() || wi >= warpPositions.length) {
+                    if (sc._bossAlive()) {
+                        _playBossAnim(sc, "idle");
+                        sc.time.delayedCall(500, function() { sc.bossShootStart(); });
+                    }
+                    return;
+                }
+                sc.tweens.add({ targets: boss, alpha: 0, duration: 100, onComplete: function() {
+                    if (!sc._bossAlive()) return;
+                    boss.x = warpPositions[wi++];
+                    sc.tweens.add({ targets: boss, alpha: 1, duration: 100, onComplete: function() {
+                        sc.time.delayedCall(200, warpStep);
+                    }});
+                }});
+            };
+            warpStep();
+        } else if (seed < 0.4) {
+            // Psycho Crusher (Pyramid.Pentagram) — 7 straight-down shots
+            _playBossAnim(sc, "shoot");
+            var shotPositions = [
+                halfW,
+                160 + halfW,
+                16 + halfW,
+                128 + halfW,
+                32 + halfW,
+                96 + halfW,
+                GCX,
+            ];
+            for (var si = 0; si < shotPositions.length; si++) {
+                boss.x = shotPositions[si];
+                sc.bossShootStraight(projA);
+            }
+            boss.x = GCX;
+            sc.time.delayedCall(4000, function() {
+                if (!sc._bossAlive()) return;
+                _playBossAnim(sc, "idle");
+                sc.bossShootStart();
+            });
+        } else if (seed < 0.7) {
+            // Radial Field (Pyramid.PsychoField) — center, 5 radial bursts
+            sc.tweens.add({
+                targets: boss, x: GCX, y: baseY + 10, duration: 300,
+                onComplete: function() {
+                    if (!sc._bossAlive()) return;
+                    _playBossAnim(sc, "shoot");
+                    var fieldCount = 0;
+                    sc.time.delayedCall(800, function fireField() {
+                        if (!sc._bossAlive()) return;
+                        // BossPyramid.js fires 72-bullet bursts, capped here to
+                        // 24 so the preview stays legible without melting the
+                        // canvas for a ~5 burst sequence.
+                        sc.bossShootRadial(projB, 24);
+                        fieldCount++;
+                        if (fieldCount >= 5) {
+                            _playBossAnim(sc, "idle");
+                            sc.time.delayedCall(3000, function() { sc.bossShootStart(); });
+                        } else {
+                            sc.time.delayedCall(1000, fireField);
+                        }
+                    });
+                }
+            });
+        } else {
+            // Spread + Dive (Pyramid.Dive) — teleport to player x, dive, return from top
+            var px = sc.playerSprite.x;
+            boss.x = px;
+            _playBossAnim(sc, "attack");
+            sc.tweens.add({
+                targets: boss, y: baseY - 20, duration: 200,
+                onComplete: function() {
+                    if (!sc._bossAlive()) return;
+                    sc.tweens.add({
+                        targets: boss, y: GH - 15, duration: 900,
+                        onComplete: function() {
+                            if (!sc._bossAlive()) return;
+                            _playBossAnim(sc, "idle");
+                            boss.x = GCX;
+                            boss.y = -(boss.height || 50);
+                            sc.tweens.add({
+                                targets: boss, y: baseY, duration: 1000,
+                                onComplete: function() {
+                                    sc.time.delayedCall(1000, function() { sc.bossShootStart(); });
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+        }
+    }
+
     // Pattern catalog per boss
     var PATTERNS = {
         boss0: [
-            { name: "Dive", seed: 0.3, fn: patternBison },
-            { name: "Step Sweep L", seed: 0.7, fn: patternBison },
-            { name: "Step Sweep R", seed: 0.9, fn: patternBison }
+            { name: "Teleport", seed: 0.05, fn: patternPyramid },
+            { name: "Psycho Crusher", seed: 0.25, fn: patternPyramid },
+            { name: "Radial Field", seed: 0.55, fn: patternPyramid },
+            { name: "Spread + Dive", seed: 0.85, fn: patternPyramid }
         ],
         boss1: [
             { name: "Random Shot", seed: 0.15, fn: patternBarlog },
