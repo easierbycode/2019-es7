@@ -1,0 +1,11 @@
+{
+  "name": "build-level",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Build a standalone Cordova/Electron app from a single Firebase level by name.",
+  "bin": "./index.js",
+  "dependencies": {
+    "esbuild": "^0.21.0",
+    "pngjs": "^7.0.0"
+  }
+}

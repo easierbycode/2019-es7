@@ -41,6 +41,13 @@ function readBossRushParam() {
 }
 
 function fetchFirebaseLevel(levelName) {
+    // Offline build mode: tools/build-level embeds the full level record on
+    // window.__OFFLINE_LEVEL__ (with atlas overrides pre-baked into
+    // game_asset.png/.json) so there is no network dependency at runtime.
+    if (typeof window !== "undefined" && window.__OFFLINE_LEVEL__) {
+        return Promise.resolve(window.__OFFLINE_LEVEL__);
+    }
+
     if (typeof firebase === "undefined" || !firebase.database) {
         return Promise.reject(new Error("Firebase not available"));
     }
