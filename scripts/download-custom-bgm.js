@@ -68,7 +68,9 @@ function downloadFile(url, dest) {
                     return;
                 }
                 if (res.statusCode !== 200) {
-                    reject(new Error("HTTP " + res.statusCode + " downloading " + url));
+                    var err = new Error("HTTP " + res.statusCode + " downloading " + url);
+                    err.statusCode = res.statusCode;
+                    reject(err);
                     res.resume();
                     return;
                 }
@@ -83,6 +85,32 @@ function downloadFile(url, dest) {
         };
         request(url, 0);
     });
+}
+
+function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+}
+
+// Retry downloads on transient failures (5xx responses and network errors).
+// Uses exponential backoff: 1s, 2s, 4s between attempts.
+async function downloadFileWithRetry(url, dest, maxAttempts) {
+    maxAttempts = maxAttempts || 4;
+    var lastErr;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            await downloadFile(url, dest);
+            return;
+        } catch (err) {
+            lastErr = err;
+            var transient = !err.statusCode || err.statusCode >= 500;
+            if (!transient || attempt === maxAttempts) throw err;
+            var delay = 1000 * Math.pow(2, attempt - 1);
+            console.warn("  -> attempt " + attempt + " failed (" + err.message +
+                "), retrying in " + (delay / 1000) + "s ...");
+            await sleep(delay);
+        }
+    }
+    throw lastErr;
 }
 
 async function main() {
@@ -149,7 +177,7 @@ async function main() {
 
         console.log("Downloading " + key + " from " + url + " -> " + filename + " ...");
         try {
-            await downloadFile(url, dest);
+            await downloadFileWithRetry(url, dest);
             var stat = fs.statSync(dest);
             console.log("  -> saved " + filename + " (" + (stat.size / 1024).toFixed(1) + " KB)");
             manifest[key] = filename;
