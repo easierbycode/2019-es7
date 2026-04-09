@@ -968,6 +968,9 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             try {
                 var vol = typeof volume === "number" ? volume : 0.7;
                 if (this.cache.audio.exists(key)) {
+                    // Stop any currently playing instance of this key so the
+                    // sound is heard immediately, even if already playing.
+                    this.sound.stopByKey(key);
                     this.sound.play(key, { volume: vol });
                 }
             } catch (e) {}
