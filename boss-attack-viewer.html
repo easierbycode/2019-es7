@@ -78,6 +78,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
     var customAtlasFrames = null;
     var customAudioEntries = {}; // key -> blobURL from editorCustomAudio IndexedDB
     var firebaseBossData = null; // bossData loaded from Firebase ?level= param
+    var firebaseAudioURLs = {}; // customAudioURLs from Firebase ?level= param
     var looping = false;
     var speedIdx = 1;
     var speeds = [0.5, 1, 2];
@@ -707,12 +708,16 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
                 "boss_goki_voice_projectile1",
                 "boss_goki_voice_ashura"
             ];
+            // Priority: IndexedDB blob (local editor upload) > Firebase customAudioURLs
+            // (remote URL from loaded level) > bundled default mp3.
             var loadedKeys = {};
             for (var bs = 0; bs < bossSounds.length; bs++) {
                 var sndKey = bossSounds[bs];
                 loadedKeys[sndKey] = true;
                 if (customAudioEntries[sndKey]) {
                     this.load.audio(sndKey, customAudioEntries[sndKey]);
+                } else if (firebaseAudioURLs[sndKey]) {
+                    this.load.audio(sndKey, firebaseAudioURLs[sndKey]);
                 } else {
                     this.load.audio(sndKey, "assets/sounds/" + sndKey + ".mp3");
                 }
@@ -720,7 +725,14 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             // Load any additional custom audio entries (e.g. boss sounds not in the default list)
             for (var cKey in customAudioEntries) {
                 if (!loadedKeys[cKey]) {
+                    loadedKeys[cKey] = true;
                     this.load.audio(cKey, customAudioEntries[cKey]);
+                }
+            }
+            for (var fKey in firebaseAudioURLs) {
+                if (!loadedKeys[fKey]) {
+                    loadedKeys[fKey] = true;
+                    this.load.audio(fKey, firebaseAudioURLs[fKey]);
                 }
             }
         }
@@ -774,7 +786,7 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
             } else {
                 bossData = recipe.bossData;
             }
-            if (Object.keys(customAudioEntries).length > 0) {
+            if (Object.keys(customAudioEntries).length > 0 || Object.keys(firebaseAudioURLs).length > 0) {
                 document.getElementById("custom-audio-badge").style.display = "";
             }
             scene = this;
@@ -1304,6 +1316,12 @@ html, body { width:100%; height:100%; overflow:hidden; background:#111; font-fam
         return fetchFirebaseLevel(levelName).then(function(data) {
             if (data.bossData && typeof data.bossData === "object") {
                 firebaseBossData = data.bossData;
+            }
+            if (data.customAudioURLs && typeof data.customAudioURLs === "object") {
+                for (var k in data.customAudioURLs) {
+                    var u = data.customAudioURLs[k];
+                    if (u && typeof u === "string") firebaseAudioURLs[k] = u;
+                }
             }
         }).catch(function(err) {
             console.warn("Firebase level load failed:", err);
