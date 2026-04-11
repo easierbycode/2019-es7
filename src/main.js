@@ -4,6 +4,33 @@ import { HitTester } from "./HitTester.js";
 
 let started = false;
 
+function syncViewportSafeAreaFallback() {
+    if (!document || !document.documentElement) { return; }
+
+    var rootStyle = document.documentElement.style;
+    var vv = window.visualViewport;
+    var top = 0;
+    var left = 0;
+    var right = 0;
+    var bottom = 0;
+
+    if (vv) {
+        top = Math.max(0, vv.offsetTop || 0);
+        left = Math.max(0, vv.offsetLeft || 0);
+        right = Math.max(0, window.innerWidth - (vv.offsetLeft + vv.width));
+        bottom = Math.max(0, window.innerHeight - (vv.offsetTop + vv.height));
+    }
+
+    rootStyle.setProperty("--safe-area-top-fallback", Math.round(top) + "px");
+    rootStyle.setProperty("--safe-area-left-fallback", Math.round(left) + "px");
+    rootStyle.setProperty("--safe-area-right-fallback", Math.round(right) + "px");
+    rootStyle.setProperty("--safe-area-bottom-fallback", Math.round(bottom) + "px");
+
+    if (typeof window.__fitCanvas === "function") {
+        window.__fitCanvas();
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Orientation lock — requires fullscreen to be active on most mobile browsers
 // ---------------------------------------------------------------------------
@@ -101,6 +128,14 @@ export function fitCanvas() {
 
 window.addEventListener("resize", fitCanvas);
 window.__fitCanvas = fitCanvas;
+
+window.addEventListener("resize", syncViewportSafeAreaFallback);
+window.addEventListener("orientationchange", syncViewportSafeAreaFallback);
+if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", syncViewportSafeAreaFallback);
+    window.visualViewport.addEventListener("scroll", syncViewportSafeAreaFallback);
+}
+syncViewportSafeAreaFallback();
 
 // ---------------------------------------------------------------------------
 // Edge-swipe prevention
