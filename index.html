@@ -21,6 +21,10 @@
             font-display: swap;
         }
         html, body {
+            --safe-area-top-fallback: 0px;
+            --safe-area-bottom-fallback: 0px;
+            --safe-area-left-fallback: 0px;
+            --safe-area-right-fallback: 0px;
             margin: 0;
             padding: 0;
             width: 100%;
@@ -43,10 +47,10 @@
             align-items: center;
             justify-content: center;
             box-sizing: border-box;
-            padding-top: env(safe-area-inset-top, 0px);
-            padding-bottom: env(safe-area-inset-bottom, 0px);
-            padding-left: env(safe-area-inset-left, 0px);
-            padding-right: env(safe-area-inset-right, 0px);
+            padding-top: max(env(safe-area-inset-top, 0px), var(--safe-area-top-fallback));
+            padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-bottom-fallback));
+            padding-left: max(env(safe-area-inset-left, 0px), var(--safe-area-left-fallback));
+            padding-right: max(env(safe-area-inset-right, 0px), var(--safe-area-right-fallback));
         }
         #canvas canvas, #phaser-canvas canvas {
             image-rendering: pixelated;
