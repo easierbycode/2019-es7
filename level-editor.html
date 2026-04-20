@@ -3114,17 +3114,53 @@
                 subTitleDataURL = d.subTitleDataURL || null;
                 titleStartTextDataURL = d.titleStartTextDataURL || null;
                 audioURLs = (d.customAudioURLs && typeof d.customAudioURLs === 'object') ? d.customAudioURLs : {};
-                // Restore atlas image + frame data so re-saving doesn't lose custom sprites
+                // Firebase frames are LEVEL-SPECIFIC extras. The local atlas (loaded
+                // from disk — possibly the repacked `_game_asset.png`) is the baseline.
+                // For any Firebase key that also exists locally, the local version wins
+                // so repacks propagate into already-saved levels. Only truly-new keys
+                // are imported into extraSprites. Legacy full-atlas dumps therefore
+                // collapse to an empty customFrameKeys, and re-saving clears the stale
+                // Firebase atlas from the level record.
                 if (d.atlasImageDataURL && d.atlasFrames) {
-                    const decodedFrames = {};
-                    for (const [k, v] of Object.entries(d.atlasFrames)) decodedFrames[fbKeyDecode(k)] = v;
-                    atlasData = { frames: decodedFrames };
-                    atlasImage = new Image();
-                    atlasImage.src = d.atlasImageDataURL;
-                    atlasImage.onload = () => { buildFrameThumbs(); storeAtlasForViewers(); renderAtlas(); };
-                    // Remember the custom frames carried by this level so the next
-                    // save-to-Firebase only writes this same set (plus any new edits).
-                    customFrameKeys = new Set(Object.keys(decodedFrames));
+                    const hasLocalAtlas = !!(atlasData && atlasData.frames && Object.keys(atlasData.frames).length > 0);
+                    if (!hasLocalAtlas) {
+                        // Editor has no local atlas yet (no directory loaded); fall back
+                        // to treating the Firebase atlas as the baseline so the level
+                        // is still editable.
+                        const decodedFrames = {};
+                        for (const [k, v] of Object.entries(d.atlasFrames)) decodedFrames[fbKeyDecode(k)] = v;
+                        atlasData = { frames: decodedFrames };
+                        atlasImage = new Image();
+                        atlasImage.src = d.atlasImageDataURL;
+                        atlasImage.onload = () => { buildFrameThumbs(); storeAtlasForViewers(); renderAtlas(); };
+                        customFrameKeys = new Set(Object.keys(decodedFrames));
+                    } else {
+                        const localFrames = atlasData.frames;
+                        const nextCustom = new Set();
+                        const fbImg = new Image();
+                        fbImg.onload = () => {
+                            for (const [encKey, frameData] of Object.entries(d.atlasFrames)) {
+                                const key = fbKeyDecode(encKey);
+                                const f = frameData && frameData.frame;
+                                if (!f) continue;
+                                if (localFrames[key]) continue; // local wins
+                                const fc = document.createElement('canvas');
+                                fc.width = f.w; fc.height = f.h;
+                                fc.getContext('2d').drawImage(fbImg, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+                                if (!extraSprites.find(s => s.key === key)) {
+                                    extraSprites.push({ key, canvas: fc, w: f.w, h: f.h });
+                                }
+                                nextCustom.add(key);
+                            }
+                            customFrameKeys = nextCustom;
+                            renderAtlas();
+                        };
+                        fbImg.onerror = () => {
+                            customFrameKeys = new Set();
+                            console.warn('Firebase atlas image failed to load for level', name);
+                        };
+                        fbImg.src = d.atlasImageDataURL;
+                    }
                 } else {
                     // Level has no custom atlas; ensure we don't later write a stale
                     // full-atlas snapshot that would shadow locally repacked frames.
