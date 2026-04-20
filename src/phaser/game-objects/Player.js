@@ -32,10 +32,16 @@ function pointerId(pointer) {
 export function createPlayer(scene) {
     var pd = scene.recipe.playerData;
 
-    // Cyber Liberty: 32x32 sprite, aligned so its top matches where G's top was
-    // G was 32x64 centered at GH-80 → top at GH-112
-    // Cyber Liberty 32x32 centered at GH-96 → top at GH-112
-    scene.playerSprite = scene.add.sprite(GCX, GH - 96, "cyber-liberty", 0);
+    // Player frames live in the game_asset atlas (player00.gif..player05.gif,
+    // 32x64). Driving the sprite from the atlas means editor frame replacements
+    // and Firebase-level overrides flow straight through to the in-game player.
+    var playerFrames = (pd && Array.isArray(pd.texture) && pd.texture.length > 0)
+        ? pd.texture.slice()
+        : ["player00.gif", "player01.gif", "player02.gif", "player03.gif", "player04.gif", "player05.gif"];
+    var firstFrame = playerFrames[0] || "player00.gif";
+
+    // 32x64 sprite centered at GH-80 → top at GH-112 (original G positioning).
+    scene.playerSprite = scene.add.sprite(GCX, GH - 80, "game_asset", firstFrame);
     scene.playerSprite.setOrigin(0.5);
     scene.playerSprite.setDepth(50);
 
@@ -49,20 +55,23 @@ export function createPlayer(scene) {
     scene.playerHp = gameState.playerHp || pd.maxHp;
     scene.playerMaxHp = gameState.playerMaxHp || pd.maxHp;
 
-    if (!scene.anims.exists("cyber-liberty-idle")) {
-        scene.anims.create({
-            key: "cyber-liberty-idle",
-            frames: [
-                { key: "cyber-liberty", frame: 0, duration: 250 },
-                { key: "cyber-liberty", frame: 1, duration: 100 },
-            ],
-            repeat: -1,
-        });
+    // Recreate the idle anim every time so new scenes pick up the latest
+    // playerData.texture (custom levels can override it) and any hot-swapped
+    // atlas frames. PIXI original used animationSpeed=0.1 at 60fps ≈ 6 fps.
+    if (scene.anims.exists("player-idle")) {
+        scene.anims.remove("player-idle");
     }
-    scene.playerSprite.play("cyber-liberty-idle");
+    scene.anims.create({
+        key: "player-idle",
+        frames: playerFrames.map(function (f) { return { key: "game_asset", frame: f }; }),
+        frameRate: 6,
+        repeat: -1,
+    });
+    scene.playerSprite.play("player-idle");
 
     // PIXI player shadow: shadowOffsetY=5 (app-original.js line 589)
-    scene.playerShadow = createShadow(scene, scene.playerSprite, 0, true, 5, "cyber-liberty");
+    scene.playerShadow = createShadow(scene, scene.playerSprite, firstFrame, true, 5, "game_asset");
+    scene.playerShadow.play("player-idle");
     updateShadowPosition(scene.playerShadow, scene.playerSprite);
 
     scene.barrierActive = false;

@@ -336,7 +336,6 @@ export class BootScene extends Phaser.Scene {
         this.load.atlas("game_asset",
             ea.game_asset ? "assets/img/_game_asset.png" : "assets/img/game_asset.png",
             ea.game_asset ? "assets/_game_asset.json" : "assets/game_asset.json");
-        this.load.spritesheet("cyber-liberty", "https://easierbycode.com/assets/spritesheets/cyber-liberty.png", { frameWidth: 32, frameHeight: 32 });
 
         this.load.json("recipe", "assets/game.json");
         // Optional manifest produced by scripts/download-custom-bgm.js. Maps each
