@@ -754,6 +754,11 @@
         let thumbDataURLs = {};     // key -> dataURL (cached)
         let extraSprites = [];
         let replacedFrames = {};
+        // Frame keys that represent per-level customizations (replacements or
+        // extras). Save-to-Firebase writes ONLY these frames, so the level's
+        // Firebase atlas never overrides unrelated frames that may have been
+        // repacked locally since the level was last saved.
+        let customFrameKeys = new Set();
         let currentEnemyKey = null;
         let currentEditorTab = 'enemies'; // 'enemies' or 'bosses'
 
@@ -901,6 +906,7 @@
             const editorPng = "_" + cfg.png;
             extraSprites = [];
             replacedFrames = {};
+            customFrameKeys = new Set();
             if (dirHandle) {
                 try {
                     let atlasJsonText, pngBlob;
@@ -1324,6 +1330,7 @@
         function repackFromMissingPanel() {
             for (const sprite of Object.values(pendingTextureUploads)) {
                 if (!extraSprites.find(s => s.key === sprite.key)) extraSprites.push(sprite);
+                customFrameKeys.add(sprite.key);
             }
             pendingTextureUploads = {};
             document.getElementById('missing-tex-overlay').classList.add('hidden');
@@ -1848,6 +1855,7 @@
                 cv.width = img.width; cv.height = img.height;
                 cv.getContext('2d').drawImage(img, 0, 0);
                 replacedFrames[frameName] = { key: frameName, canvas: cv, w: img.width, h: img.height };
+                customFrameKeys.add(frameName);
                 renderAtlas();
             };
             input.click();
@@ -1862,6 +1870,7 @@
                 c.width = img.width; c.height = img.height;
                 c.getContext('2d').drawImage(img, 0, 0);
                 extraSprites.push({ key: file.name, canvas: c, w: img.width, h: img.height });
+                customFrameKeys.add(file.name);
             }
             renderAtlas();
         }
@@ -2115,6 +2124,7 @@
                 const ex = fbExtractFrameCanvas(key);
                 if (!ex) { alert('Could not extract frame'); return; }
                 replacedFrames[target] = { key: target, canvas: ex.canvas, w: ex.w, h: ex.h };
+                customFrameKeys.add(target);
                 closeFirebaseSprites();
                 renderAtlas();
                 return;
@@ -2136,6 +2146,7 @@
                 }
                 existing.add(name);
                 extraSprites.push({ key: name, canvas: ex.canvas, w: ex.w, h: ex.h });
+                customFrameKeys.add(name);
                 added++;
             }
             closeFirebaseSprites();
@@ -2239,8 +2250,11 @@
 
                     if (mode === "replace" && frameName) {
                         replacedFrames[frameName] = { key: frameName, canvas: cv, w: img.width, h: img.height };
+                        customFrameKeys.add(frameName);
                     } else {
-                        extraSprites.push({ key: spr.name || ('sprite_' + Date.now()), canvas: cv, w: img.width, h: img.height });
+                        const sprKey = spr.name || ('sprite_' + Date.now());
+                        extraSprites.push({ key: sprKey, canvas: cv, w: img.width, h: img.height });
+                        customFrameKeys.add(sprKey);
                     }
                 }
                 renderAtlas();
@@ -3000,32 +3014,76 @@
                 if (logoDataURL) payload.logoDataURL = logoDataURL;
                 if (subTitleDataURL) payload.subTitleDataURL = subTitleDataURL;
                 if (titleStartTextDataURL) payload.titleStartTextDataURL = titleStartTextDataURL;
-                // Save atlas image + frame data so the game can load it
-                // If frames have been replaced, repack them into the saved atlas
+                // Save only the level's CUSTOM atlas frames (replacements + extras).
+                // Writing the full atlas would freeze a snapshot in Firebase that later
+                // shadows locally repacked frames (BootScene overrides local frames by
+                // key), so unrelated repacks wouldn't be visible in this level.
                 if (atlasImage && atlasData) {
                     try {
-                        let saveCanvas, saveFrames;
+                        // Bake any pending replacements/extras into the current atlas
+                        // state so we can pick them up from atlasImage below, and mark
+                        // their keys as custom for this level.
                         if (Object.keys(replacedFrames).length > 0 || extraSprites.length > 0) {
+                            for (const k of Object.keys(replacedFrames)) customFrameKeys.add(k);
+                            for (const s of extraSprites) customFrameKeys.add(s.key);
                             const result = buildAtlasWithReplacements();
-                            saveCanvas = result.canvas;
-                            saveFrames = result.frames;
-                            // Update in-memory state to reflect the baked replacements
-                            atlasData = { frames: saveFrames, meta: atlasData.meta };
+                            atlasData = { frames: result.frames, meta: atlasData.meta };
                             atlasImage = new Image();
-                            atlasImage.src = saveCanvas.toDataURL('image/png');
+                            atlasImage.src = result.canvas.toDataURL('image/png');
                             atlasImage.onload = () => { buildFrameThumbs(); storeAtlasForViewers(); renderAtlas(); };
                             replacedFrames = {};
                             extraSprites = [];
-                        } else {
-                            saveCanvas = document.createElement('canvas');
-                            saveCanvas.width = atlasImage.naturalWidth; saveCanvas.height = atlasImage.naturalHeight;
-                            saveCanvas.getContext('2d').drawImage(atlasImage, 0, 0);
-                            saveFrames = atlasData.frames || {};
                         }
-                        payload.atlasImageDataURL = saveCanvas.toDataURL('image/png');
-                        const encodedFrames = {};
-                        for (const [k, v] of Object.entries(saveFrames)) encodedFrames[fbKeyEncode(k)] = v;
-                        payload.atlasFrames = encodedFrames;
+                        // Only write atlas data if this level has something custom.
+                        // Otherwise leave the local disk atlas (e.g. _game_asset.png
+                        // after repack) as the single source of truth at play time.
+                        const items = [];
+                        for (const k of customFrameKeys) {
+                            const f = atlasData.frames && atlasData.frames[k] && atlasData.frames[k].frame;
+                            if (!f) continue;
+                            const fc = document.createElement('canvas');
+                            fc.width = f.w; fc.height = f.h;
+                            fc.getContext('2d').drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+                            items.push({ key: k, canvas: fc, w: f.w, h: f.h });
+                        }
+                        if (items.length > 0) {
+                            items.sort((a, b) => b.h - a.h);
+                            const MW = 2048, P = 4;
+                            let cx = P, cy = P, rh = 0, fh = 0, maxX = 0;
+                            const pos = {};
+                            items.forEach(s => {
+                                if (cx + s.w + P > MW) { cy += rh + P; cx = P; rh = 0; }
+                                pos[s.key] = { x: cx, y: cy };
+                                cx += s.w + P;
+                                rh = Math.max(rh, s.h);
+                                fh = Math.max(fh, cy + s.h + P);
+                                maxX = Math.max(maxX, pos[s.key].x + s.w + P);
+                            });
+                            const saveCanvas = document.createElement('canvas');
+                            saveCanvas.width = Math.min(MW, maxX);
+                            saveCanvas.height = fh;
+                            const nc = saveCanvas.getContext('2d');
+                            items.forEach(s => { const p = pos[s.key]; nc.drawImage(s.canvas, p.x, p.y); });
+                            const saveFrames = {};
+                            items.forEach(s => {
+                                const p = pos[s.key];
+                                saveFrames[s.key] = {
+                                    frame: { x: p.x, y: p.y, w: s.w, h: s.h },
+                                    rotated: false, trimmed: false,
+                                    spriteSourceSize: { x: 0, y: 0, w: s.w, h: s.h },
+                                    sourceSize: { w: s.w, h: s.h }
+                                };
+                            });
+                            payload.atlasImageDataURL = saveCanvas.toDataURL('image/png');
+                            const encodedFrames = {};
+                            for (const [k, v] of Object.entries(saveFrames)) encodedFrames[fbKeyEncode(k)] = v;
+                            payload.atlasFrames = encodedFrames;
+                        } else {
+                            // Clear any previously saved atlas so a stale snapshot
+                            // cannot keep shadowing local frames.
+                            payload.atlasImageDataURL = null;
+                            payload.atlasFrames = null;
+                        }
                     } catch (e) { console.warn('Could not save atlas to Firebase:', e); }
                 }
                 await firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${name}`).update(payload);
@@ -3064,6 +3122,13 @@
                     atlasImage = new Image();
                     atlasImage.src = d.atlasImageDataURL;
                     atlasImage.onload = () => { buildFrameThumbs(); storeAtlasForViewers(); renderAtlas(); };
+                    // Remember the custom frames carried by this level so the next
+                    // save-to-Firebase only writes this same set (plus any new edits).
+                    customFrameKeys = new Set(Object.keys(decodedFrames));
+                } else {
+                    // Level has no custom atlas; ensure we don't later write a stale
+                    // full-atlas snapshot that would shadow locally repacked frames.
+                    customFrameKeys = new Set();
                 }
                 document.getElementById('firebase-level-name').value = name;
                 document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Game: ${name} (cloud)</span>`;
