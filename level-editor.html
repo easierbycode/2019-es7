@@ -537,6 +537,10 @@
                 <button onclick="openFirebaseSprites()" class="menu-btn" style="flex:1;justify-content:center;">☁️ Firebase Sprites</button>
                 <button onclick="repackAtlas()" class="menu-btn" style="flex:1;justify-content:center;">Repack Atlas</button>
             </div>
+            <div id="atlas-replace-banner" class="hidden" style="display:flex;align-items:center;gap:8px;background:#422006;border:1px solid #f59e0b;color:#fbbf24;padding:8px 12px;border-radius:4px;margin-bottom:10px;font-size:12px;font-family:monospace;">
+                <span id="atlas-replace-banner-text"></span>
+                <button onclick="cancelMultiReplace()" style="margin-left:auto;background:#334155;color:#e2e8f0;border:1px solid #475569;border-radius:3px;padding:4px 10px;cursor:pointer;font-size:11px;">Cancel</button>
+            </div>
             <div id="atlas-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px;"></div>
         </div>
     </div>
@@ -556,9 +560,6 @@
                 <button onclick="selectAllFirebaseFrames(false)" class="menu-btn" style="font-size:11px;padding:4px 10px;">Clear</button>
                 <span id="fb-selected-count" style="font-size:11px;font-family:monospace;color:#94a3b8;flex:1;">0 selected</span>
                 <button onclick="addFirebaseSpritesToAtlas('add')" class="menu-btn" style="background:#84cc16;color:#000;font-weight:700;">+ Add as New</button>
-                <select id="fb-replace-target" style="background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:4px;padding:4px 8px;font-size:11px;max-width:180px;">
-                    <option value="">— Replace target —</option>
-                </select>
                 <button onclick="addFirebaseSpritesToAtlas('replace')" class="menu-btn" style="background:#f59e0b;color:#000;font-weight:700;">↻ Replace</button>
             </div>
             <div id="fb-sprites-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;max-height:60vh;overflow-y:auto;padding:4px;background:#0f172a;border-radius:4px;"></div>
@@ -907,6 +908,7 @@
             extraSprites = [];
             replacedFrames = {};
             customFrameKeys = new Set();
+            cancelMultiReplace();
             if (dirHandle) {
                 try {
                     let atlasJsonText, pngBlob;
@@ -1806,7 +1808,7 @@
             Object.keys(frames).forEach(key => {
                 const d = document.createElement('div');
                 d.style.cssText = 'text-align:center;cursor:pointer;';
-                d.title = 'Click to replace';
+                d.title = pendingMultiReplace ? 'Click to replace from here' : 'Click to replace';
                 const isReplaced = !!replacedFrames[key];
                 if (isReplaced) d.style.outline = '2px solid #84cc16';
                 const t = document.createElement('canvas');
@@ -1825,7 +1827,10 @@
                 n.style.color = isReplaced ? '#84cc16' : '#888';
                 n.textContent = key + (isReplaced ? ' (replaced)' : '');
                 d.appendChild(n);
-                d.onclick = () => replaceFrame(key);
+                d.onclick = () => {
+                    if (pendingMultiReplace) applyMultiReplaceAt(key);
+                    else replaceFrame(key);
+                };
                 c.appendChild(d);
             });
             extraSprites.forEach(s => {
@@ -1882,6 +1887,8 @@
         let fbCurrentAtlasJson = null;
         let fbCurrentAtlasImage = null;
         let fbSelectedFrames = new Set();
+        let pendingMultiReplace = null; // { sources: [{key, canvas, w, h}] }
+        const LS_LAST_FB_ATLAS = 'atlasMgrLastFbAtlas';
 
         function fbDecodeFrameKey(key) {
             if (typeof key !== 'string' || !key.startsWith('k_')) return key;
@@ -1930,16 +1937,45 @@
             if (el) el.textContent = fbSelectedFrames.size + ' selected';
         }
 
-        function fbPopulateReplaceTargets() {
-            const sel = document.getElementById('fb-replace-target');
-            if (!sel) return;
-            const keys = (atlasData && atlasData.frames) ? Object.keys(atlasData.frames).sort() : [];
-            sel.innerHTML = '<option value="">— Replace target —</option>';
-            for (const k of keys) {
-                const opt = document.createElement('option');
-                opt.value = k; opt.textContent = k;
-                sel.appendChild(opt);
+        function showMultiReplaceBanner() {
+            const el = document.getElementById('atlas-replace-banner');
+            const txt = document.getElementById('atlas-replace-banner-text');
+            if (!el || !txt || !pendingMultiReplace) return;
+            const n = pendingMultiReplace.sources.length;
+            txt.textContent = n === 1
+                ? 'Click a frame in the atlas to replace it.'
+                : 'Click a frame in the atlas to replace it and the next ' + (n - 1) + ' frame(s) — ' + n + ' source(s) queued.';
+            el.classList.remove('hidden');
+        }
+
+        function hideMultiReplaceBanner() {
+            const el = document.getElementById('atlas-replace-banner');
+            if (el) el.classList.add('hidden');
+        }
+
+        function cancelMultiReplace() {
+            pendingMultiReplace = null;
+            hideMultiReplaceBanner();
+        }
+
+        function applyMultiReplaceAt(targetKey) {
+            if (!pendingMultiReplace || !atlasData || !atlasData.frames) return;
+            const keys = Object.keys(atlasData.frames);
+            const start = keys.indexOf(targetKey);
+            if (start < 0) return;
+            const sources = pendingMultiReplace.sources;
+            const take = Math.min(sources.length, keys.length - start);
+            const skipped = sources.length - take;
+            for (let i = 0; i < take; i++) {
+                const tgt = keys[start + i];
+                const src = sources[i];
+                replacedFrames[tgt] = { key: tgt, canvas: src.canvas, w: src.w, h: src.h };
+                customFrameKeys.add(tgt);
             }
+            pendingMultiReplace = null;
+            hideMultiReplaceBanner();
+            renderAtlas();
+            if (skipped > 0) alert('Replaced ' + take + ' frame(s). Skipped ' + skipped + ' (ran past end of atlas).');
         }
 
         async function openFirebaseSprites() {
@@ -1950,7 +1986,6 @@
             fbSelectedFrames.clear();
             fbUpdateSelectedCount();
             grid.innerHTML = '';
-            fbPopulateReplaceTargets();
             modal.classList.remove('hidden');
             statusEl.textContent = 'Loading atlases…';
             statusEl.style.color = '#94a3b8';
@@ -1973,6 +2008,13 @@
                 }
                 statusEl.textContent = keys.length + ' atlas' + (keys.length === 1 ? '' : 'es') + ' available';
                 statusEl.style.color = '#94a3b8';
+                let preferred = '';
+                try { preferred = localStorage.getItem(LS_LAST_FB_ATLAS) || ''; } catch {}
+                if (!preferred || !keys.includes(preferred)) preferred = keys[0] || '';
+                if (preferred) {
+                    sel.value = preferred;
+                    await loadFirebaseAtlasFrames(preferred);
+                }
             } catch (e) {
                 statusEl.textContent = 'Failed to load: ' + e.message;
                 statusEl.style.color = '#f87171';
@@ -1992,6 +2034,7 @@
             fbCurrentAtlasJson = null;
             fbCurrentAtlasImage = null;
             if (!atlasKey) { statusEl.textContent = ''; return; }
+            try { localStorage.setItem(LS_LAST_FB_ATLAS, atlasKey); } catch {}
             if (!fbAtlasesCache || !fbAtlasesCache[atlasKey]) {
                 statusEl.textContent = 'Atlas not found';
                 statusEl.style.color = '#f87171';
@@ -2113,20 +2156,22 @@
             if (fbSelectedFrames.size === 0) { alert('Select at least one frame'); return; }
             if (!fbCurrentAtlasImage) { alert('Select an atlas first'); return; }
             if (mode === 'replace') {
-                if (fbSelectedFrames.size !== 1) { alert('Replace mode: select exactly one Firebase frame'); return; }
-                const target = document.getElementById('fb-replace-target').value;
-                if (!target) { alert('Pick a target frame to replace from the dropdown'); return; }
-                if (!atlasData || !atlasData.frames || !atlasData.frames[target]) {
-                    alert('Target frame "' + target + '" is not in the current atlas');
+                if (!atlasData || !atlasData.frames || Object.keys(atlasData.frames).length === 0) {
+                    alert('Load a local atlas first');
                     return;
                 }
-                const key = [...fbSelectedFrames][0];
-                const ex = fbExtractFrameCanvas(key);
-                if (!ex) { alert('Could not extract frame'); return; }
-                replacedFrames[target] = { key: target, canvas: ex.canvas, w: ex.w, h: ex.h };
-                customFrameKeys.add(target);
+                // Preserve source-atlas insertion order
+                const framesMap = fbGetFramesMap(fbCurrentAtlasJson);
+                const orderedKeys = Object.keys(framesMap).filter(k => fbSelectedFrames.has(k));
+                const sources = [];
+                for (const k of orderedKeys) {
+                    const ex = fbExtractFrameCanvas(k);
+                    if (ex) sources.push({ key: k, canvas: ex.canvas, w: ex.w, h: ex.h });
+                }
+                if (sources.length === 0) { alert('Could not extract any frames'); return; }
+                pendingMultiReplace = { sources };
                 closeFirebaseSprites();
-                renderAtlas();
+                showMultiReplaceBanner();
                 return;
             }
             // Add mode
