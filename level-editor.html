@@ -3068,11 +3068,18 @@
                         // Bake any pending replacements/extras into the current atlas
                         // state so we can pick them up from atlasImage below, and mark
                         // their keys as custom for this level.
+                        // Source we draw per-frame tiles from — usually the current
+                        // atlasImage, but after a rebuild we must draw from the fresh
+                        // canvas because `new Image()` with a data URL loads async and
+                        // synchronous drawImage calls against it would produce blank
+                        // tiles (which got saved to Firebase as invisible frames).
+                        let atlasSource = atlasImage;
                         if (Object.keys(replacedFrames).length > 0 || extraSprites.length > 0) {
                             for (const k of Object.keys(replacedFrames)) customFrameKeys.add(k);
                             for (const s of extraSprites) customFrameKeys.add(s.key);
                             const result = buildAtlasWithReplacements();
                             atlasData = { frames: result.frames, meta: atlasData.meta };
+                            atlasSource = result.canvas;
                             atlasImage = new Image();
                             atlasImage.src = result.canvas.toDataURL('image/png');
                             atlasImage.onload = () => { buildFrameThumbs(); storeAtlasForViewers(); renderAtlas(); };
@@ -3088,7 +3095,7 @@
                             if (!f) continue;
                             const fc = document.createElement('canvas');
                             fc.width = f.w; fc.height = f.h;
-                            fc.getContext('2d').drawImage(atlasImage, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+                            fc.getContext('2d').drawImage(atlasSource, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
                             items.push({ key: k, canvas: fc, w: f.w, h: f.h });
                         }
                         if (items.length > 0) {
