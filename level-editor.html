@@ -463,7 +463,7 @@
         </div>
         <div class="menu-section">
             <div class="menu-section-title">Advanced</div>
-            <button class="menu-btn" onclick="showEnemyEditor()">👾 Enemy &amp; Boss Editor</button>
+            <button class="menu-btn" onclick="showCharacterEditor()">👾 Character Editor</button>
             <button class="menu-btn" onclick="showBossPatternEditor()">👹 Boss Patterns</button>
             <button class="menu-btn" onclick="showStoryEditor()">📖 Story Editor</button>
             <button class="menu-btn" onclick="showAtlasManager()">🎨 Atlas Manager</button>
@@ -473,12 +473,13 @@
         <div id="status" style="font-size:11px;color:#666;margin-top:16px;">No directory loaded</div>
     </div>
 
-    <!-- ENEMY EDITOR MODAL -->
+    <!-- CHARACTER EDITOR MODAL -->
     <div id="enemy-editor-modal" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
         <div class="picker-panel" style="max-height:80vh">
-            <div class="picker-title">ENEMY &amp; BOSS EDITOR</div>
+            <div class="picker-title">CHARACTER EDITOR</div>
             <div class="enemy-editor-tabs">
-                <button class="enemy-editor-tab active" data-tab="enemies" onclick="switchEditorTab('enemies')">Enemies <span class="tab-count" id="enemy-tab-count"></span></button>
+                <button class="enemy-editor-tab active" data-tab="player" onclick="switchEditorTab('player')">Player <span class="tab-count" id="player-tab-count"></span></button>
+                <button class="enemy-editor-tab" data-tab="enemies" onclick="switchEditorTab('enemies')">Enemies <span class="tab-count" id="enemy-tab-count"></span></button>
                 <button class="enemy-editor-tab" data-tab="bosses" onclick="switchEditorTab('bosses')">Bosses <span class="tab-count" id="boss-tab-count"></span></button>
             </div>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px" id="enemy-list"></div>
@@ -721,6 +722,7 @@
         let currentGrid = [];
         let enemyData = {};
         let bossData = {};
+        let playerData = {};
         function storeBossDataForViewers() {
             try { sessionStorage.setItem('editorBossData', JSON.stringify(bossData)); } catch (e) {}
             storeAtlasForViewers();
@@ -761,7 +763,7 @@
         // repacked locally since the level was last saved.
         let customFrameKeys = new Set();
         let currentEnemyKey = null;
-        let currentEditorTab = 'enemies'; // 'enemies' or 'bosses'
+        let currentEditorTab = 'player'; // 'player', 'enemies' or 'bosses'
 
         // Tool state
         let selectedEnemyLetter = null;
@@ -888,7 +890,7 @@
             document.getElementById('menu-backdrop').classList.add('hidden');
             document.getElementById('menu-panel').classList.add('hidden');
         }
-        function showEnemyEditor() {
+        function showCharacterEditor() {
             closeMenu();
             switchEditorTab(currentEditorTab);
             document.getElementById('enemy-editor-modal').classList.remove('hidden');
@@ -1032,6 +1034,7 @@
                 }
             }
             bossData = gameData.bossData || {};
+            playerData = gameData.playerData || {};
             storeBossDataForViewers();
 
             // Load atlas JSON
@@ -1119,6 +1122,7 @@
                 }
             }
             bossData = gameData.bossData || {};
+            playerData = gameData.playerData || {};
             storeBossDataForViewers();
             populateStagePills();
             loadCurrentStage();
@@ -1682,7 +1686,7 @@
         }
 
 
-        // ================== ENEMY & BOSS EDITOR ==================
+        // ================== CHARACTER EDITOR ==================
         function switchEditorTab(tab) {
             currentEditorTab = tab;
             document.querySelectorAll('.enemy-editor-tab').forEach(t => {
@@ -1690,9 +1694,16 @@
             });
             // Clear form when switching tabs
             currentEnemyKey = null;
-            document.getElementById('enemy-key').value = '';
+            const keyInput = document.getElementById('enemy-key');
+            keyInput.value = '';
             document.getElementById('enemy-json').value = '';
-            document.getElementById('enemy-key').placeholder = tab === 'bosses' ? 'Key (e.g. boss0)' : 'Key (e.g. enemyA)';
+            if (tab === 'player') {
+                keyInput.placeholder = 'playerData (single entry)';
+                keyInput.disabled = true;
+            } else {
+                keyInput.placeholder = tab === 'bosses' ? 'Key (e.g. boss0)' : 'Key (e.g. enemyA)';
+                keyInput.disabled = false;
+            }
             renderEnemyList();
         }
 
@@ -1701,11 +1712,23 @@
             c.innerHTML = '';
             const enemyKeys = Object.keys(enemyData);
             const bossKeys = Object.keys(bossData);
+            const hasPlayer = playerData && Object.keys(playerData).length > 0;
             document.getElementById('enemy-tab-count').textContent = '(' + enemyKeys.length + ')';
             document.getElementById('boss-tab-count').textContent = '(' + bossKeys.length + ')';
+            const playerCountEl = document.getElementById('player-tab-count');
+            if (playerCountEl) playerCountEl.textContent = '(' + (hasPlayer ? 1 : 0) + ')';
 
-            const keys = currentEditorTab === 'bosses' ? bossKeys : enemyKeys;
-            const data = currentEditorTab === 'bosses' ? bossData : enemyData;
+            let keys, data;
+            if (currentEditorTab === 'player') {
+                keys = hasPlayer ? ['playerData'] : [];
+                data = { playerData: playerData };
+            } else if (currentEditorTab === 'bosses') {
+                keys = bossKeys;
+                data = bossData;
+            } else {
+                keys = enemyKeys;
+                data = enemyData;
+            }
 
             if (!keys.length) {
                 c.innerHTML = '<div style="color:#666;font-size:11px;padding:8px;">No ' + currentEditorTab + ' loaded.</div>';
@@ -1739,6 +1762,8 @@
                 const label = document.createElement('span');
                 if (currentEditorTab === 'bosses') {
                     label.textContent = (BOSS_PATTERN_NAMES[key] || entry.name || key);
+                } else if (currentEditorTab === 'player') {
+                    label.textContent = (entry && entry.name) ? entry.name : 'player';
                 } else {
                     label.textContent = key;
                 }
@@ -1751,9 +1776,15 @@
 
         function editEnemy(key) {
             currentEnemyKey = key;
-            const data = currentEditorTab === 'bosses' ? bossData : enemyData;
+            let entry;
+            if (currentEditorTab === 'player') {
+                entry = playerData;
+            } else {
+                const data = currentEditorTab === 'bosses' ? bossData : enemyData;
+                entry = data[key];
+            }
             document.getElementById('enemy-key').value = key;
-            document.getElementById('enemy-json').value = JSON.stringify(data[key], null, 2);
+            document.getElementById('enemy-json').value = JSON.stringify(entry, null, 2);
             renderEnemyList(); // refresh highlight
         }
 
@@ -1761,42 +1792,50 @@
             const dk = document.getElementById('enemy-key').value.trim();
             const dj = document.getElementById('enemy-json').value.trim();
             if (!dk && !dj && !currentEnemyKey) return true;
-            if (!dk) { if (showErrors) alert('Key required'); return false; }
+            if (currentEditorTab !== 'player' && !dk) { if (showErrors) alert('Key required'); return false; }
             let nd;
             try { nd = JSON.parse(dj || '{}'); } catch { if (showErrors) alert('Invalid JSON'); return false; }
 
-            const data = currentEditorTab === 'bosses' ? bossData : enemyData;
-            if (currentEnemyKey && currentEnemyKey !== dk) delete data[currentEnemyKey];
-            data[dk] = nd;
-
-            if (currentEditorTab === 'bosses') {
-                gameData.bossData = bossData;
-                storeBossDataForViewers();
+            if (currentEditorTab === 'player') {
+                playerData = nd;
+                gameData.playerData = playerData;
+                currentEnemyKey = 'playerData';
             } else {
-                gameData.enemyData = enemyData;
+                const data = currentEditorTab === 'bosses' ? bossData : enemyData;
+                if (currentEnemyKey && currentEnemyKey !== dk) delete data[currentEnemyKey];
+                data[dk] = nd;
+
+                if (currentEditorTab === 'bosses') {
+                    gameData.bossData = bossData;
+                    storeBossDataForViewers();
+                } else {
+                    gameData.enemyData = enemyData;
+                }
+                currentEnemyKey = dk;
             }
-            currentEnemyKey = dk;
             renderEnemyList();
             return true;
         }
 
         function saveCurrentEnemy() {
             if (syncEnemyEditorForm(true)) {
-                const isBoss = currentEditorTab === 'bosses';
+                const tab = currentEditorTab;
+                const label = tab === 'player' ? 'Player' : (tab === 'bosses' ? 'Boss' : 'Enemy');
                 // Persist to Firebase RTDB if a cloud game name is set
                 const fbName = document.getElementById('firebase-level-name').value.trim();
                 if (fbName) {
                     initFirebase();
                     if (firebaseDb) {
-                        const dataKey = isBoss ? 'bossData' : 'enemyData';
-                        const dataVal = isBoss ? (bossData || {}) : (enemyData || {});
-                        firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${fbName}/${dataKey}`).update(dataVal)
-                            .then(() => alert((isBoss ? 'Boss' : 'Enemy') + ' saved to cloud!'))
-                            .catch(e => alert((isBoss ? 'Boss' : 'Enemy') + ' saved locally but cloud save failed: ' + e.message));
+                        const dataKey = tab === 'player' ? 'playerData' : (tab === 'bosses' ? 'bossData' : 'enemyData');
+                        const dataVal = tab === 'player' ? (playerData || {}) : (tab === 'bosses' ? (bossData || {}) : (enemyData || {}));
+                        const ref = firebaseDb.ref(`${FIREBASE_LEVELS_PATH}/${fbName}/${dataKey}`);
+                        const op = tab === 'player' ? ref.set(dataVal) : ref.update(dataVal);
+                        op.then(() => alert(label + ' saved to cloud!'))
+                          .catch(e => alert(label + ' saved locally but cloud save failed: ' + e.message));
                         return;
                     }
                 }
-                alert(isBoss ? 'Boss saved' : 'Enemy saved');
+                alert(label + ' saved');
             }
         }
 
@@ -2350,6 +2389,9 @@
             const r = JSON.parse(JSON.stringify(gameData || {}));
             r.enemyData = JSON.parse(JSON.stringify(enemyData || {}));
             r.bossData = JSON.parse(JSON.stringify(bossData || {}));
+            if (playerData && Object.keys(playerData).length > 0) {
+                r.playerData = JSON.parse(JSON.stringify(playerData));
+            }
             r[currentStageKey] = r[currentStageKey] || {};
             r[currentStageKey].enemylist = normalizeGrid(currentGrid);
             return r;
@@ -3046,6 +3088,7 @@
                 const payload = {
                     name, stageKey: currentStageKey, enemylist: normalizeGrid(currentGrid),
                     enemyData: enemyData || {}, bossData: bossData || {},
+                    playerData: playerData || {},
                     storyData: (gameData && gameData.storyData) || null,
                     width: 8, savedAt: firebase.database.ServerValue.TIMESTAMP
                 };
@@ -3160,6 +3203,10 @@
                 currentGrid = normalizeGrid(d.enemylist || []);
                 enemyData = (d.enemyData && typeof d.enemyData === 'object') ? d.enemyData : {};
                 bossData = (d.bossData && typeof d.bossData === 'object') ? d.bossData : {};
+                if (d.playerData && typeof d.playerData === 'object') {
+                    playerData = d.playerData;
+                    if (gameData) gameData.playerData = playerData;
+                }
                 storeBossDataForViewers();
                 if (d.storyData && typeof d.storyData === 'object') {
                     if (!gameData) gameData = {};
@@ -3288,6 +3335,7 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
                         }
                     }
                     bossData = gameData.bossData || {};
+                    playerData = gameData.playerData || {};
                     storeBossDataForViewers();
                     populateStagePills();
                     loadCurrentStage();
