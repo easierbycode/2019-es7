@@ -147,6 +147,7 @@ export function enemyShoot(scene, enemy) {
     bullet.setData("frames", frames);
     bullet.setData("animIdx", 0);
     bullet.setData("animTimer", 0);
+    if (projData.frameRate) bullet.setData("frameRate", projData.frameRate);
 
     // PIXI projectileAdd default: rotX=0, rotY=1 (straight down).
     // soliderB aims at player only on secondLoop; special projectile types always aim.

@@ -488,6 +488,34 @@ export class BootScene extends Phaser.Scene {
                     baseRecipe.storyData = data.storyData;
                 }
 
+                if (data.playerData && typeof data.playerData === "object") {
+                    // Merge Firebase playerData, keeping local textures when Firebase
+                    // textures don't exist in the loaded atlas (cross-game level support)
+                    var mergedPlayer = Object.assign(
+                        baseRecipe.playerData ? JSON.parse(JSON.stringify(baseRecipe.playerData)) : {},
+                        JSON.parse(JSON.stringify(data.playerData))
+                    );
+                    try {
+                        var playerAtlas = self.textures.get("game_asset");
+                        var playerAtlasFrames = playerAtlas && playerAtlas.frames ? playerAtlas.frames : null;
+                        if (playerAtlasFrames) {
+                            var shootKeys = ["shootNormal", "shootBig", "shoot3way"];
+                            for (var sk = 0; sk < shootKeys.length; sk++) {
+                                var shootEntry = mergedPlayer[shootKeys[sk]];
+                                var localShoot = baseRecipe.playerData && baseRecipe.playerData[shootKeys[sk]];
+                                if (shootEntry && shootEntry.texture && shootEntry.texture.length > 0 && !playerAtlasFrames[shootEntry.texture[0]]) {
+                                    if (localShoot && localShoot.texture && localShoot.texture.length > 0) {
+                                        shootEntry.texture = localShoot.texture;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (playerTexErr) {
+                        console.warn("Player texture resolution failed, using Firebase playerData as-is:", playerTexErr);
+                    }
+                    baseRecipe.playerData = mergedPlayer;
+                }
+
                 // Replace title_bg texture if Firebase provides a custom one
                 if (data.titleBgDataURL) {
                     var titleImg = new Image();

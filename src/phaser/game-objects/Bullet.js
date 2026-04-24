@@ -32,12 +32,13 @@ export function shootBullets(scene) {
 
     var frames = (shootData.texture && shootData.texture.length) ? shootData.texture : ["shot00.gif"];
     var frameKey = frames[0];
-    var animKey = "bullet_anim_" + frames.join("|");
+    var frameRate = shootData.frameRate || 6;
+    var animKey = "bullet_anim_" + frames.join("|") + "_" + frameRate;
     if (!scene.anims.exists(animKey)) {
         scene.anims.create({
             key: animKey,
             frames: frames.map(function (f) { return { key: "game_asset", frame: f }; }),
-            frameRate: 6,
+            frameRate: frameRate,
             repeat: -1,
         });
     }
