@@ -30,7 +30,17 @@ export function shootBullets(scene) {
         break;
     }
 
-    var frameKey = (shootData.texture && shootData.texture[0]) || "shot00.gif";
+    var frames = (shootData.texture && shootData.texture.length) ? shootData.texture : ["shot00.gif"];
+    var frameKey = frames[0];
+    var animKey = "bullet_anim_" + frames.join("|");
+    if (!scene.anims.exists(animKey)) {
+        scene.anims.create({
+            key: animKey,
+            frames: frames.map(function (f) { return { key: "game_asset", frame: f }; }),
+            frameRate: 6,
+            repeat: -1,
+        });
+    }
 
     if (scene.shootMode === "3way") {
         for (var a = -1; a <= 1; a++) {
@@ -42,6 +52,7 @@ export function shootBullets(scene) {
             b.setData("angle", a * 0.15);
             b.setData("bulletId", scene.bulletIdCnt++);
             b.setRotation(-Math.PI / 2 + a * 0.2);
+            b.play(animKey);
             scene.playerBullets.push(b);
         }
     } else {
@@ -56,6 +67,7 @@ export function shootBullets(scene) {
         if (scene.shootMode === "big") {
             bullet.setScale(1.5);
         }
+        bullet.play(animKey);
         scene.playerBullets.push(bullet);
     }
 
