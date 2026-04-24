@@ -5,6 +5,13 @@ import { GAME_DIMENSIONS } from "../../constants.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
 
+function attachAnim(bullet, frames, frameRate) {
+    bullet.setData("frames", frames);
+    bullet.setData("animIdx", 0);
+    bullet.setData("animTimer", 0);
+    bullet.setData("frameRate", frameRate);
+}
+
 /**
  * Fires player bullet(s) based on current shootMode.
  *
@@ -33,15 +40,6 @@ export function shootBullets(scene) {
     var frames = (shootData.texture && shootData.texture.length) ? shootData.texture : ["shot00.gif"];
     var frameKey = frames[0];
     var frameRate = shootData.frameRate || 6;
-    var animKey = "bullet_anim_" + frames.join("|") + "_" + frameRate;
-    if (!scene.anims.exists(animKey)) {
-        scene.anims.create({
-            key: animKey,
-            frames: frames.map(function (f) { return { key: "game_asset", frame: f }; }),
-            frameRate: frameRate,
-            repeat: -1,
-        });
-    }
 
     if (scene.shootMode === "3way") {
         for (var a = -1; a <= 1; a++) {
@@ -53,7 +51,7 @@ export function shootBullets(scene) {
             b.setData("angle", a * 0.15);
             b.setData("bulletId", scene.bulletIdCnt++);
             b.setRotation(-Math.PI / 2 + a * 0.2);
-            b.play(animKey);
+            attachAnim(b, frames, frameRate);
             scene.playerBullets.push(b);
         }
     } else {
@@ -68,7 +66,7 @@ export function shootBullets(scene) {
         if (scene.shootMode === "big") {
             bullet.setScale(1.5);
         }
-        bullet.play(animKey);
+        attachAnim(bullet, frames, frameRate);
         scene.playerBullets.push(bullet);
     }
 
@@ -79,8 +77,10 @@ export function shootBullets(scene) {
  * Moves all player bullets and removes off-screen ones.
  *
  * @param {Phaser.Scene} scene
+ * @param {number} step  fixedUpdate step in ms (for frame animation)
  */
-export function updatePlayerBullets(scene) {
+export function updatePlayerBullets(scene, step) {
+    var stepMs = step || 0;
     for (var b = scene.playerBullets.length - 1; b >= 0; b--) {
         var bullet = scene.playerBullets[b];
         if (!bullet.active) {
@@ -96,6 +96,21 @@ export function updatePlayerBullets(scene) {
             if (tintTimer <= 0) {
                 bullet.clearTint();
             }
+        }
+
+        // Advance multi-frame bullet animation using per-bullet frameRate
+        var bFrames = bullet.getData("frames");
+        if (bFrames && bFrames.length > 1 && stepMs > 0) {
+            var bRate = bullet.getData("frameRate") || 6;
+            var bThreshold = 1000 / bRate;
+            var bTimer = (bullet.getData("animTimer") || 0) + stepMs;
+            while (bTimer >= bThreshold) {
+                bTimer -= bThreshold;
+                var bIdx = ((bullet.getData("animIdx") || 0) + 1) % bFrames.length;
+                bullet.setData("animIdx", bIdx);
+                try { bullet.setFrame(bFrames[bIdx]); } catch (e) {}
+            }
+            bullet.setData("animTimer", bTimer);
         }
 
         var angle = bullet.getData("angle") || 0;

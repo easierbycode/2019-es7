@@ -927,7 +927,7 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         // Player bullets
-        updatePlayerBullets(this);
+        updatePlayerBullets(this, step);
 
         // --- Enemy loop (collision, movement, animation) ---
         for (var e = this.enemies.length - 1; e >= 0; e--) {
