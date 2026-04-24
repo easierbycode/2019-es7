@@ -422,6 +422,7 @@ export function bossShootStraight(scene, projData) {
         bullet.setData("frames", frames);
         bullet.setData("animIdx", 0);
         bullet.setData("animTimer", 0);
+        if (projData.frameRate) bullet.setData("frameRate", projData.frameRate);
     }
 
     scene.enemyBullets.push(bullet);
@@ -454,6 +455,7 @@ export function bossShootAimed(scene, projData) {
         bullet.setData("frames", frames);
         bullet.setData("animIdx", 0);
         bullet.setData("animTimer", 0);
+        if (projData.frameRate) bullet.setData("frameRate", projData.frameRate);
     }
 
     scene.enemyBullets.push(bullet);
