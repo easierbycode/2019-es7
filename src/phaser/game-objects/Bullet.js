@@ -37,7 +37,27 @@ export function shootBullets(scene) {
         break;
     }
 
-    var frames = (shootData.texture && shootData.texture.length) ? shootData.texture : ["shot00.gif"];
+    var rawFrames = (shootData.texture && shootData.texture.length) ? shootData.texture : ["shot00.gif"];
+    var atlas = scene.textures.get("game_asset");
+    var atlasFrames = atlas && atlas.frames ? atlas.frames : null;
+    var frames = rawFrames;
+    if (atlasFrames) {
+        var present = rawFrames.filter(function (f) { return !!atlasFrames[f]; });
+        if (present.length === 0) {
+            frames = ["shot00.gif"];
+        } else {
+            frames = present;
+        }
+        if (present.length !== rawFrames.length) {
+            scene._bulletWarnSeen = scene._bulletWarnSeen || {};
+            var warnKey = scene.shootMode + ":" + rawFrames.join(",");
+            if (!scene._bulletWarnSeen[warnKey]) {
+                scene._bulletWarnSeen[warnKey] = true;
+                var missing = rawFrames.filter(function (f) { return !atlasFrames[f]; });
+                console.warn("Bullet[" + scene.shootMode + "]: dropping missing frames", missing, "kept", frames);
+            }
+        }
+    }
     var frameKey = frames[0];
     var frameRate = shootData.frameRate || 6;
 
