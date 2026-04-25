@@ -52,6 +52,20 @@
                       android:resizeableActivity="false"
                       xmlns:android="http://schemas.android.com/apk/res/android" />
         </edit-config>
+
+        <!-- Long-press launcher icon -> "Level Editor" app shortcut.
+             shortcuts.xml routes the shortcut to MainActivity with a
+             launch_target extra; the after_prepare.js hook patches
+             MainActivity.kt to load level-editor.html when set. -->
+        <resource-file src="res/android/xml/shortcuts.xml"
+                       target="app/src/main/res/xml/shortcuts.xml" />
+        <resource-file src="res/android/values/shortcut_strings.xml"
+                       target="app/src/main/res/values/shortcut_strings.xml" />
+        <config-file target="AndroidManifest.xml" parent="/manifest/application/activity">
+            <meta-data android:name="android.app.shortcuts"
+                       android:resource="@xml/shortcuts"
+                       xmlns:android="http://schemas.android.com/apk/res/android" />
+        </config-file>
     </platform>
 
     <platform name="ios">

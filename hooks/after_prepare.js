@@ -163,6 +163,7 @@ module.exports = function (context) {
 
     // ---- Add required imports --------------------------------------------------
     const importsToAdd = [
+        "import android.content.Intent",
         "import android.os.Build",
         "import android.view.View",
         "import android.view.WindowInsets",
@@ -175,7 +176,7 @@ module.exports = function (context) {
         "$1\n" + importsToAdd
     );
 
-    // ---- Add enterImmersiveMode() + onWindowFocusChanged() ---------------------
+    // ---- Add enterImmersiveMode() + onWindowFocusChanged() + onNewIntent() ---
     const methodBlock = `
     private fun enterImmersiveMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -202,12 +203,29 @@ module.exports = function (context) {
         if (hasFocus) {
             enterImmersiveMode()
         }
+    }
+
+    private fun resolveLaunchUrl(sourceIntent: Intent?): String {
+        val target = sourceIntent?.getStringExtra("launch_target")
+        return if (target == "level-editor") {
+            launchUrl.replace("/phaser-game.html", "/level-editor.html")
+        } else {
+            launchUrl
+        }
+    }
+
+    override fun onNewIntent(newIntent: Intent) {
+        super.onNewIntent(newIntent)
+        setIntent(newIntent)
+        if (newIntent.getStringExtra("launch_target") == "level-editor") {
+            loadUrl(resolveLaunchUrl(newIntent))
+        }
     }`;
 
-    // Call enterImmersiveMode() right after loadUrl in onCreate
+    // Route launch URL through resolveLaunchUrl(), and call enterImmersiveMode()
     src = src.replace(
-        /(loadUrl\(launchUrl\))/,
-        "$1\n        enterImmersiveMode()"
+        /loadUrl\(launchUrl\)/,
+        "loadUrl(resolveLaunchUrl(intent))\n        enterImmersiveMode()"
     );
 
     // Insert methods before the final closing brace of the class
@@ -215,5 +233,8 @@ module.exports = function (context) {
     src = src.substring(0, lastBrace) + methodBlock + "\n}\n";
 
     fs.writeFileSync(mainActivity, src, "utf8");
-    console.log("after_prepare hook: patched MainActivity.kt with immersive sticky mode");
+    console.log(
+        "after_prepare hook: patched MainActivity.kt with immersive sticky mode " +
+        "and Level Editor app-shortcut intent routing"
+    );
 };

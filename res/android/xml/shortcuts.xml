@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="level_editor"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_level_editor_short_label"
+        android:shortcutLongLabel="@string/shortcut_level_editor_long_label">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.easierbycode.game2028"
+            android:targetClass="com.easierbycode.game2028.MainActivity">
+            <extra android:name="launch_target" android:value="level-editor" />
+        </intent>
+        <categories android:name="android.shortcut.conversation" />
+    </shortcut>
+</shortcuts>
