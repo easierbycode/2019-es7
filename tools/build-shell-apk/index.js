@@ -130,7 +130,11 @@ function ensureNpmInstall() {
 function verifyPlaceholdersInApk(apkPath) {
     const yauzl = require("yauzl");
     return new Promise(function (resolve, reject) {
-        const hits = { pkgUtf16: 0, labelUtf8: 0, labelUtf16: 0 };
+        const hits = {
+            manifestUtf16: 0, manifestUtf8: 0,
+            arscUtf16: 0, arscUtf8: 0
+        };
+        const samples = {};
         yauzl.open(apkPath, { lazyEntries: true }, function (err, zip) {
             if (err) return reject(err);
             zip.readEntry();
@@ -144,23 +148,33 @@ function verifyPlaceholdersInApk(apkPath) {
                     rs.on("data", function (c) { chunks.push(c); });
                     rs.on("end", function () {
                         const buf = Buffer.concat(chunks);
+                        samples[e.fileName] = {
+                            size: buf.length,
+                            head: buf.slice(0, Math.min(64, buf.length)).toString("hex")
+                        };
                         if (e.fileName === "AndroidManifest.xml") {
-                            hits.pkgUtf16 += countOccurrences(buf,
+                            hits.manifestUtf16 += countOccurrences(buf,
                                 Buffer.from(PKG_PLACEHOLDER, "utf16le"));
+                            hits.manifestUtf8 += countOccurrences(buf,
+                                Buffer.from(PKG_PLACEHOLDER, "utf8"));
                         } else {
-                            hits.labelUtf8 += countOccurrences(buf,
+                            hits.arscUtf8 += countOccurrences(buf,
                                 Buffer.from(LABEL_PLACEHOLDER, "utf8"));
-                            hits.labelUtf16 += countOccurrences(buf,
+                            hits.arscUtf16 += countOccurrences(buf,
                                 Buffer.from(LABEL_PLACEHOLDER, "utf16le"));
+                            hits.arscPkgUtf16 = (hits.arscPkgUtf16 || 0) +
+                                countOccurrences(buf, Buffer.from(PKG_PLACEHOLDER, "utf16le"));
+                            hits.arscPkgUtf8 = (hits.arscPkgUtf8 || 0) +
+                                countOccurrences(buf, Buffer.from(PKG_PLACEHOLDER, "utf8"));
                         }
                         zip.readEntry();
                     });
                 });
             });
             zip.on("end", function () {
-                const ok = hits.pkgUtf16 > 0
-                    && (hits.labelUtf8 > 0 || hits.labelUtf16 > 0);
-                resolve({ ok, hits });
+                const pkgFound = (hits.manifestUtf16 + hits.manifestUtf8) > 0;
+                const labelFound = (hits.arscUtf16 + hits.arscUtf8) > 0;
+                resolve({ ok: pkgFound && labelFound, hits, samples });
             });
         });
     });
@@ -236,7 +250,10 @@ async function main() {
 
     const v = await verifyPlaceholdersInApk(outApk);
     console.log("Placeholder verification: " + JSON.stringify(v.hits));
+    console.log("Entry samples: " + JSON.stringify(v.samples));
     if (!v.ok) {
+        console.error("Expected PKG_PLACEHOLDER:   " + PKG_PLACEHOLDER + " (len=" + PKG_PLACEHOLDER.length + ")");
+        console.error("Expected LABEL_PLACEHOLDER: " + LABEL_PLACEHOLDER + " (len=" + LABEL_PLACEHOLDER.length + ")");
         throw new Error("Placeholder strings not found in shell APK — manifest/arsc rewriting will fail at runtime");
     }
     console.log("Shell APK ready: " + outApk);
