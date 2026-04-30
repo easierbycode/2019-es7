@@ -1,0 +1,198 @@
+/* Evil Invaders Character CMS — minimal dark UI */
+
+:root {
+  --bg: #0e0f13;
+  --bg-2: #15171c;
+  --bg-3: #1c1f26;
+  --line: #2a2e38;
+  --text: #e7e9ee;
+  --muted: #8a8f9c;
+  --accent: #6cf;
+  --accent-2: #ffd166;
+  --danger: #ff6b6b;
+  --ok: #6bd66b;
+  --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+code { font-family: var(--mono); background: var(--bg-3); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+
+/* Top bar */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: var(--bg-2);
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 0; z-index: 10;
+}
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.brand-mark {
+  width: 28px; height: 28px; border-radius: 6px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #111; display: grid; place-items: center; font-weight: 800;
+}
+.nav { display: flex; gap: 4px; }
+.nav-item {
+  padding: 6px 12px;
+  border-radius: 6px;
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 500;
+}
+.nav-item:hover { background: var(--bg-3); color: var(--text); text-decoration: none; }
+.nav-item.active { background: var(--bg-3); color: var(--text); }
+
+/* Layout */
+.content { padding: 24px; max-width: 1400px; margin: 0 auto; }
+.editor-page h1 { margin: 0 0 4px; font-size: 22px; }
+.hint { color: var(--muted); margin: 0 0 20px; }
+
+/* Overview cards */
+.overview h1 { font-size: 28px; margin: 0 0 4px; }
+.subtitle { color: var(--muted); margin: 0 0 24px; }
+.card-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.card {
+  display: block; color: inherit; text-decoration: none;
+  padding: 18px; border-radius: 10px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  transition: border-color 120ms, transform 120ms;
+}
+.card:hover { border-color: var(--accent); text-decoration: none; transform: translateY(-1px); }
+.card h2 { margin: 0 0 6px; font-size: 16px; }
+.card p { margin: 0; color: var(--muted); font-size: 13px; }
+.foot { margin-top: 32px; color: var(--muted); font-size: 12px; }
+
+/* Editor split layout */
+.split {
+  display: grid; gap: 16px;
+  grid-template-columns: 1fr 1fr;
+  height: calc(100vh - 200px);
+  min-height: 480px;
+}
+@media (max-width: 1080px) { .split { grid-template-columns: 1fr; height: auto; } }
+
+.panel {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+}
+.panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--bg-3);
+  border-bottom: 1px solid var(--line);
+  font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
+}
+.panel-body { flex: 1; min-height: 0; overflow: auto; }
+
+/* CodeMirror host */
+.cm-host { height: 100%; }
+.cm-host .cm-editor { height: 100%; }
+
+/* Buttons */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-3); color: var(--text);
+  border: 1px solid var(--line);
+  padding: 5px 10px; border-radius: 5px;
+  font: inherit; font-size: 12px; cursor: pointer;
+}
+.btn:hover { border-color: var(--accent); }
+.btn[disabled] { opacity: 0.5; cursor: default; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #002233; font-weight: 600; }
+.btn.danger { color: var(--danger); }
+
+.toolbar { display: flex; gap: 6px; flex-wrap: wrap; padding: 8px 12px; border-bottom: 1px solid var(--line); background: var(--bg-3); }
+
+/* Status pill */
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 8px; border-radius: 999px;
+  font-size: 11px;
+  background: var(--bg-3); color: var(--muted);
+}
+.pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+.pill.saved { color: var(--ok); }
+.pill.saved .dot { background: var(--ok); }
+.pill.dirty { color: var(--accent-2); }
+.pill.dirty .dot { background: var(--accent-2); }
+.pill.error { color: var(--danger); }
+.pill.error .dot { background: var(--danger); }
+
+/* Lists */
+.list-grid {
+  display: grid; gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.list-item {
+  display: block; padding: 12px; border-radius: 8px;
+  background: var(--bg-2); border: 1px solid var(--line);
+  color: inherit; text-decoration: none;
+}
+.list-item:hover { border-color: var(--accent); text-decoration: none; }
+.list-item .title { font-weight: 600; }
+.list-item .meta { color: var(--muted); font-size: 12px; margin-top: 4px; }
+
+/* Preview canvas */
+.preview-stack { display: grid; gap: 12px; padding: 12px; }
+.preview-canvas {
+  background: #000; border: 1px solid var(--line); border-radius: 6px;
+  width: 100%; aspect-ratio: 4 / 3; image-rendering: pixelated;
+}
+.frame-strip {
+  display: flex; gap: 6px; flex-wrap: wrap; padding: 8px;
+  background: var(--bg-3); border-radius: 6px;
+  max-height: 160px; overflow: auto;
+}
+.frame-cell {
+  background: #000; border: 1px solid var(--line);
+  image-rendering: pixelated; width: 64px; height: 64px;
+  display: grid; place-items: center;
+}
+.frame-cell img { max-width: 100%; max-height: 100%; image-rendering: pixelated; }
+.frame-cell .label { font-size: 10px; color: var(--muted); }
+
+.error-box {
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  padding: 8px 12px; border-radius: 6px; font-size: 12px;
+  margin: 8px 12px;
+}
+
+/* Forms */
+input[type=text], input[type=number], select {
+  background: var(--bg-3); color: var(--text); border: 1px solid var(--line);
+  padding: 6px 8px; border-radius: 5px; font: inherit; font-size: 13px;
+}
+label { font-size: 12px; color: var(--muted); }
+
+/* Atlas builder */
+.dropzone {
+  border: 2px dashed var(--line);
+  border-radius: 10px;
+  padding: 32px;
+  text-align: center;
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color 120ms, background 120ms;
+}
+.dropzone.over { border-color: var(--accent); background: rgba(102,204,255,0.08); }

@@ -1,0 +1,47 @@
+{
+  "tasks": {
+    "dev": "deno run -A --node-modules-dir npm:vite",
+    "build": "deno run -A --node-modules-dir npm:vite build",
+    "start": "deno run -A --node-modules-dir npm:vite preview",
+    "serve": "deno run -A main.ts",
+    "seed": "deno run -A scripts/seed-from-game-json.ts --game evil-invaders --src ../assets/game.json",
+    "check": "deno fmt --check && deno lint"
+  },
+  "lint": {
+    "rules": {
+      "tags": ["fresh", "recommended"]
+    }
+  },
+  "exclude": ["**/_fresh/*", "node_modules", "dist", "_fresh"],
+  "imports": {
+    "@/": "./",
+    "fresh": "jsr:@fresh/core@^2.3.0",
+    "@fresh/plugin-vite": "jsr:@fresh/plugin-vite@^1.1.2",
+    "preact": "npm:preact@^10.29.1",
+    "preact/jsx-runtime": "npm:preact@^10.29.1/jsx-runtime",
+    "preact/jsx-dev-runtime": "npm:preact@^10.29.1/jsx-dev-runtime",
+    "preact/hooks": "npm:preact@^10.29.1/hooks",
+    "preact/debug": "npm:preact@^10.29.1/debug",
+    "preact/devtools": "npm:preact@^10.29.1/devtools",
+    "@preact/signals": "npm:@preact/signals@^2.5.1",
+    "@preact/signals-core": "npm:@preact/signals-core@^1.14.1",
+    "svelte": "npm:svelte@^5.0.0",
+    "svelte/": "npm:svelte@^5.0.0/",
+    "@sveltejs/vite-plugin-svelte": "npm:@sveltejs/vite-plugin-svelte@^6.2.1",
+    "vite": "npm:vite@^7.1.4",
+    "firebase/": "https://www.gstatic.com/firebasejs/10.12.0/",
+    "@codemirror/state": "npm:@codemirror/state@^6.4.1",
+    "@codemirror/view": "npm:@codemirror/view@^6.26.3",
+    "@codemirror/language": "npm:@codemirror/language@^6.10.1",
+    "@codemirror/lang-json": "npm:@codemirror/lang-json@^6.0.1",
+    "@codemirror/commands": "npm:@codemirror/commands@^6.5.0",
+    "@codemirror/lint": "npm:@codemirror/lint@^6.5.0",
+    "@codemirror/theme-one-dark": "npm:@codemirror/theme-one-dark@^6.1.2"
+  },
+  "compilerOptions": {
+    "lib": ["dom", "dom.asynciterable", "deno.ns"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
+  },
+  "nodeModulesDir": "auto"
+}
