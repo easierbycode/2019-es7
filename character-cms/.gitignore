@@ -1,0 +1,6 @@
+# Fresh build output
+_fresh/
+node_modules/
+.deno_dir/
+.env
+.DS_Store
