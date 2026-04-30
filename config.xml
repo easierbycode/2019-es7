@@ -107,4 +107,11 @@
          Installed via `cordova plugin add` in CI workflows (path is
          relative to the Cordova project, not this file).
          Plugin source: plugins/cordova-plugin-sprite-share -->
+
+    <!-- Android APK Forge: builds an installable APK on-device by stamping a
+         bundled shell template with new package id, label, and assets/www.
+         Adds REQUEST_INSTALL_PACKAGES + a FileProvider via plugin.xml.
+         The shell APK lives at /android_asset/apkforge/shell-template.apk
+         and is produced by the shell-apk CI job (tools/build-shell-apk).
+         Plugin source: plugins/cordova-plugin-apk-forge -->
 </widget>

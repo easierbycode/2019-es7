@@ -9,6 +9,7 @@ import { PhaserAdvScene } from "./AdvScene.js";
 import { PhaserGameScene } from "./GameScene.js";
 import { PhaserContinueScene } from "./ContinueScene.js";
 import { PhaserEndingScene } from "./EndingScene.js";
+import { PhaserForgeScene } from "./ForgeScene.js";
 
 export function createPhaserGame() {
     syncRuntimeFlagsFromLocation();
@@ -49,7 +50,8 @@ export function createPhaserGame() {
             PhaserAdvScene,
             PhaserGameScene,
             PhaserContinueScene,
-            PhaserEndingScene
+            PhaserEndingScene,
+            PhaserForgeScene
         ]
     };
 

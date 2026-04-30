@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plugin xmlns="http://apache.org/cordova/ns/plugins/1.0"
+        id="cordova-plugin-apk-forge"
+        version="1.0.0">
+
+    <name>APK Forge</name>
+    <description>On-device APK builder. Clones a bundled shell APK, swaps assets/www/, patches the package id and display name, re-signs with v1+v2, and hands the result to the system installer.</description>
+
+    <js-module src="www/apk-forge.js" name="ApkForge">
+        <clobbers target="ApkForge" />
+    </js-module>
+
+    <platform name="android">
+        <config-file target="res/xml/config.xml" parent="/*">
+            <feature name="ApkForge">
+                <param name="android-package" value="com.easierbycode.apkforge.ApkForgePlugin" />
+                <param name="onload" value="true" />
+            </feature>
+        </config-file>
+
+        <config-file target="AndroidManifest.xml" parent="/manifest">
+            <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+                             xmlns:android="http://schemas.android.com/apk/res/android" />
+        </config-file>
+
+        <config-file target="AndroidManifest.xml" parent="/manifest/application">
+            <provider android:name="androidx.core.content.FileProvider"
+                      android:authorities="${applicationId}.apkforge.fileprovider"
+                      android:exported="false"
+                      android:grantUriPermissions="true"
+                      xmlns:android="http://schemas.android.com/apk/res/android">
+                <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
+                           android:resource="@xml/apk_forge_paths"
+                           xmlns:android="http://schemas.android.com/apk/res/android" />
+            </provider>
+        </config-file>
+
+        <resource-file src="res/xml/apk_forge_paths.xml"
+                       target="app/src/main/res/xml/apk_forge_paths.xml" />
+
+        <source-file src="src/android/ApkForgePlugin.kt"
+                     target-dir="app/src/main/java/com/easierbycode/apkforge" />
+        <source-file src="src/android/ApkBuilder.kt"
+                     target-dir="app/src/main/java/com/easierbycode/apkforge" />
+        <source-file src="src/android/AxmlPatcher.kt"
+                     target-dir="app/src/main/java/com/easierbycode/apkforge" />
+        <source-file src="src/android/ArscPatcher.kt"
+                     target-dir="app/src/main/java/com/easierbycode/apkforge" />
+        <source-file src="src/android/IconRecolor.kt"
+                     target-dir="app/src/main/java/com/easierbycode/apkforge" />
+        <source-file src="src/android/Signer.kt"
+                     target-dir="app/src/main/java/com/easierbycode/apkforge" />
+        <source-file src="src/android/Installer.kt"
+                     target-dir="app/src/main/java/com/easierbycode/apkforge" />
+        <source-file src="src/android/ZipRewriter.kt"
+                     target-dir="app/src/main/java/com/easierbycode/apkforge" />
+
+        <framework src="src/android/build.gradle" custom="true" type="gradleReference" />
+    </platform>
+</plugin>
