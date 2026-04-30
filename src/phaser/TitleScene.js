@@ -162,6 +162,30 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.staffrollBtn.setScale(1, 0);
         this.staffrollBtn.on("pointerup", this.showStaffroll, this);
 
+        if (typeof window !== "undefined"
+                && window.cordova
+                && window.cordova.platformId === "android") {
+            this.forgeBtn = this.add.text(
+                GAME_DIMENSIONS.WIDTH - 6, GAME_DIMENSIONS.HEIGHT - 22,
+                "BUILD APK",
+                {
+                    fontFamily: "Arial",
+                    fontSize: "10px",
+                    fontStyle: "bold",
+                    color: "#0f0",
+                    stroke: "#000",
+                    strokeThickness: 2,
+                    backgroundColor: "rgba(0,0,0,0.6)",
+                    padding: { left: 4, right: 4, top: 2, bottom: 2 }
+                }
+            );
+            this.forgeBtn.setOrigin(1, 0);
+            this.forgeBtn.setInteractive({ useHandCursor: true });
+            this.forgeBtn.on("pointerup", function () {
+                self.scene.start("PhaserForgeScene");
+            });
+        }
+
         this.playTitleVoice = false;
         this.startIntroAnimation();
 

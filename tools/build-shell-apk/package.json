@@ -1,0 +1,10 @@
+{
+  "name": "build-shell-apk",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Builds the placeholder shell APK that cordova-plugin-apk-forge stamps on-device.",
+  "dependencies": {
+    "yauzl": "^3.1.0",
+    "yazl": "^3.0.0"
+  }
+}
