@@ -92,9 +92,19 @@ function stripMetaInf(apkPath) {
                 if (/^META-INF\//.test(e.fileName)) { zip.readEntry(); return; }
                 zip.openReadStream(e, function (err2, rs) {
                     if (err2) return reject(err2);
-                    const opts = { mtime: e.getLastModDate() || new Date() };
-                    writer.addReadStream(rs, e.fileName, opts);
-                    rs.on("end", function () { zip.readEntry(); });
+                    const chunks = [];
+                    rs.on("data", function (c) { chunks.push(c); });
+                    rs.on("end", function () {
+                        const buf = Buffer.concat(chunks);
+                        // Preserve STORED for entries Android requires uncompressed
+                        // (resources.arsc on API 30+, native libs for in-place mmap).
+                        const wasStored = e.compressionMethod === 0;
+                        writer.addBuffer(buf, e.fileName, {
+                            compress: !wasStored,
+                            mtime: e.getLastModDate() || new Date()
+                        });
+                        zip.readEntry();
+                    });
                 });
             });
             zip.on("end", function () {
@@ -118,24 +128,42 @@ function ensureNpmInstall() {
 }
 
 function verifyPlaceholdersInApk(apkPath) {
-    const data = fs.readFileSync(apkPath);
-    const hits = {
-        pkgUtf16: searchUtf16(data, PKG_PLACEHOLDER),
-        labelUtf8: searchUtf8(data, LABEL_PLACEHOLDER),
-        labelUtf16: searchUtf16(data, LABEL_PLACEHOLDER)
-    };
-    const ok = hits.pkgUtf16 > 0 && (hits.labelUtf8 > 0 || hits.labelUtf16 > 0);
-    return { ok, hits };
-}
-
-function searchUtf16(data, str) {
-    const buf = Buffer.from(str, "utf16le");
-    return countOccurrences(data, buf);
-}
-
-function searchUtf8(data, str) {
-    const buf = Buffer.from(str, "utf8");
-    return countOccurrences(data, buf);
+    const yauzl = require("yauzl");
+    return new Promise(function (resolve, reject) {
+        const hits = { pkgUtf16: 0, labelUtf8: 0, labelUtf16: 0 };
+        yauzl.open(apkPath, { lazyEntries: true }, function (err, zip) {
+            if (err) return reject(err);
+            zip.readEntry();
+            zip.on("entry", function (e) {
+                if (e.fileName !== "AndroidManifest.xml" && e.fileName !== "resources.arsc") {
+                    zip.readEntry(); return;
+                }
+                zip.openReadStream(e, function (err2, rs) {
+                    if (err2) return reject(err2);
+                    const chunks = [];
+                    rs.on("data", function (c) { chunks.push(c); });
+                    rs.on("end", function () {
+                        const buf = Buffer.concat(chunks);
+                        if (e.fileName === "AndroidManifest.xml") {
+                            hits.pkgUtf16 += countOccurrences(buf,
+                                Buffer.from(PKG_PLACEHOLDER, "utf16le"));
+                        } else {
+                            hits.labelUtf8 += countOccurrences(buf,
+                                Buffer.from(LABEL_PLACEHOLDER, "utf8"));
+                            hits.labelUtf16 += countOccurrences(buf,
+                                Buffer.from(LABEL_PLACEHOLDER, "utf16le"));
+                        }
+                        zip.readEntry();
+                    });
+                });
+            });
+            zip.on("end", function () {
+                const ok = hits.pkgUtf16 > 0
+                    && (hits.labelUtf8 > 0 || hits.labelUtf16 > 0);
+                resolve({ ok, hits });
+            });
+        });
+    });
 }
 
 function countOccurrences(haystack, needle) {
@@ -206,7 +234,7 @@ async function main() {
     fs.writeFileSync(outApk + ".sha256", sha + "  " + path.basename(outApk) + "\n");
     console.log("sha256 " + sha);
 
-    const v = verifyPlaceholdersInApk(outApk);
+    const v = await verifyPlaceholdersInApk(outApk);
     console.log("Placeholder verification: " + JSON.stringify(v.hits));
     if (!v.ok) {
         throw new Error("Placeholder strings not found in shell APK — manifest/arsc rewriting will fail at runtime");
