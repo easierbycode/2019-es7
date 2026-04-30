@@ -36,7 +36,7 @@
         </config-file>
 
         <resource-file src="res/xml/apk_forge_paths.xml"
-                       target="app/src/main/res/xml/apk_forge_paths.xml" />
+                       target="res/xml/apk_forge_paths.xml" />
 
         <source-file src="src/android/ApkForgePlugin.kt"
                      target-dir="app/src/main/java/com/easierbycode/apkforge" />
