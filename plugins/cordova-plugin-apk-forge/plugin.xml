@@ -24,7 +24,7 @@
         </config-file>
 
         <config-file target="AndroidManifest.xml" parent="/manifest/application">
-            <provider android:name="androidx.core.content.FileProvider"
+            <provider android:name="com.easierbycode.apkforge.ForgeFileProvider"
                       android:authorities="${applicationId}.apkforge.fileprovider"
                       android:exported="false"
                       android:grantUriPermissions="true"
@@ -35,10 +35,25 @@
             </provider>
         </config-file>
 
+        <!-- Diagnostic Application class: installs an UncaughtExceptionHandler in
+             attachBaseContext (i.e. before any ContentProvider.attachInfo runs)
+             so launch-time crashes are recorded to a file the user can read on
+             the device without ADB. -->
+        <edit-config file="AndroidManifest.xml"
+                     target="/manifest/application"
+                     mode="merge">
+            <application android:name="com.easierbycode.apkforge.ForgeApplication"
+                         xmlns:android="http://schemas.android.com/apk/res/android" />
+        </edit-config>
+
         <resource-file src="res/xml/apk_forge_paths.xml"
                        target="res/xml/apk_forge_paths.xml" />
 
         <source-file src="src/android/ApkForgePlugin.kt"
+                     target-dir="app/src/main/java/com/easierbycode/apkforge" />
+        <source-file src="src/android/ForgeApplication.kt"
+                     target-dir="app/src/main/java/com/easierbycode/apkforge" />
+        <source-file src="src/android/ForgeFileProvider.kt"
                      target-dir="app/src/main/java/com/easierbycode/apkforge" />
         <source-file src="src/android/ApkBuilder.kt"
                      target-dir="app/src/main/java/com/easierbycode/apkforge" />

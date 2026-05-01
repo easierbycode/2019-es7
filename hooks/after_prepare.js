@@ -166,7 +166,12 @@ module.exports = function (context) {
         "import android.os.Build",
         "import android.view.View",
         "import android.view.WindowInsets",
-        "import android.view.WindowInsetsController"
+        "import android.view.WindowInsetsController",
+        "import android.app.AlertDialog",
+        "import android.widget.TextView",
+        "import android.widget.ScrollView",
+        "import android.text.method.ScrollingMovementMethod",
+        "import java.io.File"
     ].join("\n");
 
     // Insert right after the existing CordovaActivity import line
@@ -175,8 +180,31 @@ module.exports = function (context) {
         "$1\n" + importsToAdd
     );
 
-    // ---- Add enterImmersiveMode() + onWindowFocusChanged() ---------------------
+    // ---- Add enterImmersiveMode() + onWindowFocusChanged() + showPreviousCrashIfAny() -
     const methodBlock = `
+    private fun showPreviousCrashIfAny() {
+        try {
+            val f = File(cacheDir, "last-crash.txt")
+            if (!f.exists()) return
+            val text = f.readText()
+            f.delete()
+            val tv = TextView(this).apply {
+                this.text = text
+                textSize = 10f
+                setPadding(24, 24, 24, 24)
+                setTextIsSelectable(true)
+                movementMethod = ScrollingMovementMethod()
+            }
+            val sv = ScrollView(this).apply { addView(tv) }
+            AlertDialog.Builder(this)
+                .setTitle("Previous launch crashed")
+                .setView(sv)
+                .setPositiveButton("Continue") { d, _ -> d.dismiss() }
+                .setCancelable(false)
+                .show()
+        } catch (_: Throwable) {}
+    }
+
     private fun enterImmersiveMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             window.insetsController?.let { controller ->
@@ -204,10 +232,11 @@ module.exports = function (context) {
         }
     }`;
 
-    // Call enterImmersiveMode() right after loadUrl in onCreate
+    // Call enterImmersiveMode() right after loadUrl in onCreate, and surface any
+    // crash log written by ForgeApplication on the previous launch.
     src = src.replace(
         /(loadUrl\(launchUrl\))/,
-        "$1\n        enterImmersiveMode()"
+        "$1\n        enterImmersiveMode()\n        showPreviousCrashIfAny()"
     );
 
     // Insert methods before the final closing brace of the class
