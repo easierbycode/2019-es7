@@ -50,6 +50,12 @@ jobs:
           AAPT2_BIN=$(find "$ANDROID_HOME/build-tools" -name "aapt2" | sort -V | tail -n1)
           "$AAPT2_BIN" dump xmltree --file AndroidManifest.xml "$APK" | tee /tmp/manifest-tree.txt
           grep -F 'com.easierbycode.zzzzzzzzzzzzzzzzzzzzzzzzzzzzzz' /tmp/manifest-tree.txt
+          # The activity must be declared with the FULLY-QUALIFIED placeholder
+          # class name. If it's left as the relative form ("MainActivity"), the
+          # on-device patcher will rewrite the manifest's package attribute and
+          # Android will then look for <new-pkg>.MainActivity, which doesn't
+          # exist in the DEX -> forged APK crashes immediately on launch.
+          grep -F 'com.easierbycode.zzzzzzzzzzzzzzzzzzzzzzzzzzzzzz.MainActivity' /tmp/manifest-tree.txt
       - name: Upload shell APK
         uses: actions/upload-artifact@v4
         with:
