@@ -129,10 +129,12 @@ function ensureNpmInstall() {
 
 function verifyPlaceholdersInApk(apkPath) {
     const yauzl = require("yauzl");
+    const ACTIVITY_FQCN = PKG_PLACEHOLDER + ".MainActivity";
     return new Promise(function (resolve, reject) {
         const hits = {
             manifestUtf16: 0, manifestUtf8: 0,
-            arscUtf16: 0, arscUtf8: 0
+            arscUtf16: 0, arscUtf8: 0,
+            activityFqcnUtf16: 0, activityFqcnUtf8: 0
         };
         const samples = {};
         yauzl.open(apkPath, { lazyEntries: true }, function (err, zip) {
@@ -157,6 +159,10 @@ function verifyPlaceholdersInApk(apkPath) {
                                 Buffer.from(PKG_PLACEHOLDER, "utf16le"));
                             hits.manifestUtf8 += countOccurrences(buf,
                                 Buffer.from(PKG_PLACEHOLDER, "utf8"));
+                            hits.activityFqcnUtf16 += countOccurrences(buf,
+                                Buffer.from(ACTIVITY_FQCN, "utf16le"));
+                            hits.activityFqcnUtf8 += countOccurrences(buf,
+                                Buffer.from(ACTIVITY_FQCN, "utf8"));
                         } else {
                             hits.arscUtf8 += countOccurrences(buf,
                                 Buffer.from(LABEL_PLACEHOLDER, "utf8"));
@@ -174,7 +180,13 @@ function verifyPlaceholdersInApk(apkPath) {
             zip.on("end", function () {
                 const pkgFound = (hits.manifestUtf16 + hits.manifestUtf8) > 0;
                 const labelFound = (hits.arscUtf16 + hits.arscUtf8) > 0;
-                resolve({ ok: pkgFound && labelFound, hits, samples });
+                const activityFqcnFound =
+                    (hits.activityFqcnUtf16 + hits.activityFqcnUtf8) > 0;
+                resolve({
+                    ok: pkgFound && labelFound && activityFqcnFound,
+                    hits, samples,
+                    activityFqcn: ACTIVITY_FQCN
+                });
             });
         });
     });
@@ -184,6 +196,24 @@ function countOccurrences(haystack, needle) {
     let count = 0; let i = 0;
     while ((i = haystack.indexOf(needle, i)) !== -1) { count++; i += needle.length; }
     return count;
+}
+
+function qualifyMainActivityInManifest(manifestPath, fullyQualifiedName) {
+    const xml = fs.readFileSync(manifestPath, "utf8");
+    // Match android:name="MainActivity" or android:name=".MainActivity" — the
+    // two forms Cordova-android emits. We deliberately don't touch a name that
+    // already has a dot before "MainActivity" (which would mean it's already
+    // qualified).
+    const re = /android:name="\.?MainActivity"/;
+    if (!re.test(xml)) {
+        throw new Error(
+            "Could not find <activity android:name=\"MainActivity\"> in " + manifestPath +
+            " — the cordova-android template may have changed."
+        );
+    }
+    const out = xml.replace(re, 'android:name="' + fullyQualifiedName + '"');
+    fs.writeFileSync(manifestPath, out, "utf8");
+    console.log("Patched activity name -> " + fullyQualifiedName + " in " + manifestPath);
 }
 
 async function main() {
@@ -224,6 +254,19 @@ async function main() {
         run("cordova", ["plugin", "add", apkForgePlugin, "--nosave"], { cwd: cordovaDir });
     }
 
+    // Cordova writes <activity android:name="MainActivity"> (relative). Android
+    // resolves that against the manifest's package attribute at launch. The
+    // on-device patcher rewrites the package attribute to the new app id, but
+    // the DEX classes stay in the placeholder package — so the relative form
+    // would point at a class that doesn't exist and crash the app immediately.
+    // Bake the fully-qualified placeholder activity name in here so AAPT2
+    // emits it verbatim into the binary AXML; the patcher leaves it alone and
+    // the launcher always finds the original DEX class.
+    qualifyMainActivityInManifest(
+        path.join(cordovaDir, "platforms", "android", "app", "src", "main", "AndroidManifest.xml"),
+        PKG_PLACEHOLDER + ".MainActivity"
+    );
+
     run("cordova", ["compile", "android", "--debug", "--packageType=apk"], { cwd: cordovaDir });
 
     const apkRoot = path.join(cordovaDir, "platforms", "android", "app", "build", "outputs", "apk");
@@ -254,7 +297,8 @@ async function main() {
     if (!v.ok) {
         console.error("Expected PKG_PLACEHOLDER:   " + PKG_PLACEHOLDER + " (len=" + PKG_PLACEHOLDER.length + ")");
         console.error("Expected LABEL_PLACEHOLDER: " + LABEL_PLACEHOLDER + " (len=" + LABEL_PLACEHOLDER.length + ")");
-        throw new Error("Placeholder strings not found in shell APK — manifest/arsc rewriting will fail at runtime");
+        console.error("Expected ACTIVITY_FQCN:    " + v.activityFqcn);
+        throw new Error("Placeholder strings not found in shell APK — manifest/arsc rewriting will fail at runtime, or the activity name is still relative and the forged APK will crash on launch");
     }
     console.log("Shell APK ready: " + outApk);
 }
