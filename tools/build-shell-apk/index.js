@@ -134,7 +134,9 @@ function verifyPlaceholdersInApk(apkPath) {
         const hits = {
             manifestUtf16: 0, manifestUtf8: 0,
             arscUtf16: 0, arscUtf8: 0,
-            activityFqcnUtf16: 0, activityFqcnUtf8: 0
+            activityFqcnUtf16: 0, activityFqcnUtf8: 0,
+            standalonePkgUtf16: 0,
+            fqcnSurvivesSimulatedPatch: false
         };
         const samples = {};
         yauzl.open(apkPath, { lazyEntries: true }, function (err, zip) {
@@ -163,6 +165,11 @@ function verifyPlaceholdersInApk(apkPath) {
                                 Buffer.from(ACTIVITY_FQCN, "utf16le"));
                             hits.activityFqcnUtf8 += countOccurrences(buf,
                                 Buffer.from(ACTIVITY_FQCN, "utf8"));
+                            hits.standalonePkgUtf16 = countStandaloneUtf16(
+                                buf, PKG_PLACEHOLDER);
+                            hits.fqcnSurvivesSimulatedPatch =
+                                simulatedPatchPreservesFqcn(buf,
+                                    PKG_PLACEHOLDER, ACTIVITY_FQCN);
                         } else {
                             hits.arscUtf8 += countOccurrences(buf,
                                 Buffer.from(LABEL_PLACEHOLDER, "utf8"));
@@ -182,14 +189,66 @@ function verifyPlaceholdersInApk(apkPath) {
                 const labelFound = (hits.arscUtf16 + hits.arscUtf8) > 0;
                 const activityFqcnFound =
                     (hits.activityFqcnUtf16 + hits.activityFqcnUtf8) > 0;
+                const standaloneFound = hits.standalonePkgUtf16 > 0;
                 resolve({
-                    ok: pkgFound && labelFound && activityFqcnFound,
+                    ok: pkgFound && labelFound && activityFqcnFound &&
+                        standaloneFound && hits.fqcnSurvivesSimulatedPatch,
                     hits, samples,
                     activityFqcn: ACTIVITY_FQCN
                 });
             });
         });
     });
+}
+
+// Count UTF-16LE occurrences of `find` that are followed by a UTF-16 NUL
+// terminator (0x00 0x00) — i.e. a complete entry in the AXML string pool, not
+// a prefix of a longer string. Mirrors the Kotlin AxmlPatcher boundary check.
+function countStandaloneUtf16(haystack, find) {
+    const findBytes = Buffer.from(find, "utf16le");
+    let count = 0; let i = 0;
+    while ((i = haystack.indexOf(findBytes, i)) !== -1) {
+        const end = i + findBytes.length;
+        const followedByNul = end + 1 >= haystack.length ||
+            (haystack[end] === 0 && haystack[end + 1] === 0);
+        if (followedByNul) count++;
+        i += findBytes.length;
+    }
+    return count;
+}
+
+// Simulate the on-device manifest patch (AxmlPatcher) on the shell APK bytes
+// and confirm that the activity FQCN is still present unchanged afterwards.
+// This is the regression check for the launch crash: the FQCN must survive
+// the package-id rewrite, otherwise Android resolves the activity class to
+// <new-pkg>.MainActivity which doesn't exist in the DEX.
+function simulatedPatchPreservesFqcn(manifest, placeholder, fqcn) {
+    const probePkg = "com.example.probe.app.testlauncher.aaaaaaaaaaaa";
+    if (probePkg.length !== placeholder.length) {
+        throw new Error("probe package length mismatch (probe=" +
+            probePkg.length + ", placeholder=" + placeholder.length + ")");
+    }
+    const findBytes = Buffer.from(placeholder, "utf16le");
+    const replaceBytes = Buffer.from(probePkg, "utf16le");
+    const out = Buffer.from(manifest);
+    let i = 0; let standalone = 0;
+    while (i <= out.length - findBytes.length) {
+        if (out.slice(i, i + findBytes.length).equals(findBytes)) {
+            const end = i + findBytes.length;
+            const followedByNul = end + 1 >= out.length ||
+                (out[end] === 0 && out[end + 1] === 0);
+            if (followedByNul) {
+                replaceBytes.copy(out, i);
+                standalone++;
+            }
+            i += findBytes.length;
+        } else {
+            i++;
+        }
+    }
+    if (standalone === 0) return false;
+    const fqcnBytes = Buffer.from(fqcn, "utf16le");
+    return out.indexOf(fqcnBytes) !== -1;
 }
 
 function countOccurrences(haystack, needle) {
@@ -298,7 +357,13 @@ async function main() {
         console.error("Expected PKG_PLACEHOLDER:   " + PKG_PLACEHOLDER + " (len=" + PKG_PLACEHOLDER.length + ")");
         console.error("Expected LABEL_PLACEHOLDER: " + LABEL_PLACEHOLDER + " (len=" + LABEL_PLACEHOLDER.length + ")");
         console.error("Expected ACTIVITY_FQCN:    " + v.activityFqcn);
-        throw new Error("Placeholder strings not found in shell APK — manifest/arsc rewriting will fail at runtime, or the activity name is still relative and the forged APK will crash on launch");
+        if (v.hits.standalonePkgUtf16 === 0) {
+            console.error("No standalone (NUL-terminated) PKG_PLACEHOLDER occurrence in manifest — the on-device patcher would fail to find the package= attribute string.");
+        }
+        if (!v.hits.fqcnSurvivesSimulatedPatch) {
+            console.error("Simulated on-device patch destroyed the activity FQCN — the forged APK would crash on launch with ClassNotFoundException.");
+        }
+        throw new Error("Placeholder strings not found in shell APK — manifest/arsc rewriting will fail at runtime, or the simulated on-device patch mangles the activity FQCN and the forged APK would crash on launch");
     }
     console.log("Shell APK ready: " + outApk);
 }
