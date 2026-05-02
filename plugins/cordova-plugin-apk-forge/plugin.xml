@@ -35,16 +35,11 @@
             </provider>
         </config-file>
 
-        <!-- Diagnostic Application class: installs an UncaughtExceptionHandler in
-             attachBaseContext (i.e. before any ContentProvider.attachInfo runs)
-             so launch-time crashes are recorded to a file the user can read on
-             the device without ADB. -->
-        <edit-config file="AndroidManifest.xml"
-                     target="/manifest/application"
-                     mode="merge">
-            <application android:name="com.easierbycode.apkforge.ForgeApplication"
-                         xmlns:android="http://schemas.android.com/apk/res/android" />
-        </edit-config>
+        <!-- Diagnostic Application class (com.easierbycode.apkforge.ForgeApplication)
+             is registered on the <application> element by hooks/after_prepare.js
+             rather than via <edit-config> here, because cordova-common rejects
+             edit-config xpaths that overlap with an existing one (the project's
+             config.xml already targets /manifest/application/activity). -->
 
         <resource-file src="res/xml/apk_forge_paths.xml"
                        target="res/xml/apk_forge_paths.xml" />
