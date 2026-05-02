@@ -132,6 +132,43 @@ function removeStaleSpriteShareJavaStub(context) {
     }
 }
 
+/**
+ * Register com.easierbycode.apkforge.ForgeApplication as the application
+ * class. This is done here (not via the apk-forge plugin's plugin.xml)
+ * because cordova-common rejects an <edit-config> on /manifest/application
+ * when another edit-config already targets /manifest/application/activity
+ * — it considers ancestor xpaths to overlap and refuses to merge.
+ *
+ * Idempotent: if android:name is already set on <application>, leaves it.
+ */
+function registerForgeApplication(platformRoot) {
+    const manifestPath = path.join(
+        platformRoot, "app", "src", "main", "AndroidManifest.xml"
+    );
+    if (!fs.existsSync(manifestPath)) return;
+
+    let xml = fs.readFileSync(manifestPath, "utf8");
+    if (xml.indexOf("ForgeApplication") !== -1) return;
+
+    const appOpenRe = /<application\b([^>]*)>/;
+    const m = xml.match(appOpenRe);
+    if (!m) {
+        console.warn("after_prepare hook: <application> tag not found in AndroidManifest.xml");
+        return;
+    }
+
+    const attrs = m[1];
+    if (/\bandroid:name\s*=/.test(attrs)) {
+        console.log("after_prepare hook: <application> already has android:name; leaving it alone");
+        return;
+    }
+
+    const replacement = '<application android:name="com.easierbycode.apkforge.ForgeApplication"' + attrs + '>';
+    xml = xml.replace(appOpenRe, replacement);
+    fs.writeFileSync(manifestPath, xml, "utf8");
+    console.log("after_prepare hook: registered ForgeApplication on <application> in AndroidManifest.xml");
+}
+
 module.exports = function (context) {
     // ── iOS: enable WKWebView remote inspection ─────────────────────
     patchIOSWebViewInspectable(context);
@@ -145,6 +182,9 @@ module.exports = function (context) {
         context.opts.projectRoot, "platforms", "android"
     );
     if (!fs.existsSync(platformRoot)) return;
+
+    // ── Android: register ForgeApplication on <application> ─────────
+    registerForgeApplication(platformRoot);
 
     const mainActivity = findFile(
         path.join(platformRoot, "app", "src"), "MainActivity.kt"
