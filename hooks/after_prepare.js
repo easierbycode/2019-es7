@@ -4,8 +4,8 @@
  * Cordova after_prepare hook
  *
  * Patches MainActivity.kt (cordova-android 13+) to enable Android immersive
- * sticky mode.  This replaces the old cordova-plugin-fullscreen which only
- * supported Java-based CordovaActivity projects.
+ * sticky mode and to install lightweight on-device diagnostics so we can
+ * triage launch crashes on a device with no ADB.
  *
  * The patched activity:
  *  - Hides both status bar and navigation bar on launch.
@@ -13,6 +13,19 @@
  *    gesture momentarily reveals the bars).
  *  - Uses the modern WindowInsetsController API (API 30+) with a legacy
  *    fallback for older devices.
+ *  - Writes a timestamped launch-log.txt entry at the very start of
+ *    onCreate(), then again before/after loadUrl(launchUrl). The log is
+ *    written to the public Download/EvilInvadersForge/ folder so the user
+ *    can read it from a stock Files app even if the app crashes mid-boot.
+ *  - Installs an UncaughtExceptionHandler that persists stack traces to the
+ *    same folder as last-crash.txt.
+ *  - Shows a diagnostic AlertDialog (and a Toast) on every launch so the
+ *    user has visible proof that MainActivity reached the patched code.
+ *
+ * Diagnostics deliberately live in MainActivity itself, NOT in a custom
+ * Application class — registering android:name on <application> caused the
+ * game APK to fail to start at all on real devices (process died before any
+ * of our code could run).
  *
  * Note: SpriteShareActivity (for receiving shared images) is installed by
  * the cordova-plugin-sprite-share plugin via plugin.xml, not by this hook.
@@ -133,40 +146,27 @@ function removeStaleSpriteShareJavaStub(context) {
 }
 
 /**
- * Register com.easierbycode.apkforge.ForgeApplication as the application
- * class. This is done here (not via the apk-forge plugin's plugin.xml)
- * because cordova-common rejects an <edit-config> on /manifest/application
- * when another edit-config already targets /manifest/application/activity
- * — it considers ancestor xpaths to overlap and refuses to merge.
- *
- * Idempotent: if android:name is already set on <application>, leaves it.
+ * Strip any android:name="...ForgeApplication" left on <application> by
+ * older builds. Registering a custom Application class via the manifest
+ * caused the game APK to fail to launch at all on real devices, so we now
+ * intentionally leave <application> with no android:name and run all
+ * diagnostics from MainActivity instead. Idempotent.
  */
-function registerForgeApplication(platformRoot) {
+function removeStaleForgeApplicationRef(platformRoot) {
     const manifestPath = path.join(
         platformRoot, "app", "src", "main", "AndroidManifest.xml"
     );
     if (!fs.existsSync(manifestPath)) return;
 
-    let xml = fs.readFileSync(manifestPath, "utf8");
-    if (xml.indexOf("ForgeApplication") !== -1) return;
-
-    const appOpenRe = /<application\b([^>]*)>/;
-    const m = xml.match(appOpenRe);
-    if (!m) {
-        console.warn("after_prepare hook: <application> tag not found in AndroidManifest.xml");
-        return;
+    const xml = fs.readFileSync(manifestPath, "utf8");
+    const stripped = xml.replace(
+        /\s*android:name\s*=\s*"com\.easierbycode\.apkforge\.ForgeApplication"/g,
+        ""
+    );
+    if (stripped !== xml) {
+        fs.writeFileSync(manifestPath, stripped, "utf8");
+        console.log("after_prepare hook: stripped stale ForgeApplication android:name from <application>");
     }
-
-    const attrs = m[1];
-    if (/\bandroid:name\s*=/.test(attrs)) {
-        console.log("after_prepare hook: <application> already has android:name; leaving it alone");
-        return;
-    }
-
-    const replacement = '<application android:name="com.easierbycode.apkforge.ForgeApplication"' + attrs + '>';
-    xml = xml.replace(appOpenRe, replacement);
-    fs.writeFileSync(manifestPath, xml, "utf8");
-    console.log("after_prepare hook: registered ForgeApplication on <application> in AndroidManifest.xml");
 }
 
 module.exports = function (context) {
@@ -183,8 +183,8 @@ module.exports = function (context) {
     );
     if (!fs.existsSync(platformRoot)) return;
 
-    // ── Android: register ForgeApplication on <application> ─────────
-    registerForgeApplication(platformRoot);
+    // ── Android: scrub stale ForgeApplication manifest reference ────
+    removeStaleForgeApplicationRef(platformRoot);
 
     const mainActivity = findFile(
         path.join(platformRoot, "app", "src"), "MainActivity.kt"
@@ -213,7 +213,10 @@ module.exports = function (context) {
         "import android.widget.Toast",
         "import android.text.method.ScrollingMovementMethod",
         "import android.os.Environment",
+        "import android.util.Log",
         "import java.io.File",
+        "import java.io.PrintWriter",
+        "import java.io.StringWriter",
         "import java.text.SimpleDateFormat",
         "import java.util.Date",
         "import java.util.Locale"
@@ -231,7 +234,7 @@ module.exports = function (context) {
         try {
             val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
             val line = "[\$ts] \$marker\\n"
-            File(cacheDir, "launch-log.txt").appendText(line)
+            try { File(cacheDir, "launch-log.txt").appendText(line) } catch (_: Throwable) {}
             try {
                 getExternalFilesDir(null)?.let { File(it, "launch-log.txt").appendText(line) }
             } catch (_: Throwable) {}
@@ -241,6 +244,31 @@ module.exports = function (context) {
                 dl.mkdirs()
                 File(dl, "launch-log.txt").appendText(line)
             } catch (_: Throwable) {}
+        } catch (_: Throwable) {}
+    }
+
+    private fun installCrashHandler() {
+        try {
+            val previous = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+                try {
+                    val sw = StringWriter()
+                    val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+                    sw.write("CRASH at \$ts on thread \${thread.name}\\n\\n")
+                    throwable.printStackTrace(PrintWriter(sw))
+                    val text = sw.toString()
+                    Log.e("MainActivityCrash", text)
+                    try { File(cacheDir, "last-crash.txt").writeText(text) } catch (_: Throwable) {}
+                    try { getExternalFilesDir(null)?.let { File(it, "last-crash.txt").writeText(text) } } catch (_: Throwable) {}
+                    try {
+                        @Suppress("DEPRECATION")
+                        val dl = File(Environment.getExternalStorageDirectory(), "Download/EvilInvadersForge")
+                        dl.mkdirs()
+                        File(dl, "last-crash.txt").writeText(text)
+                    } catch (_: Throwable) {}
+                } catch (_: Throwable) {}
+                previous?.uncaughtException(thread, throwable)
+            }
         } catch (_: Throwable) {}
     }
 
@@ -319,9 +347,15 @@ module.exports = function (context) {
         }
     }`;
 
-    // Call enterImmersiveMode() and the diag dialog right after loadUrl in
-    // onCreate, plus log activity start/stop transitions to launch-log.txt so
-    // we can tell from the file alone how far the process got.
+    // Insert ACTIVITY_ENTER + crash handler at the very start of onCreate (right
+    // after super.onCreate). This proves the activity reached our patched code
+    // even if the WebView load triggers a fast follow-on crash. Then surround
+    // loadUrl with PRE_LOAD/POST_LOAD markers so the file alone tells us how
+    // far the boot got.
+    src = src.replace(
+        /(super\.onCreate\([^)]*\))/,
+        '$1\n        appendActivityDiagLine("ACTIVITY_ENTER")\n        installCrashHandler()'
+    );
     src = src.replace(
         /(loadUrl\(launchUrl\))/,
         'appendActivityDiagLine("ACTIVITY_PRE_LOAD")\n        $1\n        appendActivityDiagLine("ACTIVITY_POST_LOAD")\n        enterImmersiveMode()\n        showDiagnostics()'

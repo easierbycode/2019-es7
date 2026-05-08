@@ -18,37 +18,32 @@
             </feature>
         </config-file>
 
+        <!-- IMPORTANT: the <application android:name="...ForgeApplication"/>
+             and <provider name="...ForgeFileProvider"/> entries are
+             intentionally omitted. Earlier versions added them, but those
+             caused the game APK to crash on launch on real devices (process
+             died before any of our patched code could run, with no log file
+             or Toast). The on-device APK installer hand-off is temporarily
+             disabled until we can ship those entries with confidence; the
+             rest of the plugin (Cordova-side feature registration, build
+             pipeline, signing, etc.) still loads through res/xml/config.xml
+             below.
+
+             We do keep the REQUEST_INSTALL_PACKAGES permission though: it's
+             a pure manifest-level declaration that doesn't reference a
+             class, so it can't cause the boot crash, and
+             PackageManager.canRequestPackageInstalls() (used by
+             ApkForge.checkInstallPermission) returns false without it. -->
+
         <config-file target="AndroidManifest.xml" parent="/manifest">
             <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"
                              xmlns:android="http://schemas.android.com/apk/res/android" />
         </config-file>
 
-        <config-file target="AndroidManifest.xml" parent="/manifest/application">
-            <provider android:name="com.easierbycode.apkforge.ForgeFileProvider"
-                      android:authorities="${applicationId}.apkforge.fileprovider"
-                      android:exported="false"
-                      android:grantUriPermissions="true"
-                      xmlns:android="http://schemas.android.com/apk/res/android">
-                <meta-data android:name="android.support.FILE_PROVIDER_PATHS"
-                           android:resource="@xml/apk_forge_paths"
-                           xmlns:android="http://schemas.android.com/apk/res/android" />
-            </provider>
-        </config-file>
-
-        <!-- Diagnostic Application class (com.easierbycode.apkforge.ForgeApplication)
-             is registered on the <application> element by hooks/after_prepare.js
-             rather than via <edit-config> here, because cordova-common rejects
-             edit-config xpaths that overlap with an existing one (the project's
-             config.xml already targets /manifest/application/activity). -->
-
         <resource-file src="res/xml/apk_forge_paths.xml"
                        target="res/xml/apk_forge_paths.xml" />
 
         <source-file src="src/android/ApkForgePlugin.kt"
-                     target-dir="app/src/main/java/com/easierbycode/apkforge" />
-        <source-file src="src/android/ForgeApplication.kt"
-                     target-dir="app/src/main/java/com/easierbycode/apkforge" />
-        <source-file src="src/android/ForgeFileProvider.kt"
                      target-dir="app/src/main/java/com/easierbycode/apkforge" />
         <source-file src="src/android/ApkBuilder.kt"
                      target-dir="app/src/main/java/com/easierbycode/apkforge" />
