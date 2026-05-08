@@ -203,7 +203,12 @@ module.exports = function (context) {
 
     // ---- Add required imports --------------------------------------------------
     const importsToAdd = [
+        "import android.content.ContentUris",
+        "import android.content.ContentValues",
+        "import android.content.Context",
+        "import android.net.Uri",
         "import android.os.Build",
+        "import android.provider.MediaStore",
         "import android.view.View",
         "import android.view.WindowInsets",
         "import android.view.WindowInsetsController",
@@ -230,21 +235,90 @@ module.exports = function (context) {
 
     // ---- Add enterImmersiveMode() + onWindowFocusChanged() + showDiagnostics() ----
     const methodBlock = `
-    private fun appendActivityDiagLine(marker: String) {
+    private val DIAG_DOWNLOAD_NAME = "evilinvaders-launch-log.txt"
+    private val DIAG_CRASH_DOWNLOAD_NAME = "evilinvaders-last-crash.txt"
+
+    private fun diagAppendCtx(ctx: Context, marker: String) {
         try {
             val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
             val line = "[\$ts] \$marker\\n"
-            try { File(cacheDir, "launch-log.txt").appendText(line) } catch (_: Throwable) {}
+
+            // 1. App cache (always works, hidden from user but used by showDiagnostics)
+            try { File(ctx.cacheDir, "launch-log.txt").appendText(line) } catch (_: Throwable) {}
+
+            // 2. App external files dir (always works; user-visible only with adb /
+            // third-party file manager because Android 11+ Files app blocks it)
             try {
-                getExternalFilesDir(null)?.let { File(it, "launch-log.txt").appendText(line) }
+                ctx.getExternalFilesDir(null)?.let { File(it, "launch-log.txt").appendText(line) }
             } catch (_: Throwable) {}
-            try {
-                @Suppress("DEPRECATION")
-                val dl = File(Environment.getExternalStorageDirectory(), "Download/EvilInvadersForge")
-                dl.mkdirs()
-                File(dl, "launch-log.txt").appendText(line)
-            } catch (_: Throwable) {}
+
+            // 3. Public Downloads via MediaStore on API 29+ (the only place a user can
+            // actually find it from a stock Files app on Android 11+). On 28 and below
+            // we fall back to the legacy direct-file path.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try { mediaStoreAppend(ctx, DIAG_DOWNLOAD_NAME, line) } catch (_: Throwable) {}
+            } else {
+                try {
+                    @Suppress("DEPRECATION")
+                    val dl = File(Environment.getExternalStorageDirectory(), "Download/EvilInvadersForge")
+                    dl.mkdirs()
+                    File(dl, "launch-log.txt").appendText(line)
+                } catch (_: Throwable) {}
+            }
         } catch (_: Throwable) {}
+    }
+
+    private fun appendActivityDiagLine(marker: String) = diagAppendCtx(this, marker)
+
+    private fun mediaStoreAppend(ctx: Context, displayName: String, text: String) {
+        val resolver = ctx.contentResolver
+        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        val projection = arrayOf(MediaStore.Downloads._ID)
+        val selection = MediaStore.Downloads.DISPLAY_NAME + " = ?"
+        val args = arrayOf(displayName)
+
+        var existing: Uri? = null
+        try {
+            resolver.query(collection, projection, selection, args, null)?.use { c ->
+                if (c.moveToFirst()) existing = ContentUris.withAppendedId(collection, c.getLong(0))
+            }
+        } catch (_: Throwable) {}
+
+        val target = existing ?: run {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, displayName)
+                put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            }
+            resolver.insert(collection, values) ?: return
+        }
+        resolver.openOutputStream(target, "wa")?.use { it.write(text.toByteArray()) }
+    }
+
+    private fun mediaStoreOverwrite(ctx: Context, displayName: String, text: String) {
+        val resolver = ctx.contentResolver
+        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        val projection = arrayOf(MediaStore.Downloads._ID)
+        val selection = MediaStore.Downloads.DISPLAY_NAME + " = ?"
+        val args = arrayOf(displayName)
+
+        var existing: Uri? = null
+        try {
+            resolver.query(collection, projection, selection, args, null)?.use { c ->
+                if (c.moveToFirst()) existing = ContentUris.withAppendedId(collection, c.getLong(0))
+            }
+        } catch (_: Throwable) {}
+
+        val target = existing ?: run {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, displayName)
+                put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            }
+            resolver.insert(collection, values) ?: return
+        }
+        // "wt" truncates and writes
+        resolver.openOutputStream(target, "wt")?.use { it.write(text.toByteArray()) }
     }
 
     private fun installCrashHandler() {
@@ -260,12 +334,16 @@ module.exports = function (context) {
                     Log.e("MainActivityCrash", text)
                     try { File(cacheDir, "last-crash.txt").writeText(text) } catch (_: Throwable) {}
                     try { getExternalFilesDir(null)?.let { File(it, "last-crash.txt").writeText(text) } } catch (_: Throwable) {}
-                    try {
-                        @Suppress("DEPRECATION")
-                        val dl = File(Environment.getExternalStorageDirectory(), "Download/EvilInvadersForge")
-                        dl.mkdirs()
-                        File(dl, "last-crash.txt").writeText(text)
-                    } catch (_: Throwable) {}
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        try { mediaStoreOverwrite(this, DIAG_CRASH_DOWNLOAD_NAME, text) } catch (_: Throwable) {}
+                    } else {
+                        try {
+                            @Suppress("DEPRECATION")
+                            val dl = File(Environment.getExternalStorageDirectory(), "Download/EvilInvadersForge")
+                            dl.mkdirs()
+                            File(dl, "last-crash.txt").writeText(text)
+                        } catch (_: Throwable) {}
+                    }
                 } catch (_: Throwable) {}
                 previous?.uncaughtException(thread, throwable)
             }
@@ -345,16 +423,29 @@ module.exports = function (context) {
         if (hasFocus) {
             enterImmersiveMode()
         }
+    }
+
+    override fun attachBaseContext(newBase: Context) {
+        // Earliest hook in the Activity lifecycle. Runs before super.onCreate,
+        // before Cordova bootstrap, before plugin instantiation. If MAIN_ATTACH
+        // never appears in evilinvaders-launch-log.txt (Files app -> Downloads),
+        // the crash is happening before MainActivity even gets constructed —
+        // probably a manifest / dex-load problem. If MAIN_ATTACH appears but
+        // ACTIVITY_PRE_SUPER does not, super.attachBaseContext is the killer.
+        // If ACTIVITY_PRE_SUPER appears but POST_SUPER does not, super.onCreate
+        // (i.e. CordovaActivity bootstrap) is the killer.
+        try { diagAppendCtx(newBase, "MAIN_ATTACH") } catch (_: Throwable) {}
+        super.attachBaseContext(newBase)
+        try { diagAppendCtx(newBase, "MAIN_ATTACH_DONE") } catch (_: Throwable) {}
     }`;
 
-    // Insert ACTIVITY_ENTER + crash handler at the very start of onCreate (right
-    // after super.onCreate). This proves the activity reached our patched code
-    // even if the WebView load triggers a fast follow-on crash. Then surround
-    // loadUrl with PRE_LOAD/POST_LOAD markers so the file alone tells us how
-    // far the boot got.
+    // Wrap super.onCreate with PRE/POST markers and Toast so the user has
+    // immediate visible confirmation that MainActivity reached this point even
+    // if loadUrl triggers a fast follow-on crash. Then surround loadUrl with
+    // PRE_LOAD/POST_LOAD markers.
     src = src.replace(
         /(super\.onCreate\([^)]*\))/,
-        '$1\n        appendActivityDiagLine("ACTIVITY_ENTER")\n        installCrashHandler()'
+        'appendActivityDiagLine("ACTIVITY_PRE_SUPER")\n        $1\n        appendActivityDiagLine("ACTIVITY_POST_SUPER")\n        try { Toast.makeText(this, "MainActivity OK (forge diag)", Toast.LENGTH_LONG).show() } catch (_: Throwable) {}\n        installCrashHandler()'
     );
     src = src.replace(
         /(loadUrl\(launchUrl\))/,
