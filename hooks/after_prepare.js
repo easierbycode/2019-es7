@@ -210,8 +210,13 @@ module.exports = function (context) {
         "import android.app.AlertDialog",
         "import android.widget.TextView",
         "import android.widget.ScrollView",
+        "import android.widget.Toast",
         "import android.text.method.ScrollingMovementMethod",
-        "import java.io.File"
+        "import android.os.Environment",
+        "import java.io.File",
+        "import java.text.SimpleDateFormat",
+        "import java.util.Date",
+        "import java.util.Locale"
     ].join("\n");
 
     // Insert right after the existing CordovaActivity import line
@@ -220,28 +225,70 @@ module.exports = function (context) {
         "$1\n" + importsToAdd
     );
 
-    // ---- Add enterImmersiveMode() + onWindowFocusChanged() + showPreviousCrashIfAny() -
+    // ---- Add enterImmersiveMode() + onWindowFocusChanged() + showDiagnostics() ----
     const methodBlock = `
-    private fun showPreviousCrashIfAny() {
+    private fun appendActivityDiagLine(marker: String) {
         try {
-            val f = File(cacheDir, "last-crash.txt")
-            if (!f.exists()) return
-            val text = f.readText()
-            f.delete()
-            val tv = TextView(this).apply {
-                this.text = text
-                textSize = 10f
-                setPadding(24, 24, 24, 24)
-                setTextIsSelectable(true)
-                movementMethod = ScrollingMovementMethod()
+            val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+            val line = "[\$ts] \$marker\\n"
+            File(cacheDir, "launch-log.txt").appendText(line)
+            try {
+                getExternalFilesDir(null)?.let { File(it, "launch-log.txt").appendText(line) }
+            } catch (_: Throwable) {}
+            try {
+                @Suppress("DEPRECATION")
+                val dl = File(Environment.getExternalStorageDirectory(), "Download/EvilInvadersForge")
+                dl.mkdirs()
+                File(dl, "launch-log.txt").appendText(line)
+            } catch (_: Throwable) {}
+        } catch (_: Throwable) {}
+    }
+
+    private fun showDiagnostics() {
+        try {
+            // Always-visible Toast: confirms MainActivity reached this point.
+            Toast.makeText(this, "MainActivity OK (forge diag)", Toast.LENGTH_LONG).show()
+
+            val crash = File(cacheDir, "last-crash.txt")
+            val log = File(cacheDir, "launch-log.txt")
+            val hasCrash = crash.exists()
+            val hasLog = log.exists()
+            if (!hasCrash && !hasLog) return
+
+            val sb = StringBuilder()
+            if (hasCrash) {
+                sb.append("=== LAST CRASH ===\\n").append(crash.readText()).append("\\n\\n")
             }
-            val sv = ScrollView(this).apply { addView(tv) }
-            AlertDialog.Builder(this)
-                .setTitle("Previous launch crashed")
-                .setView(sv)
-                .setPositiveButton("Continue") { d, _ -> d.dismiss() }
-                .setCancelable(false)
-                .show()
+            if (hasLog) {
+                sb.append("=== LAUNCH LOG (most recent) ===\\n").append(log.readText())
+            }
+            val text = sb.toString()
+
+            // Post to UI thread with a small delay so the dialog has a chance to
+            // render even if loadUrl() triggers a fast follow-on crash.
+            window.decorView.postDelayed({
+                try {
+                    val tv = TextView(this).apply {
+                        this.text = text
+                        textSize = 10f
+                        setPadding(24, 24, 24, 24)
+                        setTextIsSelectable(true)
+                        movementMethod = ScrollingMovementMethod()
+                    }
+                    val sv = ScrollView(this).apply { addView(tv) }
+                    AlertDialog.Builder(this)
+                        .setTitle(if (hasCrash) "Previous launch crashed" else "Forge diagnostics")
+                        .setView(sv)
+                        .setPositiveButton("Continue") { d, _ -> d.dismiss() }
+                        .setNegativeButton("Clear logs") { d, _ ->
+                            try { crash.delete() } catch (_: Throwable) {}
+                            try { log.delete() } catch (_: Throwable) {}
+                            d.dismiss()
+                        }
+                        .setCancelable(false)
+                        .show()
+                } catch (_: Throwable) {}
+            }, 300L)
         } catch (_: Throwable) {}
     }
 
@@ -272,11 +319,12 @@ module.exports = function (context) {
         }
     }`;
 
-    // Call enterImmersiveMode() right after loadUrl in onCreate, and surface any
-    // crash log written by ForgeApplication on the previous launch.
+    // Call enterImmersiveMode() and the diag dialog right after loadUrl in
+    // onCreate, plus log activity start/stop transitions to launch-log.txt so
+    // we can tell from the file alone how far the process got.
     src = src.replace(
         /(loadUrl\(launchUrl\))/,
-        "$1\n        enterImmersiveMode()\n        showPreviousCrashIfAny()"
+        'appendActivityDiagLine("ACTIVITY_PRE_LOAD")\n        $1\n        appendActivityDiagLine("ACTIVITY_POST_LOAD")\n        enterImmersiveMode()\n        showDiagnostics()'
     );
 
     // Insert methods before the final closing brace of the class

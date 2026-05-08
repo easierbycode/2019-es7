@@ -2,6 +2,7 @@ package com.easierbycode.apkforge
 
 import android.app.Application
 import android.content.Context
+import android.os.Build
 import android.os.Environment
 import android.util.Log
 import java.io.File
@@ -12,18 +13,20 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * Diagnostic Application class that installs an UncaughtExceptionHandler in
- * attachBaseContext() — runs *before* ContentProvider.attachInfo, so it
- * captures FileProvider/manifest-merge style crashes that would otherwise
- * leave no visible trace on a device without ADB.
+ * Diagnostic Application class. Two responsibilities:
  *
- * The handler writes the stack trace to three locations (best-effort):
- *   1. cacheDir/last-crash.txt                           (always writable)
- *   2. getExternalFilesDir(null)/last-crash.txt          (visible to file managers)
- *   3. /sdcard/Download/EvilInvadersForge/last-crash.txt (visible in Files app)
+ *   1) Append a "boot ping" line to a launch log on every process start so the
+ *      user can confirm — even on a device with no ADB — whether ForgeApplication
+ *      is being loaded at all. The log is written to several locations so at
+ *      least one is reachable from a stock Files app.
  *
- * MainActivity is patched (by hooks/after_prepare.js) to read #1 on the next
- * launch and display it in a Dialog so the user can read the trace on-device.
+ *   2) Install an UncaughtExceptionHandler in attachBaseContext (runs *before*
+ *      ContentProvider.attachInfo, so it captures FileProvider/manifest-merge
+ *      style crashes that would otherwise leave no trace) and persist the
+ *      stack trace to the same locations.
+ *
+ * MainActivity (patched by hooks/after_prepare.js) reads these files on every
+ * launch and shows them in a Dialog so the user has a visible record without ADB.
  */
 class ForgeApplication : Application() {
 
@@ -31,8 +34,14 @@ class ForgeApplication : Application() {
 
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(base)
+        appendDiagLine(base, "APP_ATTACH pid=${android.os.Process.myPid()} api=${Build.VERSION.SDK_INT}")
         installCrashHandler(base)
         Log.i(TAG, "ForgeApplication attached, crash handler installed")
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        appendDiagLine(this, "APP_CREATE")
     }
 
     private fun installCrashHandler(ctx: Context) {
@@ -47,7 +56,8 @@ class ForgeApplication : Application() {
         val sw = StringWriter()
         val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
         sw.write("CRASH at $ts\n")
-        sw.write("Thread: ${thread.name}\n\n")
+        sw.write("Thread: ${thread.name}\n")
+        sw.write("Process: ${android.os.Process.myPid()}\n\n")
         throwable.printStackTrace(PrintWriter(sw))
         val text = sw.toString()
         Log.e(TAG, text)
@@ -67,8 +77,41 @@ class ForgeApplication : Application() {
         }
     }
 
+    /**
+     * Append a single timestamped line to launch-log.txt in three locations
+     * (best-effort; any can fail without affecting the others). Keeps the
+     * tail of the file under MAX_LOG_BYTES so it doesn't grow unbounded.
+     */
+    private fun appendDiagLine(ctx: Context, marker: String) {
+        val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+        val line = "[$ts] $marker\n"
+
+        runCatching { appendCapped(File(ctx.cacheDir, LAUNCH_LOG), line) }
+        runCatching {
+            ctx.getExternalFilesDir(null)?.let { appendCapped(File(it, LAUNCH_LOG), line) }
+        }
+        runCatching {
+            @Suppress("DEPRECATION")
+            val downloads = File(Environment.getExternalStorageDirectory(),
+                "Download/EvilInvadersForge")
+            downloads.mkdirs()
+            appendCapped(File(downloads, LAUNCH_LOG), line)
+        }
+    }
+
+    private fun appendCapped(f: File, text: String) {
+        if (f.exists() && f.length() > MAX_LOG_BYTES) {
+            // Trim to last half so we keep recent history
+            val keep = f.readText().takeLast(MAX_LOG_BYTES.toInt() / 2)
+            f.writeText(keep)
+        }
+        f.appendText(text)
+    }
+
     companion object {
         private const val TAG = "ForgeApplication"
         const val CRASH_FILE = "last-crash.txt"
+        const val LAUNCH_LOG = "launch-log.txt"
+        private const val MAX_LOG_BYTES = 64L * 1024L
     }
 }
