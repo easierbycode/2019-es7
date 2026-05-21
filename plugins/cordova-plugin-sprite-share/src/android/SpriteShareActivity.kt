@@ -1,6 +1,9 @@
 package com.easierbycode.spriteshare
 
 import android.app.Activity
+import android.content.ContentUris
+import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.Bitmap
@@ -8,6 +11,8 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.util.TypedValue
@@ -22,9 +27,15 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import android.widget.TextView
+import android.widget.Toast
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.PrintWriter
+import java.io.StringWriter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -39,15 +50,34 @@ class SpriteShareActivity : Activity() {
     private var sharedImageFile: File? = null
     private var tempSourceFile: File? = null
 
+    // ── attachBaseContext runs before any other Activity lifecycle hook, before
+    //    super.onCreate, before WebView class load. Earliest place we can install
+    //    a process-wide crash handler so a force-close anywhere in this Activity
+    //    leaves an evilinvaders-spriteshare-crash.txt on disk.
+    //
+    //    When the user shares an image without first launching the main app, the
+    //    MainActivity diagnostics never run, so we install our own here.
+    override fun attachBaseContext(newBase: Context) {
+        try { diagAppendCtx(newBase, "SHARE_ATTACH") } catch (_: Throwable) {}
+        try { installCrashHandler(newBase) } catch (_: Throwable) {}
+        super.attachBaseContext(newBase)
+        try { diagAppendCtx(newBase, "SHARE_ATTACH_DONE") } catch (_: Throwable) {}
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        appendShareDiag("SHARE_PRE_SUPER")
         super.onCreate(savedInstanceState)
+        appendShareDiag("SHARE_POST_SUPER")
+        try { Toast.makeText(this, "SpriteShare OK", Toast.LENGTH_SHORT).show() } catch (_: Throwable) {}
         showStatusView("Loading shared image...")
+        appendShareDiag("SHARE_STATUS_SHOWN action=${intent?.action ?: "(none)"} type=${intent?.type ?: "(none)"}")
 
         try {
             // Save the shared image to a temp file — avoids passing multi-MB
             // base64 through evaluateJavascript (crashes WebView) or the
             // @JavascriptInterface bridge (Binder TransactionTooLargeException).
             sharedImageFile = saveSharedImageToFile()
+            appendShareDiag("SHARE_IMG_LOADED ok=${sharedImageFile != null}")
             if (sharedImageFile == null) {
                 Log.e(TAG, "Failed to read shared image from intent")
                 showFatalError("Could not read the shared image.", null)
@@ -62,6 +92,7 @@ class SpriteShareActivity : Activity() {
             // Set up the WebView
             val wv = WebView(this)
             webView = wv
+            appendShareDiag("SHARE_WEBVIEW_CREATED")
 
             wv.settings.javaScriptEnabled = true
             wv.settings.domStorageEnabled = true
@@ -127,12 +158,16 @@ class SpriteShareActivity : Activity() {
             }
 
             setContentView(wv)
+            appendShareDiag("SHARE_PRE_LOADURL")
             wv.loadUrl("file:///android_asset/www/sprite-share/sprite-picker.html")
+            appendShareDiag("SHARE_POST_LOADURL")
         } catch (e: Exception) {
             Log.e(TAG, "onCreate failed", e)
+            appendShareDiag("SHARE_ONCREATE_EXCEPTION ${e::class.java.simpleName}: ${e.message}")
             showFatalError("Sprite Share failed during startup.", e)
         } catch (t: Throwable) {
             Log.e(TAG, "onCreate failed with fatal error", t)
+            appendShareDiag("SHARE_ONCREATE_THROWABLE ${t::class.java.simpleName}: ${t.message}")
             showFatalError("Sprite Share hit a fatal error during startup.", t)
         }
     }
@@ -437,10 +472,124 @@ class SpriteShareActivity : Activity() {
         super.onDestroy()
     }
 
+    // ── On-device diagnostics ────────────────────────────────────────────
+    // Mirrors the MainActivity launch-log / crash-log pattern but with
+    // SpriteShare-specific filenames so the two activities don't overwrite
+    // each other's logs. Files appear in Files app → Downloads on API 29+.
+
+    private fun appendShareDiag(marker: String) = diagAppendCtx(this, marker)
+
+    private fun diagAppendCtx(ctx: Context, marker: String) {
+        try {
+            val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+            val line = "[$ts] $marker\n"
+            try { File(ctx.cacheDir, "spriteshare-log.txt").appendText(line) } catch (_: Throwable) {}
+            try {
+                ctx.getExternalFilesDir(null)?.let { File(it, "spriteshare-log.txt").appendText(line) }
+            } catch (_: Throwable) {}
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                try { mediaStoreAppend(ctx, SHARE_LOG_DOWNLOAD_NAME, line) } catch (_: Throwable) {}
+            } else {
+                try {
+                    @Suppress("DEPRECATION")
+                    val dl = File(Environment.getExternalStorageDirectory(), "Download/EvilInvadersForge")
+                    dl.mkdirs()
+                    File(dl, "spriteshare-log.txt").appendText(line)
+                } catch (_: Throwable) {}
+            }
+        } catch (_: Throwable) {}
+    }
+
+    private fun mediaStoreAppend(ctx: Context, displayName: String, text: String) {
+        val resolver = ctx.contentResolver
+        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        val projection = arrayOf(MediaStore.Downloads._ID)
+        val selection = MediaStore.Downloads.DISPLAY_NAME + " = ?"
+        val args = arrayOf(displayName)
+
+        var existing: Uri? = null
+        try {
+            resolver.query(collection, projection, selection, args, null)?.use { c ->
+                if (c.moveToFirst()) existing = ContentUris.withAppendedId(collection, c.getLong(0))
+            }
+        } catch (_: Throwable) {}
+
+        val target = existing ?: run {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, displayName)
+                put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            }
+            resolver.insert(collection, values) ?: return
+        }
+        resolver.openOutputStream(target, "wa")?.use { it.write(text.toByteArray()) }
+    }
+
+    private fun mediaStoreOverwrite(ctx: Context, displayName: String, text: String) {
+        val resolver = ctx.contentResolver
+        val collection = MediaStore.Downloads.EXTERNAL_CONTENT_URI
+        val projection = arrayOf(MediaStore.Downloads._ID)
+        val selection = MediaStore.Downloads.DISPLAY_NAME + " = ?"
+        val args = arrayOf(displayName)
+
+        var existing: Uri? = null
+        try {
+            resolver.query(collection, projection, selection, args, null)?.use { c ->
+                if (c.moveToFirst()) existing = ContentUris.withAppendedId(collection, c.getLong(0))
+            }
+        } catch (_: Throwable) {}
+
+        val target = existing ?: run {
+            val values = ContentValues().apply {
+                put(MediaStore.Downloads.DISPLAY_NAME, displayName)
+                put(MediaStore.Downloads.MIME_TYPE, "text/plain")
+                put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS)
+            }
+            resolver.insert(collection, values) ?: return
+        }
+        resolver.openOutputStream(target, "wt")?.use { it.write(text.toByteArray()) }
+    }
+
+    // Installs a process-wide UncaughtExceptionHandler so a crash anywhere in
+    // SpriteShareActivity (including super.onCreate, WebView class load, etc.)
+    // writes a stack trace to disk before the process dies.
+    private fun installCrashHandler(ctx: Context) {
+        try {
+            val previous = Thread.getDefaultUncaughtExceptionHandler()
+            Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+                try {
+                    val sw = StringWriter()
+                    val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(Date())
+                    sw.write("CRASH at $ts on thread ${thread.name}\n\n")
+                    throwable.printStackTrace(PrintWriter(sw))
+                    val text = sw.toString()
+                    Log.e(TAG, text)
+                    try { File(ctx.cacheDir, "spriteshare-crash.txt").writeText(text) } catch (_: Throwable) {}
+                    try {
+                        ctx.getExternalFilesDir(null)?.let { File(it, "spriteshare-crash.txt").writeText(text) }
+                    } catch (_: Throwable) {}
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        try { mediaStoreOverwrite(ctx, SHARE_CRASH_DOWNLOAD_NAME, text) } catch (_: Throwable) {}
+                    } else {
+                        try {
+                            @Suppress("DEPRECATION")
+                            val dl = File(Environment.getExternalStorageDirectory(), "Download/EvilInvadersForge")
+                            dl.mkdirs()
+                            File(dl, "spriteshare-crash.txt").writeText(text)
+                        } catch (_: Throwable) {}
+                    }
+                } catch (_: Throwable) {}
+                previous?.uncaughtException(thread, throwable)
+            }
+        } catch (_: Throwable) {}
+    }
+
     companion object {
         private const val TAG = "SpriteShare"
         private const val MAX_IMAGE_DIMENSION = 1536
         private const val MAX_IMAGE_PIXELS = 1_250_000L
+        private const val SHARE_LOG_DOWNLOAD_NAME = "evilinvaders-spriteshare-log.txt"
+        private const val SHARE_CRASH_DOWNLOAD_NAME = "evilinvaders-spriteshare-crash.txt"
     }
 
     private enum class SaveResult {
