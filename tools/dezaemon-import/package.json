@@ -1,0 +1,13 @@
+{
+  "name": "dezaemon-import",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Import a Sega Saturn Dezaemon 2 user-created game from a .sav into the level editor's game.json + atlas format.",
+  "bin": "./index.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "dependencies": {
+    "pngjs": "^7.0.0"
+  }
+}
