@@ -5,6 +5,7 @@ const assert = require("node:assert");
 const fs = require("fs");
 const path = require("path");
 const { detect, deinterleave } = require("../lib/bup-deinterleave");
+const { normalize, isGzip } = require("../lib/bup-source");
 const bup = require("../lib/bup-parse");
 
 const FIX = path.join(__dirname, "..", "fixtures");
@@ -45,4 +46,31 @@ test("parses Mucha Kucha Fighter directory entry", () => {
 
 test("rejects non-Saturn data", () => {
     assert.throws(() => bup.parse(Buffer.alloc(1024)), /BackUpRam Format/);
+});
+
+test("normalize gunzips Mednafen .bcr cart saves", () => {
+    const raw = load("baseline-cart.bcr");
+    assert.strictEqual(isGzip(raw), true);
+    const { kind, data } = normalize(raw);
+    assert.strictEqual(kind, "gzip");
+    assert.strictEqual(data.length, 524288); // 4Mbit cart = 512KB raw
+});
+
+test("empty cart yields no save entries", () => {
+    const { data } = normalize(load("baseline-cart.bcr"));
+    const saves = bup.parse(data);
+    assert.deepStrictEqual(saves, []);
+});
+
+test("parses DEZA2___SYS system save in internal RAM dump", () => {
+    const raw = load("baseline-internal.bkr");
+    const { kind, data } = normalize(raw);
+    assert.strictEqual(kind, "raw");
+    assert.strictEqual(data.length, 32768);
+    const [save] = bup.parse(data);
+    assert.strictEqual(save.offset, 0x80);
+    assert.strictEqual(save.filename, "DEZA2___SYS");
+    assert.strictEqual(save.datasize, 17);
+    assert.strictEqual(save.blocks.length, 0); // small enough to fit inline
+    assert.strictEqual(save.payload.buffer.length, 17);
 });

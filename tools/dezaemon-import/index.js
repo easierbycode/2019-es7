@@ -12,7 +12,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { deinterleave, detect } = require("./lib/bup-deinterleave");
+const { normalize } = require("./lib/bup-source");
 const bup = require("./lib/bup-parse");
 
 const USAGE = `Usage: dezaemon-import <input.sav> [options]
@@ -50,8 +50,7 @@ function main() {
     }
 
     const raw = fs.readFileSync(opts.input);
-    const interleaved = detect(raw);
-    const data = deinterleave(raw);
+    const { kind, data } = normalize(raw);
 
     let saves;
     try {
@@ -82,7 +81,7 @@ function main() {
                 approximate: s.payload.approximate,
             },
         }));
-        process.stdout.write(JSON.stringify({ interleaved, saves: out }, null, 2) + "\n");
+        process.stdout.write(JSON.stringify({ container: kind, saves: out }, null, 2) + "\n");
         return;
     }
 

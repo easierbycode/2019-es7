@@ -1,20 +1,46 @@
 # Dezaemon 2 (Saturn) save format — reverse-engineering notes
 
 Working notes for the importer. Split into **confirmed** (validated against real
-saves) and **open** (needs more samples). Two reference saves live in
-`fixtures/`: `ramsie.sav` and `mucha-kucha.sav` — both 4Mbit backup-cartridge
-dumps of distinct user-made games.
+saves) and **open** (needs more samples). Four reference saves live in
+`fixtures/`:
+
+| File                    | Source                        | What it is                       |
+|-------------------------|-------------------------------|----------------------------------|
+| `ramsie.sav`            | hardware-style cart dump      | full user game "Ramsie"          |
+| `mucha-kucha.sav`       | hardware-style cart dump      | full user game "MuchaKucha"      |
+| `baseline-cart.bcr`     | OpenEmu / Mednafen battery    | empty (just-formatted) cart      |
+| `baseline-internal.bkr` | OpenEmu / Mednafen battery    | 32KB internal RAM, `DEZA2___SYS` |
 
 All multi-byte integers are **big-endian** (Saturn is a big-endian SH-2 machine).
 
-## Container: Saturn backup RAM (confirmed)
+## Container wrappings (confirmed — `lib/bup-source.js`)
 
-- Physical dump is **byte-interleaved**: every even byte is `0xFF` (the unused
-  high half of each 16-bit backup-RAM word). De-interleave by taking the odd
-  bytes. 1,114,112 phys → 557,056 logical. (`lib/bup-deinterleave.js`)
-- Logical image is paged; each page starts with the ASCII magic
-  `"BackUpRam Format"` repeated 4× (= 64 bytes). Page 0 at logical `0x0000` is
-  empty in our dumps; the live directory page is at `0x8000`.
+Input files arrive in one of three wrappings, all normalized to raw BUP bytes:
+
+- **gzip** — Mednafen / OpenEmu's `.bcr` battery saves. Standard gzip header
+  (`1f 8b 08 …`) over the raw 512KB cart image. The "COMPRESS POINT / 87%"
+  screen Dezaemon 2 shows during SAVE is just deflate running on the user data.
+- **0xFF-interleaved** — full hardware-style cart dumps. Every even byte is
+  `0xFF` (the unused high half of each 16-bit backup-RAM word). 1MB physical,
+  512KB logical. De-interleave by taking the odd bytes. (`lib/bup-deinterleave.js`)
+- **raw** — internal-RAM dumps (`.bkr`, 32KB) and already-unwrapped cart images.
+
+After normalization, the BUP image starts with the ASCII magic
+`"BackUpRam Format"` repeated some number of times. Internal RAM has 4 copies
+(64 bytes); cart dumps have varying amounts (32 copies / 512 bytes on a
+Mednafen-formatted cart, plus a second magic block at logical `0x8000` on the
+hardware-style Ramsie / Mucha dumps).
+
+## Targets: where each save type lives (confirmed)
+
+Dezaemon 2 splits its data across two backup memory targets:
+
+- **Internal RAM** holds `DEZA2___SYS` — the system/settings record (17 bytes).
+  Its Shift-JIS comment decodes to `デザ2_ｼｽﾃﾑ` ("Deza2 System"). This is what
+  gets written automatically on save without prompting.
+- **External cart** holds user game projects as `DEZA2____01` (and presumably
+  `_02`, `_03` …). Cart writes require an extra confirm step in the save flow.
+  An empty just-formatted cart has no directory entries at all.
 
 ## Directory entry (confirmed — `lib/bup-parse.js`)
 
