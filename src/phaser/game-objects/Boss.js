@@ -56,8 +56,9 @@ export function bossAdd(scene) {
     scene.gokiFlg = false;
     scene.bossIsGoki = false;
 
-    // spBoss: at stageId 3 with 0 continues, BossGoki replaces BossVega
-    var isGokiStage = stageId === 3 && Number(gameState.continueCnt || 0) === 0;
+    // spBoss: at stageId 3 with 0 continues, BossGoki replaces BossVega.
+    // forceBossName ("goki" via ?boss=goki) keeps goki even after a continue.
+    var isGokiStage = stageId === 3 && Number(gameState.continueCnt || 0) === 0 || gameState.forceBossName === "goki" && stageId === 3;
     if (isGokiStage) {
         scene.gokiFlg = true;
     }

@@ -418,6 +418,7 @@ export class PhaserTitleScene extends Phaser.Scene {
         gameState.continueCnt = 0;
         gameState.akebonoCnt = 0;
         gameState.shortFlg = false;
+        gameState.forceBossName = null;
 
         var game = this.game;
         setTimeout(function () {
