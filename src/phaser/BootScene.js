@@ -726,6 +726,18 @@ export class BootScene extends Phaser.Scene {
         var stageParam = readStageParam();
         var bossRush = readBossRushParam();
 
+        // ?boss=goki forces the goki boss: pin stage 3 (unless ?stage says
+        // otherwise) and jump straight to the boss via the bossRush path.
+        var forceBoss = null;
+        try {
+            forceBoss = new URLSearchParams(window.location.search).get("boss");
+        } catch (e) {}
+        if (forceBoss === "goki") {
+            gameState.forceBossName = "goki";
+            if (stageParam == null) stageParam = 3;
+            bossRush = true;
+        }
+
         var nextSceneKey = "PhaserTitleScene";
         if (editorPlay && recipe) {
             primeGameStateForStage(recipe, editorPlay.stageId);
