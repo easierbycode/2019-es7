@@ -4,3 +4,7 @@ node_modules/
 .deno_dir/
 .env
 .DS_Store
+
+# Vite writes this transient file while loading a TS config; it should be
+# cleaned up automatically but can be left behind if Vite is killed mid-load.
+vite.config.ts.timestamp-*.mjs
