@@ -6,7 +6,7 @@
 #   - AthenaEnv v4 SDK installed
 #   - ffmpeg (for audio conversion)
 #   - ImageMagick or similar (for atlas conversion)
-#   - mkisofs or genisoimage (for ISO creation)
+#   - deno (for --iso: build-athena-iso.ts writes an ISO9660 image, no mkisofs needed)
 #
 # Usage:
 #   cd src/ps2/deploy
@@ -449,3 +449,30 @@ echo ""
 echo "=== Build Complete ==="
 echo "Output: $BUILD_DIR/"
 echo "Files: $(find "$BUILD_DIR" -type f | wc -l)"
+
+# --- Optional: package build/ into a bootable PS2 ISO ---
+if [ "$BUILD_ISO" = true ]; then
+    echo ""
+    echo "[iso] Packaging build/ into a PS2 ISO..."
+    OUT_ISO="$SCRIPT_DIR/build.iso"
+    ISO_BUILDER="$SCRIPT_DIR/build-athena-iso.ts"
+
+    if ! command -v deno &>/dev/null; then
+        echo "  ERROR: deno not found — needed to build the ISO. Install from https://deno.com and re-run."
+        exit 1
+    fi
+    if [ ! -f "$ISO_BUILDER" ]; then
+        echo "  ERROR: ISO builder not found at $ISO_BUILDER"
+        exit 1
+    fi
+
+    # build-athena-iso.ts <appDir> <outIso> <bootElfName>; build/ already holds athena.elf.
+    deno run --allow-read --allow-write "$ISO_BUILDER" "$BUILD_DIR" "$OUT_ISO" "athena.elf"
+
+    if [ -f "$OUT_ISO" ]; then
+        echo "  ISO: $OUT_ISO ($(du -h "$OUT_ISO" | cut -f1))"
+    else
+        echo "  ERROR: ISO was not produced"
+        exit 1
+    fi
+fi
