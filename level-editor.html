@@ -452,6 +452,8 @@
             <button class="menu-btn" onclick="saveAll();closeMenu()">💾 Save All (Live Patch)</button>
             <button class="menu-btn" onclick="playCurrentStage();closeMenu()">▶ Play In Phaser</button>
             <button class="menu-btn" onclick="exportCurrentLevelJSON();closeMenu()">📤 Export Level JSON</button>
+            <button class="menu-btn" onclick="saveAs3D();closeMenu()">🎮 Save as 3D (Super Scaler)</button>
+            <button class="menu-btn" onclick="play3D();closeMenu()">▶ Play 3D</button>
         </div>
         <div class="menu-section">
             <div class="menu-section-title">Game Save (Cloud)</div>
@@ -2414,6 +2416,1380 @@
             a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }));
             a.download = `${currentStageKey}-level.json`; a.click();
         }
+
+        // ================== SAVE AS 3D (SUPER SCALER) ==================
+        // Exports the loaded game as a single self-contained HTML file that plays
+        // a Burning Force style pseudo-3D (super scaler) version of the game:
+        // same enemies, power-ups, bosses and stage backgrounds, with the 8 grid
+        // columns mapped onto 8 lanes of a perspective ground plane. The runtime
+        // (GAME3D_RUNTIME below) plus the recipe, atlas, backgrounds and SFX are
+        // embedded as data URLs, so the exported file runs anywhere — even from
+        // file://.
+
+        // SFX bundled into the export. `paths` are candidates relative to
+        // assets/sounds/ (2019-turbo naming first, legacy se_sp/g_sp aliases
+        // second); `aliases` are alternate keys for editor custom-audio lookups.
+        const SFX_3D = [
+            { key: 'se_shoot', paths: ['se_shoot.mp3'] },
+            { key: 'se_shoot_b', paths: ['se_shoot_b.mp3'] },
+            { key: 'se_explosion', paths: ['se_explosion.mp3'] },
+            { key: 'se_damage', paths: ['se_damage.mp3'] },
+            { key: 'se_guard', paths: ['se_guard.mp3'] },
+            { key: 'g_damage_voice', paths: ['g_damage_voice.mp3'] },
+            { key: 'g_powerup_voice', paths: ['g_powerup_voice.mp3'] },
+            { key: 'se_ca', aliases: ['se_sp'], paths: ['se_ca.mp3', 'se_sp.mp3'] },
+            { key: 'se_ca_explosion', aliases: ['se_sp_explosion'], paths: ['se_ca_explosion.mp3', 'se_sp_explosion.mp3'] },
+            { key: 'g_ca_voice', aliases: ['g_sp_voice'], paths: ['g_ca_voice.mp3', 'g_sp_voice.mp3'] },
+            { key: 'se_barrier_start', paths: ['se_barrier_start.mp3'] },
+            { key: 'se_barrier_end', paths: ['se_barrier_end.mp3'] },
+            { key: 'g_stage_voice_0', paths: ['scene_game/g_stage_voice_0.mp3'] },
+            { key: 'g_stage_voice_1', paths: ['scene_game/g_stage_voice_1.mp3'] },
+            { key: 'g_stage_voice_2', paths: ['scene_game/g_stage_voice_2.mp3'] },
+            { key: 'g_stage_voice_3', paths: ['scene_game/g_stage_voice_3.mp3'] },
+            { key: 'g_stage_voice_4', paths: ['scene_game/g_stage_voice_4.mp3'] },
+        ];
+
+        function blobToDataURL3D(blob) {
+            return new Promise((resolve) => {
+                const fr = new FileReader();
+                fr.onload = () => resolve(fr.result);
+                fr.onerror = () => resolve(null);
+                fr.readAsDataURL(blob);
+            });
+        }
+
+        // Read a game file as a Blob: from the loaded directory when one is
+        // open, otherwise from the server the editor is hosted on.
+        async function readGameBlob3D(relPath) {
+            const parts = relPath.split('/');
+            if (dirHandle) {
+                try { return await (await getFileHandle(parts)).getFile(); } catch (e) {}
+                // some game folders are rooted at assets/ already
+                if (parts[0] === 'assets') {
+                    try { return await (await getFileHandle(parts.slice(1))).getFile(); } catch (e) {}
+                }
+                return null;
+            }
+            try {
+                const resp = await fetch(relPath);
+                if (resp.ok) return await resp.blob();
+            } catch (e) {}
+            return null;
+        }
+
+        async function resolve3DSound(entry) {
+            // Editor custom-audio overrides win (uploaded via the Audio Editor)
+            const customKeys = [entry.key].concat(entry.aliases || []);
+            for (const ck of customKeys) {
+                try {
+                    const blob = await getCustomAudio(ck);
+                    if (blob) return await blobToDataURL3D(blob);
+                } catch (e) {}
+            }
+            for (const p of entry.paths) {
+                const blob = await readGameBlob3D('assets/sounds/' + p);
+                if (blob) return await blobToDataURL3D(blob);
+            }
+            return null;
+        }
+
+        // The game_ui frames GAME3D_RUNTIME draws (digits, labels, banners,
+        // the CA button, title art). Keep in sync with the runtime below.
+        const UI_3D_KEYS = [
+            'bigNum0.gif', 'bigNum1.gif', 'bigNum2.gif', 'bigNum3.gif', 'bigNum4.gif',
+            'bigNum5.gif', 'bigNum6.gif', 'bigNum7.gif', 'bigNum8.gif', 'bigNum9.gif',
+            'scoreTxt.gif', 'hiScoreTxt.gif', 'timeTxt.gif',
+            'hudCabtn0per.gif', 'hudCabtn100per.gif',
+            'stageTitle.gif', 'stageNum1.gif', 'stageNum2.gif', 'stageNum3.gif', 'stageNum4.gif',
+            'stageFight.gif', 'stageclear.gif', 'continueGameOver.gif', 'congraTxt0.gif',
+            'logo.gif', 'subTitle.gif', 'subTitleEn.gif', 'titleStartText.gif',
+        ];
+
+        // Repack just the needed game_ui frames into a compact vertical-strip
+        // atlas (one frame per row) and return { frames, imageDataURL }.
+        function packUiAtlas3D(img, frames) {
+            const entries = [];
+            for (const k of UI_3D_KEYS) {
+                const fd = frames[k];
+                if (fd && fd.frame) entries.push([k, fd.frame]);
+            }
+            if (!entries.length) return null;
+            let maxW = 0, totalH = 0;
+            for (const [, f] of entries) { maxW = Math.max(maxW, f.w); totalH += f.h + 1; }
+            const cv = document.createElement('canvas');
+            cv.width = maxW; cv.height = totalH;
+            const c2 = cv.getContext('2d');
+            const outFrames = {};
+            let y = 0;
+            for (const [k, f] of entries) {
+                c2.drawImage(img, f.x, f.y, f.w, f.h, 0, y, f.w, f.h);
+                outFrames[k] = { frame: { x: 0, y: y, w: f.w, h: f.h } };
+                y += f.h + 1;
+            }
+            return { frames: outFrames, imageDataURL: cv.toDataURL('image/png') };
+        }
+
+        async function build3DData() {
+            if (!gameData) { alert('Load a game directory or a saved game first'); return null; }
+            if (!syncEnemyEditorForm(true)) return null;
+            if (!atlasImage || !atlasImage.complete || !atlasImage.naturalWidth || !atlasData || !atlasData.frames) {
+                alert('Atlas not loaded yet — wait for sprites to finish loading');
+                return null;
+            }
+            const statusEl = document.getElementById('status');
+            const setStatus = (m) => { if (statusEl) statusEl.innerHTML = '<span style="color:#7dd3fc">' + m + '</span>'; };
+
+            setStatus('3D export: packing atlas…');
+            const cv = document.createElement('canvas');
+            cv.width = atlasImage.naturalWidth; cv.height = atlasImage.naturalHeight;
+            cv.getContext('2d').drawImage(atlasImage, 0, 0);
+            const atlasDataURL = cv.toDataURL('image/png');
+
+            setStatus('3D export: reading stage backgrounds…');
+            const backgrounds = {};
+            for (let sid = 0; sid <= 4; sid++) {
+                const blob = await readGameBlob3D('assets/img/stage/stage_loop' + sid + '.png');
+                if (blob) backgrounds[sid] = await blobToDataURL3D(blob);
+            }
+
+            setStatus('3D export: bundling sounds…');
+            const sounds = {};
+            for (const entry of SFX_3D) {
+                const url = await resolve3DSound(entry);
+                if (url) sounds[entry.key] = url;
+            }
+
+            // game_ui atlas: the runtime uses the original bitmap digits,
+            // labels, banners and CA-button art for all EX UI. Only the frames
+            // the runtime actually draws are repacked into a mini-atlas, so
+            // the export stays small. Best-effort — the runtime falls back to
+            // plain text without it.
+            setStatus('3D export: packing UI atlas…');
+            let uiAtlas = null;
+            try {
+                await _ensureGameUiAtlas();
+                if (_titleEditorUiImage && _titleEditorUiFrames) {
+                    uiAtlas = packUiAtlas3D(_titleEditorUiImage, _titleEditorUiFrames);
+                }
+            } catch (e) { console.warn('game_ui atlas unavailable for 3D export:', e); }
+
+            const rawName = (document.getElementById('firebase-level-name').value || '').trim()
+                || (dirHandle && dirHandle.name) || '2019 Turbo';
+            setStatus('3D export: ready');
+            return {
+                name: rawName,
+                recipe: buildRuntimeRecipe(),
+                atlas: { frames: atlasData.frames, imageDataURL: atlasDataURL },
+                uiAtlas: uiAtlas,
+                backgrounds: backgrounds,
+                sounds: sounds,
+                startStage: 0,
+            };
+        }
+
+        function build3DHTML(data) {
+            const json = JSON.stringify(data).replace(/</g, '\\u003c');
+            const SC = '<' + 'script>';
+            const SE = '</' + 'script>';
+            const title = String(data.name).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+            return [
+                '<!DOCTYPE html>',
+                '<html lang="en">',
+                '<head>',
+                '<meta charset="UTF-8">',
+                '<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">',
+                '<title>' + title + ' — Super Scaler 3D</title>',
+                '<style>html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden}body{display:flex;align-items:center;justify-content:center}canvas{image-rendering:pixelated;image-rendering:crisp-edges;touch-action:none}</style>',
+                '</head>',
+                '<body>',
+                '<canvas id="game"></canvas>',
+                SC + 'window.GAME3D_DATA=' + json + ';' + SE,
+                SC + '(' + GAME3D_RUNTIME.toString() + ')(window.GAME3D_DATA);' + SE,
+                '</body>',
+                '</html>',
+            ].join('\n');
+        }
+
+        async function saveAs3D() {
+            const data = await build3DData();
+            if (!data) return;
+            const slug = String(data.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'game';
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([build3DHTML(data)], { type: 'text/html' }));
+            a.download = slug + '-3d.html';
+            a.click();
+        }
+
+        async function play3D() {
+            // Open the tab synchronously so the click's user-gesture token is
+            // still valid (build3DData awaits many reads; a popup opened after
+            // them gets blocked).
+            const win = window.open('about:blank', '_blank');
+            const data = await build3DData();
+            if (!data) { if (win) win.close(); return; }
+            const url = URL.createObjectURL(new Blob([build3DHTML(data)], { type: 'text/html' }));
+            if (win && !win.closed) { win.location = url; win.focus(); }
+            else window.open(url, '_blank');
+        }
+
+// GAME3D_RUNTIME — self-contained super-scaler (Burning Force style) runtime for
+// 2019-turbo style games. Receives DATA = { name, recipe, atlas: { frames,
+// imageDataURL }, backgrounds: { "0".."4": dataURL }, sounds: { key: dataURL },
+// startStage } and runs the game on a full-window canvas. No dependencies.
+//
+// The vertical-shmup recipe maps onto a pseudo-3D rail shooter: the 8 grid
+// columns become 8 lanes across the ground plane, waves spawn at the horizon
+// and fly toward the camera, and the stage_loop backgrounds are perspective-
+// mapped onto the ground exactly like a super-scaler arcade board would.
+function GAME3D_RUNTIME(DATA) {
+  'use strict';
+
+  // ================== CONFIG ==================
+  var W = 480, H = 320;                 // logical resolution
+  var HY = 96;                          // horizon screen y
+  var BY = H - 26;                      // ground line at the player plane
+  var FOCAL = 140;                      // perspective focal length
+  var ZMAX = 1600;                      // spawn depth
+  var SPR = 1.5;                        // sprite world scale (px -> world units)
+  var LANE_W = 56;                      // world width of one grid column
+  var GROUND_TILE_W = 512;              // world width covered by one bg tile
+  var Z2TEX = 0.55;                     // world z units -> bg texture pixels
+  var PLAYER_ALT = 34;                  // hover altitude of the player craft
+  var AIR_ALT = 52;                     // hover altitude for flying enemies
+  var STEP_MS = 8.333333;               // 120Hz fixed step, d=1 per step (turbo)
+  var MAX_FRAME_MS = 66.67;
+  var WAVE_INTERVAL = 80;               // d-units between waves (as 2D game)
+  var CA_MAX = 100;                     // CA gauge threshold
+  var AIR_NAMES = { soliderA: 1, soliderB: 1, soliderC: 1 };
+  var ITEM_BY_CODE = { 1: 'big', 2: '3way', 3: 'speed_high', 9: 'barrier' };
+  var ITEM_PREFIX = { big: 'powerupBig', '3way': 'powerup3way', speed_high: 'speedupItem', barrier: 'barrierItem' };
+
+  var R = DATA.recipe || {};
+  var MAX_STAGE = (function () {
+    var n = -1;
+    for (var k in R) { var m = /^stage(\d+)$/.exec(k); if (m && R[k] && R[k].enemylist) n = Math.max(n, +m[1]); }
+    return n < 0 ? 0 : n;
+  })();
+
+  // ================== CANVAS ==================
+  var canvas = document.getElementById('game');
+  if (!canvas) { canvas = document.createElement('canvas'); document.body.appendChild(canvas); }
+  canvas.width = W; canvas.height = H;
+  var ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
+
+  function fit() {
+    var s = Math.min(window.innerWidth / W, window.innerHeight / H);
+    canvas.style.width = Math.floor(W * s) + 'px';
+    canvas.style.height = Math.floor(H * s) + 'px';
+  }
+  window.addEventListener('resize', fit); fit();
+
+  // ================== ASSETS ==================
+  var atlasImg = new Image();
+  var frames = (DATA.atlas && DATA.atlas.frames) || {};
+  var frameCache = {};
+  function frameCanvas(key) {
+    if (!key) return null;
+    if (frameCache[key]) return frameCache[key];
+    var fd = frames[key] || frames[String(key).replace(/\.gif$/, '.png')] || frames[String(key).replace(/\.png$/, '.gif')];
+    if (!fd || !fd.frame) return null;
+    var f = fd.frame;
+    var cv = document.createElement('canvas');
+    cv.width = f.w; cv.height = f.h;
+    cv.getContext('2d').drawImage(atlasImg, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+    frameCache[key] = cv;
+    return cv;
+  }
+  // All atlas frames matching prefix+digits, numerically sorted (robust to
+  // editor-repacked atlases where frame lists in the recipe may be stale).
+  function framesByPrefix(prefix) {
+    var out = [];
+    for (var k in frames) {
+      var m = new RegExp('^' + prefix + '(\\d+)\\.(gif|png)$').exec(k);
+      if (m) out.push({ k: k, n: +m[1] });
+    }
+    out.sort(function (a, b) { return a.n - b.n; });
+    return out.map(function (o) { return o.k; });
+  }
+  var EXPLOSION_FRAMES, SP_EXPLOSION_FRAMES, ITEM_FRAMES;
+
+  // Optional UI atlas (the 2D game's game_ui) — used so every piece of EX UI
+  // (digits, labels, banners, the SP button) is the original bitmap art. All
+  // draw helpers fall back to canvas text when a frame or the atlas is absent.
+  var uiImg = null, uiReady = false;
+  var uiFrames = (DATA.uiAtlas && DATA.uiAtlas.frames) || {};
+  var uiCache = {};
+  function uiCanvas(key) {
+    if (!key || !uiReady) return null;
+    if (uiCache[key]) return uiCache[key];
+    var fd = uiFrames[key] || uiFrames[String(key).replace(/\.gif$/, '.png')];
+    if (!fd || !fd.frame) return null;
+    var f = fd.frame;
+    var cv = document.createElement('canvas');
+    cv.width = f.w; cv.height = f.h;
+    cv.getContext('2d').drawImage(uiImg, f.x, f.y, f.w, f.h, 0, 0, f.w, f.h);
+    uiCache[key] = cv;
+    return cv;
+  }
+  // Blit a UI frame centred at (cx, cy). Returns false when unavailable so the
+  // caller can fall back to text.
+  function drawUIFrame(key, cx, cy, opts) {
+    opts = opts || {};
+    var fc = uiCanvas(key);
+    if (!fc) return false;
+    var sc = opts.scale || 1;
+    ctx.save();
+    if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
+    ctx.drawImage(fc, cx - fc.width * sc / 2, cy - fc.height * sc / 2, fc.width * sc, fc.height * sc);
+    ctx.restore();
+    return true;
+  }
+  // Bitmap digits (bigNum/smallNum/comboNum prefixes), centred at (cx, y-top).
+  function drawBitmapNum(prefix, value, cx, y, opts) {
+    opts = opts || {};
+    var str = String(value);
+    var sc = opts.scale || 1;
+    var digits = [], total = 0;
+    for (var i = 0; i < str.length; i++) {
+      var fc = uiCanvas(prefix + str[i] + '.gif');
+      if (!fc) return false;
+      digits.push(fc);
+      total += (fc.width + 1) * sc;
+    }
+    var x = cx - total / 2;
+    ctx.save();
+    if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
+    for (var j = 0; j < digits.length; j++) {
+      ctx.drawImage(digits[j], x, y, digits[j].width * sc, digits[j].height * sc);
+      x += (digits[j].width + 1) * sc;
+    }
+    ctx.restore();
+    return true;
+  }
+  // Label art above bitmap digits — the original result-screen arrangement.
+  function drawScoreRow(labelKey, value, cx, y, sc) {
+    sc = sc || 1;
+    if (!drawUIFrame(labelKey, cx, y, { scale: sc })) {
+      var lbl = labelKey === 'hiScoreTxt.gif' ? 'HI SCORE' : 'SCORE';
+      text(lbl + ' ' + String(value).padStart(8, '0'), cx, y + 4, 12, '#fff', 'center', true);
+      return;
+    }
+    if (!drawBitmapNum('bigNum', value, cx, y + 12 * sc, { scale: sc })) {
+      text(String(value).padStart(8, '0'), cx, y + 24, 12, '#fff', 'center', true);
+    }
+  }
+
+  var bgImgs = {};   // stageId -> Image
+  (function () {
+    var bgs = DATA.backgrounds || {};
+    for (var k in bgs) { if (!bgs[k]) continue; var im = new Image(); im.src = bgs[k]; bgImgs[k] = im; }
+  })();
+
+  // ================== SOUND ==================
+  var soundBank = {};
+  (function () {
+    var s = DATA.sounds || {};
+    for (var k in s) { if (s[k]) soundBank[k] = s[k]; }
+  })();
+  var VOL = { se_shoot: 0.25, se_shoot_b: 0.25, se_explosion: 0.35, se_damage: 0.2, se_guard: 0.25,
+    g_damage_voice: 0.7, g_powerup_voice: 0.6, se_ca: 0.8, se_ca_explosion: 0.8,
+    se_barrier_start: 0.8, se_barrier_end: 0.8, g_ca_voice: 0.7 };
+  var sndPool = {};
+  function play(key) {
+    var src = soundBank[key];
+    if (!src) return;
+    var pool = sndPool[key] || (sndPool[key] = []);
+    var a = null;
+    for (var i = 0; i < pool.length; i++) if (pool[i].paused || pool[i].ended) { a = pool[i]; break; }
+    if (!a) {
+      if (pool.length >= 4) { a = pool[0]; }
+      else { a = new Audio(src); a.volume = VOL[key] != null ? VOL[key] : 0.6; pool.push(a); }
+    }
+    try { a.currentTime = 0; a.play().catch(function () {}); } catch (e) {}
+  }
+
+  // ================== INPUT ==================
+  var keys = {};
+  var caRequested = false;
+  var confirmEdge = false;
+  window.addEventListener('keydown', function (e) {
+    if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', ' '].indexOf(e.key) >= 0) e.preventDefault();
+    keys[e.key] = true;
+    if (e.key === ' ') caRequested = true;
+    if (e.key === 'Enter' || e.key === ' ') confirmEdge = true;
+  });
+  window.addEventListener('keyup', function (e) { keys[e.key] = false; });
+  var dragTargetWx = null, lastTap = 0;
+  // Semi-transparent SP (CA) button, bottom-right; its ring is the SP meter.
+  var SP_BTN = { x: W - 42, y: H - 42, r: 21 };
+  function canvasXY(e) {
+    var r = canvas.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / r.width * W, y: (e.clientY - r.top) / r.height * H };
+  }
+  function pointerWx(e) {
+    return (canvasXY(e).x - W / 2) / 0.62; // rough inverse of near-plane projection
+  }
+  canvas.addEventListener('pointerdown', function (e) {
+    // Tapping the SP button fires the CA (when charged) instead of steering.
+    var p = canvasXY(e);
+    if (state.mode === 'game' && Math.hypot(p.x - SP_BTN.x, p.y - SP_BTN.y) <= SP_BTN.r + 10) {
+      caRequested = true;
+      return;
+    }
+    confirmEdge = true;
+    var now = performance.now();
+    if (now - lastTap < 280) caRequested = true;
+    lastTap = now;
+    dragTargetWx = pointerWx(e);
+  });
+  canvas.addEventListener('pointermove', function (e) { if (dragTargetWx !== null) dragTargetWx = pointerWx(e); });
+  window.addEventListener('pointerup', function () { dragTargetWx = null; });
+
+  // ================== PROJECTION ==================
+  var camX = 0;
+  function proj(z) { return FOCAL / (FOCAL + Math.max(z, -FOCAL * 0.6)); }
+  function groundY(z) { return HY + (BY - HY) * proj(z); }
+  function screenX(wx, z) { return W / 2 + (wx - camX) * proj(z); }
+
+  // Flash-tinted copies of atlas frames, masked to the sprite's own pixels.
+  var tintCache = {};
+  function tintedFrame(key, color) {
+    var id = key + '|' + color;
+    if (tintCache[id]) return tintCache[id];
+    var fc = frameCanvas(key);
+    if (!fc) return null;
+    var cv = document.createElement('canvas');
+    cv.width = fc.width; cv.height = fc.height;
+    var c2 = cv.getContext('2d');
+    c2.drawImage(fc, 0, 0);
+    c2.globalCompositeOperation = 'source-atop';
+    c2.globalAlpha = 0.7;
+    c2.fillStyle = color;
+    c2.fillRect(0, 0, cv.width, cv.height);
+    tintCache[id] = cv;
+    return cv;
+  }
+
+  // Draw an atlas frame anchored bottom-centre at world (wx, alt, z).
+  function drawSprite3D(key, wx, alt, z, opts) {
+    opts = opts || {};
+    var fc = opts.tint ? tintedFrame(key, opts.tint) : frameCanvas(key);
+    if (!fc) return;
+    var t = proj(z);
+    var sc = SPR * t * (opts.scale || 1);
+    var dw = fc.width * sc, dh = fc.height * sc;
+    var x = screenX(wx, z), y = groundY(z) - alt * t;
+    ctx.save();
+    if (opts.alpha != null) ctx.globalAlpha = opts.alpha;
+    if (opts.rotate) {
+      ctx.translate(x, y - dh / 2);
+      ctx.rotate(opts.rotate);
+      ctx.drawImage(fc, -dw / 2, -dh / 2, dw, dh);
+    } else {
+      ctx.drawImage(fc, x - dw / 2, y - dh, dw, dh);
+    }
+    ctx.restore();
+  }
+  function drawShadow(wx, z, widthPx, opts) {
+    var t = proj(z);
+    var x = screenX(wx, z), y = groundY(z);
+    var rw = Math.max(2, widthPx * SPR * t * 0.45), rh = Math.max(1, rw * 0.28);
+    ctx.save();
+    ctx.globalAlpha = (opts && opts.alpha != null ? opts.alpha : 1) * 0.35;
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.ellipse(x, y, rw, rh, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+  }
+
+  // ================== GROUND / SKY ==================
+  var skyGrad = null, skyStageId = -1, skyTint = { r: 24, g: 24, b: 48 };
+  function computeSkyTint(img) {
+    try {
+      var cv = document.createElement('canvas'); cv.width = 8; cv.height = 8;
+      cv.getContext('2d').drawImage(img, 0, 0, 8, 8);
+      var d = cv.getContext('2d').getImageData(0, 0, 8, 8).data;
+      var r = 0, g = 0, b = 0;
+      for (var i = 0; i < d.length; i += 4) { r += d[i]; g += d[i + 1]; b += d[i + 2]; }
+      var n = d.length / 4;
+      return { r: Math.round(r / n), g: Math.round(g / n), b: Math.round(b / n) };
+    } catch (e) { return { r: 40, g: 40, b: 80 }; }
+  }
+  function drawSky(stageId, frame) {
+    if (skyStageId !== stageId) {
+      var img = bgImgs[stageId];
+      skyTint = img && img.complete && img.naturalWidth ? computeSkyTint(img) : { r: 40, g: 40, b: 80 };
+      skyGrad = ctx.createLinearGradient(0, 0, 0, HY);
+      skyGrad.addColorStop(0, 'rgb(' + (skyTint.r >> 2) + ',' + (skyTint.g >> 2) + ',' + ((skyTint.b >> 2) + 12) + ')');
+      skyGrad.addColorStop(0.72, 'rgb(' + (skyTint.r >> 1) + ',' + (skyTint.g >> 1) + ',' + ((skyTint.b >> 1) + 16) + ')');
+      skyGrad.addColorStop(1, 'rgb(' + Math.min(255, skyTint.r + 90) + ',' + Math.min(255, skyTint.g + 70) + ',' + Math.min(255, skyTint.b + 60) + ')');
+      skyStageId = stageId;
+    }
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, W, HY);
+    // retro striped sun
+    var sunX = W / 2 - camX * 0.05, sunY = HY - 26, rr = 30;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, W, HY); ctx.clip();
+    var g = ctx.createRadialGradient(sunX, sunY, 4, sunX, sunY, rr);
+    g.addColorStop(0, 'rgba(255,236,160,0.95)');
+    g.addColorStop(1, 'rgba(255,160,60,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(sunX, sunY, rr, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    // horizon haze
+    ctx.fillStyle = 'rgba(255,220,170,0.28)';
+    ctx.fillRect(0, HY - 2, W, 3);
+  }
+  function drawGround(stageId, scrollZ) {
+    var img = bgImgs[stageId];
+    var hasTex = img && img.complete && img.naturalWidth > 0;
+    var texW = hasTex ? img.naturalWidth : 256;
+    var texH = hasTex ? img.naturalHeight : 256;
+    for (var y = HY + 1; y < H; y++) {
+      var t = (y - HY) / (BY - HY);
+      var z = FOCAL * (1 - t) / t;
+      if (hasTex) {
+        var srcY = Math.floor(((scrollZ + z) * Z2TEX) % texH);
+        if (srcY < 0) srcY += texH;
+        var dw = GROUND_TILE_W * t;
+        var x0 = W / 2 - camX * t;
+        // tile the row across the screen — always opaque, so no frame ghosting
+        var start = x0 - Math.ceil(x0 / dw) * dw;
+        for (var x = start; x < W; x += dw) {
+          ctx.drawImage(img, 0, srcY, texW, 1, x, y, dw + 0.5, 1);
+        }
+      } else {
+        var shade = Math.floor(30 + 60 * t);
+        ctx.fillStyle = 'rgb(' + (shade >> 1) + ',' + shade + ',' + (shade >> 1) + ')';
+        ctx.fillRect(0, y, W, 1);
+      }
+    }
+    // horizon haze as an overlay band (the rows beneath stay opaque)
+    var hazeH = 26;
+    var hz = ctx.createLinearGradient(0, HY, 0, HY + hazeH);
+    hz.addColorStop(0, 'rgba(' + Math.min(255, skyTint.r + 90) + ',' + Math.min(255, skyTint.g + 70) + ',' + Math.min(255, skyTint.b + 60) + ',0.85)');
+    hz.addColorStop(1, 'rgba(' + Math.min(255, skyTint.r + 90) + ',' + Math.min(255, skyTint.g + 70) + ',' + Math.min(255, skyTint.b + 60) + ',0)');
+    ctx.fillStyle = hz;
+    ctx.fillRect(0, HY, W, hazeH);
+    if (!hasTex) {
+      // fallback: perspective grid, Burning Force style
+      ctx.strokeStyle = 'rgba(120,255,120,0.35)';
+      ctx.lineWidth = 1;
+      for (var i = -8; i <= 8; i++) {
+        var wx = i * LANE_W;
+        ctx.beginPath();
+        ctx.moveTo(screenX(wx, 0), groundY(0));
+        ctx.lineTo(screenX(wx, ZMAX * 4), groundY(ZMAX * 4));
+        ctx.stroke();
+      }
+      for (var zi = 0; zi < 14; zi++) {
+        var zz = ((zi * 120) - (scrollZ * 2) % 120);
+        if (zz < 0) zz += 1680;
+        var gy = groundY(zz);
+        ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke();
+      }
+    }
+  }
+
+  // ================== GAME STATE ==================
+  var state = {
+    mode: 'boot',            // boot | title | game | clear | gameover | ending
+    stageId: 0,
+    score: 0, hiScore: 0, combo: 0, maxCombo: 0, comboTimer: 0,
+    cagage: 0, continueCnt: 0,
+    frame: 0,
+  };
+  try { state.hiScore = +(localStorage.getItem('g3d_hiscore') || 0) || 0; } catch (e) {}
+  var startStage = (function () {
+    var q = /[?&]stage=(\d+)/.exec(location.search || '');
+    if (q) return Math.max(0, Math.min(MAX_STAGE, +q[1]));
+    return Math.max(0, Math.min(MAX_STAGE, DATA.startStage || 0));
+  })();
+
+  var player, enemies, playerShots, enemyShots, items, fx, boss, waves;
+  var scrollZ = 0, waveFrameCnt = 0, waveCount = 0, theWorld = false, worldTimer = 0;
+  var bossTimer = 99, bossTimerMs = 0, bossTimerOn = false;
+  var banner = null;   // {text, sub, timer}
+  var flashAlpha = 0, shake = 0, gameOverTimer = 0, clearTimer = 0, titleFrame = 0;
+
+  function anim(list, timer, speed) {
+    if (!list || !list.length) return null;
+    return list[Math.floor(timer * speed) % list.length];
+  }
+
+  // ================== SETUP / STAGE ==================
+  function newRun() {
+    state.score = 0; state.combo = 0; state.maxCombo = 0; state.cagage = 0; state.continueCnt = 0;
+    state.stageId = startStage;
+    var pd = R.playerData || {};
+    player = {
+      wx: 0, vx: 0, alt: PLAYER_ALT, hp: pd.maxHp || 3, maxHp: pd.maxHp || 3,
+      shootMode: 'normal', speedBoost: 0, shootCnt: 0, animT: 0,
+      barrierOn: false, barrierT: 0, invuln: 0, dead: false, deadT: 0,
+      hitRingT: 0,
+    };
+    startStageRun();
+  }
+  function startStageRun() {
+    enemies = []; playerShots = []; enemyShots = []; items = []; fx = [];
+    boss = null; bossTimerOn = false; bossTimer = 99; bossTimerMs = 0;
+    waveFrameCnt = 0; waveCount = 0; theWorld = false; worldTimer = 0;
+    scrollZ = 0;
+    var sd = R['stage' + state.stageId];
+    waves = sd && sd.enemylist ? sd.enemylist.slice().reverse() : [];
+    banner = { kind: 'stage', n: state.stageId + 1, timer: 170 };
+    play('g_stage_voice_' + state.stageId);
+    state.mode = 'game';
+  }
+
+  // ================== SPAWNING ==================
+  function spawnWaveRow(row) {
+    for (var i = 0; i < 8 && i < row.length; i++) {
+      var code = row[i];
+      if (!code || code === '00' || typeof code !== 'string') continue;
+      var def = (R.enemyData || {})['enemy' + code[0]];
+      if (!def || !def.texture || !def.texture.length) continue;
+      var isAir = !!AIR_NAMES[def.name];
+      enemies.push({
+        def: def, name: def.name || ('enemy' + code[0]),
+        wx: (i - 3.5) * LANE_W, alt: isAir ? AIR_ALT : 0, z: ZMAX,
+        vz: (def.speed || 0.7) * 3,
+        hp: def.hp === 'infinity' ? Infinity : (def.hp || 1),
+        score: def.score || 0, cagage: def.spgage != null ? def.spgage : (def.cagage || 0),
+        interval: def.interval || -1, fireCnt: Math.random() * 40,
+        itemName: ITEM_BY_CODE[code[1]] || null,
+        animT: Math.random() * 100, posName: null, flash: 0, isAir: isAir,
+        w: 32, h: 32, sized: false,
+      });
+    }
+  }
+  function sizeEntity(e, key) {
+    var fc = frameCanvas(key);
+    if (fc) { e.w = fc.width * SPR; e.h = fc.height * SPR; e.sized = true; }
+  }
+  function spawnBoss() {
+    var dataKey = 'boss' + state.stageId;
+    var bd = (R.bossData || {})[dataKey];
+    if (!bd || !bd.anim || !bd.anim.idle) { stageClear(); return; }
+    makeBoss(bd, state.stageId === 3 && state.continueCnt === 0);
+  }
+  function makeBoss(bd, gokiFlg) {
+    boss = {
+      def: bd, name: bd.name || 'boss',
+      wx: 0, alt: 40, z: ZMAX, targetZ: 360,
+      hp: bd.hp === 'infinity' ? Infinity : (bd.hp || 100), maxHp: bd.hp || 100,
+      score: bd.score || 0, cagage: bd.spgage || 0,
+      interval: bd.interval || 100, fireCnt: 0,
+      animT: 0, attackT: 0, entered: false, gokiFlg: !!gokiFlg, dying: 0,
+      w: 90, h: 90, sized: false, flash: 0,
+    };
+  }
+  function bossBulletDef() {
+    var bd = boss && boss.def && boss.def.bulletData;
+    if (bd && bd.texture && bd.texture.length) return bd;
+    var ed = R.enemyData || {};
+    for (var k in ed) {
+      if (ed[k] && ed[k].bulletData && ed[k].bulletData.texture) return ed[k].bulletData;
+    }
+    return null;
+  }
+
+  function fireEnemyShot(e, spread) {
+    var bd = e === boss ? bossBulletDef() : (e.def && e.def.bulletData);
+    if (!bd || !bd.texture || !bd.texture.length) return;
+    var sp = Math.max(4, (bd.speed || 1) * 6);
+    // aim from the unit to the player plane
+    var dz = -e.z, dx = (player.wx + (spread || 0) * 60) - e.wx, da = PLAYER_ALT - e.alt;
+    var len = Math.sqrt(dz * dz + dx * dx + da * da) || 1;
+    enemyShots.push({
+      tex: bd.texture, wx: e.wx, alt: e.alt + 10, z: e.z,
+      vx: dx / len * sp, vz: dz / len * sp, va: da / len * sp,
+      damage: bd.damage || 1, animT: 0, w: 18, h: 18,
+    });
+    play('se_shoot');
+  }
+
+  function playerShoot() {
+    var pd = R.playerData || {};
+    var mode = player.shootMode;
+    var conf = mode === 'big' ? pd.shootBig : mode === '3way' ? pd.shoot3way : pd.shootNormal;
+    if (!conf) conf = { texture: ['shot00.gif'], damage: 1, interval: 23 };
+    var tex = (mode === '3way' && pd.shootNormal ? pd.shootNormal.texture : conf.texture) || ['shot00.gif'];
+    var baseV = (conf.speed || (mode === 'big' ? 6 : 8)) * 3;
+    var mk = function (vx) {
+      playerShots.push({
+        tex: tex, wx: player.wx, alt: player.alt + 6, z: 30, zPrev: 30,
+        vx: vx, vz: baseV, damage: conf.damage || 1,
+        big: mode === 'big', hitIds: {}, animT: 0,
+      });
+    };
+    if (mode === '3way') { mk(-2.6); mk(0); mk(2.6); play('se_shoot'); }
+    else if (mode === 'big') { mk(0); play('se_shoot_b'); }
+    else { mk(0); play('se_shoot'); }
+    var interval = (conf.interval || 23) - player.speedBoost;
+    return Math.max(6, interval);
+  }
+
+  function dropItem(e) {
+    if (!e.itemName) return;
+    items.push({ name: e.itemName, wx: e.wx, alt: Math.max(20, e.alt), z: e.z, animT: 0, bob: Math.random() * 10 });
+  }
+  function addExplosion(wx, alt, z, big) {
+    fx.push({ kind: 'boom', frames: big ? SP_EXPLOSION_FRAMES : EXPLOSION_FRAMES, wx: wx, alt: alt, z: z, t: 0, scale: big ? 1.6 : 1 });
+    play(big ? 'se_ca_explosion' : 'se_explosion');
+  }
+
+  // ================== DAMAGE / SCORE ==================
+  function addScore(pts, gage) {
+    state.score += pts || 0;
+    state.combo += 1; state.comboTimer = 240;
+    if (state.combo > state.maxCombo) state.maxCombo = state.combo;
+    state.cagage = Math.min(CA_MAX, state.cagage + (gage || 0));
+    if (state.score > state.hiScore) {
+      state.hiScore = state.score;
+      try { localStorage.setItem('g3d_hiscore', String(state.hiScore)); } catch (e) {}
+    }
+  }
+  function killEnemy(e) {
+    addScore(e.score, e.cagage);
+    addExplosion(e.wx, e.alt + e.h / 4, e.z, false);
+    dropItem(e);
+    var idx = enemies.indexOf(e);
+    if (idx > -1) enemies.splice(idx, 1);
+  }
+  function damageEnemy(e, dmg) {
+    if (e.hp === Infinity) { e.flash = 8; play('se_guard'); return; }
+    e.hp -= dmg;
+    if (e.hp <= 0) {
+      if (e === boss) bossDefeated();
+      else killEnemy(e);
+    } else { e.flash = 6; play('se_damage'); }
+  }
+  var godMode = false;
+  function damagePlayer(amount) {
+    if (player.dead || player.invuln > 0 || godMode) return;
+    if (player.barrierOn) { play('se_guard'); return; }
+    player.hp = Math.max(0, player.hp - amount);
+    player.hitRingT = 110; // energy ring shows only while this decays
+    shake = 14;
+    play('se_damage'); play('g_damage_voice');
+    if (player.hp <= 0) {
+      player.dead = true; player.deadT = 0;
+      addExplosion(player.wx, player.alt + 10, 10, false);
+      addExplosion(player.wx - 20, player.alt, 24, false);
+      addExplosion(player.wx + 20, player.alt + 18, 30, false);
+    } else {
+      player.invuln = 120;
+    }
+  }
+  function pickupItem(it) {
+    play('g_powerup_voice');
+    if (it.name === 'speed_high') player.speedBoost = 15;
+    else if (it.name === 'barrier') { player.barrierOn = true; player.barrierT = ((R.playerData && R.playerData.barrier && R.playerData.barrier.time) || 4) * 120; play('se_barrier_start'); }
+    else {
+      if (player.shootMode !== it.name) player.speedBoost = 0;
+      player.shootMode = it.name;
+    }
+  }
+  function bossDefeated() {
+    if (!boss || boss.dying) return;
+    boss.dying = 1;
+    bossTimerOn = false;
+    theWorld = true; worldTimer = 200;
+    addScore(boss.score, boss.cagage);
+    enemyShots = [];
+    // chain explosions handled in update
+  }
+  function stageClear() {
+    state.mode = 'clear';
+    clearTimer = 0;
+    banner = null; // the clear overlay is drawn from the mode, not a banner
+  }
+
+  function caFire() {
+    if (state.cagage < CA_MAX || theWorld || player.dead) return;
+    state.cagage = 0;
+    theWorld = true; worldTimer = 150;
+    flashAlpha = 1;
+    play('se_ca'); play('g_ca_voice');
+    var dmg = (R.playerData && R.playerData.spDamage) || 50;
+    var delay = 0;
+    for (var i = enemies.length - 1; i >= 0; i--) {
+      var e = enemies[i];
+      addExplosion(e.wx, e.alt + 10, e.z, true);
+      damageEnemy(e, dmg);
+    }
+    if (boss && boss.entered && !boss.dying) {
+      addExplosion(boss.wx, boss.alt + 30, boss.z, true);
+      damageEnemy(boss, dmg);
+    }
+    enemyShots = [];
+    // decorative barrage
+    for (var j = 0; j < 14; j++) {
+      fx.push({ kind: 'boom', frames: SP_EXPLOSION_FRAMES, wx: (Math.random() - 0.5) * 400, alt: Math.random() * 80, z: 120 + Math.random() * 900, t: -j * 4, scale: 1.4 });
+    }
+  }
+
+  // ================== UPDATE ==================
+  function update(d) {
+    state.frame += d;
+    if (state.mode === 'title') { titleFrame += d; scrollZ += 6 * d; if (anyConfirm()) newRun(); return; }
+    if (state.mode === 'ending') { titleFrame += d; scrollZ += 3 * d; if (anyConfirm()) toTitle(); return; }
+    if (state.mode !== 'game' && state.mode !== 'clear' && state.mode !== 'gameover') return;
+
+    if (banner && (banner.timer -= d) <= 0) banner = null;
+    if (flashAlpha > 0) flashAlpha = Math.max(0, flashAlpha - 0.04 * d);
+    if (shake > 0) shake = Math.max(0, shake - d);
+    if (state.comboTimer > 0) { state.comboTimer -= d; if (state.comboTimer <= 0) state.combo = 0; }
+
+    if (state.mode === 'clear') {
+      scrollZ += 9 * d;
+      clearTimer += d;
+      updateFx(d);
+      if (clearTimer > 300) {
+        state.stageId++;
+        if (state.stageId > MAX_STAGE) { state.mode = 'ending'; titleFrame = 0; }
+        else startStageRun();
+      }
+      return;
+    }
+
+    if (state.mode === 'gameover') {
+      gameOverTimer += d;
+      updateFx(d);
+      if (gameOverTimer > 90 && anyConfirm()) {
+        state.continueCnt++;
+        player.hp = player.maxHp; player.dead = false; player.invuln = 180;
+        player.shootMode = 'normal'; player.speedBoost = 0;
+        state.combo = 0;
+        startStageRun();
+      }
+      return;
+    }
+
+    // ---- game mode ----
+    if (theWorld) {
+      worldTimer -= d;
+      updateFx(d);
+      if (boss && boss.dying) {
+        boss.dying += d;
+        if (boss.dying % 14 < d) addExplosion(boss.wx + (Math.random() - 0.5) * boss.w, boss.alt + Math.random() * boss.h / SPR, boss.z, false);
+        if (boss.dying > 160) {
+          addExplosion(boss.wx, boss.alt + 20, boss.z, true);
+          var wasStage3 = state.stageId === 3;
+          var wasVega = boss.name === 'vega';
+          boss = null; theWorld = false;
+          if (wasStage3 && wasVega && state.continueCnt === 0 && R.bossData && R.bossData.bossExtra) {
+            makeBoss(R.bossData.bossExtra, false);
+          } else stageClear();
+        }
+      } else if (worldTimer <= 0) theWorld = false;
+      return;
+    }
+
+    scrollZ += 9 * d;
+
+    // player
+    if (!player.dead) {
+      var accel = 3.2 * d;
+      if (keys.ArrowLeft || keys.a || keys.A) player.vx -= accel;
+      else if (keys.ArrowRight || keys.d || keys.D) player.vx += accel;
+      else if (dragTargetWx !== null) player.vx += Math.max(-accel, Math.min(accel, (dragTargetWx - player.wx) * 0.08));
+      else player.vx *= Math.pow(0.86, d);
+      player.vx = Math.max(-7, Math.min(7, player.vx));
+      player.wx += player.vx * d;
+      if (player.wx < -210) { player.wx = -210; player.vx = 0; }
+      if (player.wx > 210) { player.wx = 210; player.vx = 0; }
+      player.animT += d;
+      if (player.invuln > 0) player.invuln -= d;
+      if (player.hitRingT > 0) player.hitRingT -= d;
+      if (player.barrierOn) { player.barrierT -= d; if (player.barrierT <= 0) { player.barrierOn = false; play('se_barrier_end'); } }
+      player.shootCnt += d;
+      if (player.shootCnt >= (player.nextInterval || 20)) { player.nextInterval = playerShoot(); player.shootCnt = 0; }
+      if (caRequested) { caFire(); }
+    } else {
+      player.deadT += d;
+      if (player.deadT > 120) { state.mode = 'gameover'; gameOverTimer = 0; state.maxCombo = Math.max(state.maxCombo, state.combo); }
+    }
+    caRequested = false;
+    camX = player.wx * 0.62;
+
+    // waves
+    if (!boss) {
+      waveFrameCnt += d;
+      if (waveFrameCnt >= WAVE_INTERVAL) {
+        waveFrameCnt = 0;
+        if (waveCount >= waves.length) { if (enemies.length === 0) spawnBoss(); }
+        else { spawnWaveRow(waves[waveCount]); waveCount++; }
+      }
+    }
+
+    // enemies
+    for (var i = enemies.length - 1; i >= 0; i--) {
+      var e = enemies[i];
+      if (!e.sized) sizeEntity(e, e.def.texture[0]);
+      e.animT += d;
+      if (e.flash > 0) e.flash -= d;
+      e.z -= e.vz * d;
+      // behavior ports from the 2D game
+      if (e.name === 'soliderA') {
+        if (e.z < ZMAX * 0.4) e.wx += 0.01 * (player.wx - e.wx) * d;
+      } else if (e.name === 'soliderB') {
+        if (e.posName === null && e.z < ZMAX * 0.9) e.posName = e.wx >= 0 ? 'right' : 'left';
+        if (e.z < ZMAX * 0.6) e.wx += (e.posName === 'right' ? -1.4 : 1.4) * d;
+      }
+      if (e.interval > 0 && e.z < ZMAX * 0.85) {
+        e.fireCnt += d;
+        if (e.fireCnt >= e.interval) { e.fireCnt = 0; fireEnemyShot(e, 0); }
+      }
+      if (e.z <= -60) { enemies.splice(i, 1); continue; }
+      // collision with player near z=0
+      if (!player.dead && e.z < 46 && e.z > -30) {
+        var vDiff = Math.abs((e.alt + e.h / 2) - player.alt);
+        if (Math.abs(e.wx - player.wx) < (e.w + 34) / 2 && vDiff < e.h / 2 + 30) {
+          if (player.barrierOn) { if (e.hp !== Infinity) { killEnemy(e); play('se_guard'); continue; } }
+          else { damagePlayer(1); if (e.hp !== Infinity) { killEnemy(e); continue; } }
+        }
+      }
+    }
+
+    // boss
+    if (boss) {
+      if (!boss.sized) sizeEntity(boss, boss.def.anim.idle[0]);
+      boss.animT += d;
+      if (boss.flash > 0) boss.flash -= d;
+      if (!boss.entered) {
+        boss.z -= 9 * d;
+        if (boss.z <= boss.targetZ) { boss.z = boss.targetZ; boss.entered = true; bossTimerOn = true; bossTimer = 99; bossTimerMs = 0; }
+      } else if (!boss.dying) {
+        boss.wx = Math.sin(boss.animT * 0.012) * 130;
+        boss.alt = 34 + Math.sin(boss.animT * 0.03) * 14;
+        boss.z = boss.targetZ + Math.sin(boss.animT * 0.007) * 60;
+        boss.fireCnt += d;
+        if (boss.fireCnt >= boss.interval) {
+          boss.fireCnt = 0;
+          boss.attackT = 40;
+          fireEnemyShot(boss, 0); fireEnemyShot(boss, -1); fireEnemyShot(boss, 1);
+        }
+        if (boss.attackT > 0) boss.attackT -= d;
+        // boss collision with player
+        if (!player.dead && boss.z < 50) {
+          if (Math.abs(boss.wx - player.wx) < (boss.w + 34) / 2) damagePlayer(1);
+        }
+      }
+    }
+    if (bossTimerOn) {
+      bossTimerMs += d * STEP_MS; // each fixed step covers STEP_MS of wall-clock time
+      if (bossTimerMs >= 1000) {
+        bossTimerMs = 0; bossTimer--;
+        if (bossTimer <= 0) { bossTimerOn = false; damagePlayer(100); }
+      }
+    }
+
+    // player shots
+    for (var s = playerShots.length - 1; s >= 0; s--) {
+      var sh = playerShots[s];
+      sh.zPrev = sh.z;
+      sh.z += sh.vz * d;
+      sh.wx += sh.vx * d;
+      sh.animT += d;
+      if (sh.z > ZMAX + 100) { playerShots.splice(s, 1); continue; }
+      var hit = false;
+      // vs enemies
+      for (var j = enemies.length - 1; j >= 0; j--) {
+        var en = enemies[j];
+        if (en.z < sh.zPrev - 20 || en.z > sh.z + 20) continue;
+        if (Math.abs(en.wx - sh.wx) > (en.w + 14) / 2) continue;
+        var sv = Math.abs((en.alt + en.h / 2) - sh.alt);
+        if (sv > en.h / 2 + 34) continue;
+        if (sh.big) {
+          var id = enemies.indexOf(en);
+          if (sh.hitIds[id]) continue;
+          sh.hitIds[id] = 1;
+          damageEnemy(en, sh.damage);
+        } else {
+          damageEnemy(en, sh.damage);
+          playerShots.splice(s, 1); hit = true;
+        }
+        break;
+      }
+      if (hit) continue;
+      // vs enemy shots (player fire destroys bullets, as in the 2D game)
+      for (var q = enemyShots.length - 1; q >= 0; q--) {
+        var eb = enemyShots[q];
+        if (eb.z < sh.zPrev - 24 || eb.z > sh.z + 24) continue;
+        if (Math.abs(eb.wx - sh.wx) > 16) continue;
+        if (Math.abs(eb.alt - sh.alt) > 26) continue;
+        addExplosion(eb.wx, eb.alt, eb.z, false);
+        addScore(100, 2);
+        enemyShots.splice(q, 1);
+        if (!sh.big) { playerShots.splice(s, 1); hit = true; }
+        break;
+      }
+      if (hit) continue;
+      // vs boss
+      if (boss && boss.entered && !boss.dying) {
+        if (sh.z + 30 >= boss.z && sh.zPrev - 30 <= boss.z &&
+            Math.abs(boss.wx - sh.wx) < (boss.w + 14) / 2) {
+          damageEnemy(boss, sh.damage);
+          if (!sh.big) playerShots.splice(s, 1);
+        }
+      }
+    }
+
+    // enemy shots
+    for (var b = enemyShots.length - 1; b >= 0; b--) {
+      var es = enemyShots[b];
+      es.z += es.vz * d;
+      es.wx += es.vx * d;
+      es.alt += es.va * d;
+      es.animT += d;
+      if (es.z <= -40 || Math.abs(es.wx) > 460) { enemyShots.splice(b, 1); continue; }
+      if (!player.dead && es.z < 26 && es.z > -26) {
+        if (Math.abs(es.wx - player.wx) < 26 && Math.abs(es.alt - player.alt) < 34) {
+          if (player.barrierOn) { play('se_guard'); }
+          else damagePlayer(es.damage);
+          enemyShots.splice(b, 1);
+        }
+      }
+    }
+
+    // items
+    for (var m = items.length - 1; m >= 0; m--) {
+      var it = items[m];
+      it.z -= 5.5 * d;
+      it.animT += d;
+      it.alt = Math.max(16, it.alt) + Math.sin((it.animT + it.bob) * 0.08) * 0.4;
+      // gentle homing so drops stay reachable
+      it.wx += Math.max(-1.2, Math.min(1.2, (player.wx - it.wx) * 0.006)) * d;
+      if (it.z <= -40) { items.splice(m, 1); continue; }
+      if (!player.dead && it.z < 40 && Math.abs(it.wx - player.wx) < 44) {
+        pickupItem(it); items.splice(m, 1);
+      }
+    }
+
+    updateFx(d);
+  }
+  function updateFx(d) {
+    for (var i = fx.length - 1; i >= 0; i--) {
+      var f = fx[i];
+      f.t += d;
+      if (f.t > 0 && f.t * 0.28 >= f.frames.length) fx.splice(i, 1);
+    }
+  }
+  function anyConfirm() {
+    if (confirmEdge) { confirmEdge = false; return true; }
+    return false;
+  }
+  function toTitle() { state.mode = 'title'; titleFrame = 0; }
+
+  // ================== RENDER ==================
+  function render() {
+    ctx.save();
+    if (shake > 0) ctx.translate((Math.random() - 0.5) * 5, (Math.random() - 0.5) * 5);
+    var sid = Math.min(state.stageId, MAX_STAGE);
+    drawSky(sid, state.frame);
+    drawGround(sid, scrollZ);
+
+    if (state.mode === 'title') { renderTitle(); ctx.restore(); return; }
+    if (state.mode === 'ending') { renderEnding(); ctx.restore(); return; }
+
+    // collect drawables far-to-near
+    var draws = [];
+    var i, e;
+    for (i = 0; i < enemies.length; i++) draws.push({ z: enemies[i].z, kind: 'enemy', o: enemies[i] });
+    if (boss) draws.push({ z: boss.z, kind: 'boss', o: boss });
+    for (i = 0; i < enemyShots.length; i++) draws.push({ z: enemyShots[i].z, kind: 'eshot', o: enemyShots[i] });
+    for (i = 0; i < playerShots.length; i++) draws.push({ z: playerShots[i].z, kind: 'pshot', o: playerShots[i] });
+    for (i = 0; i < items.length; i++) draws.push({ z: items[i].z, kind: 'item', o: items[i] });
+    for (i = 0; i < fx.length; i++) if (fx[i].t >= 0) draws.push({ z: fx[i].z, kind: 'fx', o: fx[i] });
+    draws.sort(function (a, b) { return b.z - a.z; });
+
+    for (i = 0; i < draws.length; i++) {
+      var dd = draws[i]; var o = dd.o;
+      if (dd.kind === 'enemy') {
+        drawShadow(o.wx, o.z, o.w / SPR);
+        drawSprite3D(anim(o.def.texture, o.animT, 0.1), o.wx, o.alt, o.z, o.flash > 0 ? { tint: '#fff' } : null);
+      } else if (dd.kind === 'boss') {
+        drawShadow(o.wx, o.z, o.w / SPR, { alpha: o.dying ? 0.5 : 1 });
+        var frameList = (o.attackT > 0 && o.def.anim.attack && o.def.anim.attack.length) ? o.def.anim.attack : o.def.anim.idle;
+        var op = { scale: 1.25 };
+        if (o.flash > 0) op.tint = '#fff';
+        if (o.dying) op.alpha = Math.max(0.15, 1 - o.dying / 160);
+        drawSprite3D(anim(frameList, o.animT, 0.08), o.wx, o.alt, o.z, op);
+      } else if (dd.kind === 'eshot') {
+        drawSprite3D(anim(o.tex, o.animT, 0.15), o.wx, o.alt, o.z, { scale: 1.1 });
+      } else if (dd.kind === 'pshot') {
+        drawSprite3D(anim(o.tex, o.animT, 0.3), o.wx, o.alt, o.z, { scale: o.big ? 1.3 : 0.9, rotate: -Math.PI / 2 });
+      } else if (dd.kind === 'item') {
+        drawShadow(o.wx, o.z, 14);
+        var pf = ITEM_FRAMES[o.name];
+        drawSprite3D(anim(pf, o.animT, 0.08), o.wx, o.alt, o.z, { scale: 1.15 });
+      } else if (dd.kind === 'fx') {
+        var fr = o.frames[Math.min(o.frames.length - 1, Math.floor(o.t * 0.28))];
+        drawSprite3D(fr, o.wx, o.alt, o.z, { scale: o.scale });
+      }
+    }
+
+    // player (drawn last — nearest)
+    if (!player.dead && state.mode === 'game') {
+      var pd = R.playerData || {};
+      var ptex = pd.texture || [];
+      var blink = player.invuln > 0 && (Math.floor(player.invuln / 6) % 2 === 0);
+      if (!blink) {
+        drawShadow(player.wx, 6, 30);
+        var bank = Math.max(-0.42, Math.min(0.42, player.vx * 0.075));
+        drawSprite3D(anim(ptex, player.animT, 0.35), player.wx, player.alt, 0, { rotate: bank, scale: 1.05 });
+        if (player.barrierOn) {
+          var btex = pd.barrier && pd.barrier.texture;
+          var fade = player.barrierT < 90 && (Math.floor(player.barrierT / 8) % 2 === 0);
+          if (btex && !fade) drawSprite3D(anim(btex, player.animT, 0.15), player.wx, player.alt + 6, 0, { scale: 1.3, alpha: 0.85 });
+        }
+      }
+      renderHitRing();
+    }
+
+    if (flashAlpha > 0) {
+      ctx.fillStyle = 'rgba(255,255,255,' + flashAlpha.toFixed(3) + ')';
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    if (state.mode === 'game') {
+      renderGameHUD();
+      if (banner) renderStageBanner();
+    } else if (state.mode === 'clear') {
+      renderClearOverlay();
+    } else if (state.mode === 'gameover') {
+      renderGameOver();
+    }
+    ctx.restore();
+  }
+
+  // Energy ring around the player — the only life indicator, and it only
+  // shows while the hit flash decays.
+  function renderHitRing() {
+    if (!player || player.hitRingT <= 0) return;
+    var a = Math.min(1, player.hitRingT / 45);
+    var cx = screenX(player.wx, 0);
+    var cy = groundY(0) - player.alt - 16;
+    var r = 30 + (110 - player.hitRingT) * 0.12;
+    var seg = Math.max(1, player.maxHp);
+    var gap = 0.22; // radians between segments
+    var pct = player.hp / player.maxHp;
+    var col = pct > 0.6 ? '#84cc16' : pct > 0.34 ? '#fde047' : '#ef4444';
+    ctx.save();
+    ctx.lineWidth = 3.5;
+    ctx.lineCap = 'round';
+    for (var i = 0; i < seg; i++) {
+      var a0 = -Math.PI / 2 + (i / seg) * Math.PI * 2 + gap / 2;
+      var a1 = -Math.PI / 2 + ((i + 1) / seg) * Math.PI * 2 - gap / 2;
+      var filled = i < player.hp;
+      ctx.strokeStyle = filled ? col : 'rgba(255,255,255,0.22)';
+      ctx.globalAlpha = a * (filled ? 0.95 : 0.6);
+      ctx.beginPath(); ctx.arc(cx, cy, r, a0, a1); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function text(str, x, y, size, color, align, bold) {
+    ctx.font = (bold ? 'bold ' : '') + size + 'px "Courier New", monospace';
+    ctx.textAlign = align || 'left';
+    ctx.fillStyle = '#000';
+    ctx.fillText(str, x + 1, y + 1);
+    ctx.fillStyle = color || '#fff';
+    ctx.fillText(str, x, y);
+  }
+
+  // In-game HUD is just the SP button: semi-transparent original CA-button
+  // art with the SP meter as a ring around it. (Score, power-up status and
+  // boss bars are gone — score only shows outside gameplay.)
+  function renderGameHUD() {
+    var pct = Math.max(0, Math.min(1, state.cagage / CA_MAX));
+    var full = pct >= 1;
+    var pulse = full ? 1 + 0.05 * Math.sin(state.frame * 0.12) : 1;
+    ctx.save();
+    // ring track + SP meter
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = 'rgba(255,255,255,0.16)';
+    ctx.beginPath(); ctx.arc(SP_BTN.x, SP_BTN.y, (SP_BTN.r + 6) * pulse, 0, Math.PI * 2); ctx.stroke();
+    if (pct > 0) {
+      ctx.strokeStyle = full
+        ? (Math.floor(state.frame / 10) % 2 ? 'rgba(253,224,71,0.95)' : 'rgba(249,115,22,0.95)')
+        : 'rgba(56,189,248,0.75)';
+      ctx.beginPath();
+      ctx.arc(SP_BTN.x, SP_BTN.y, (SP_BTN.r + 6) * pulse, -Math.PI / 2, -Math.PI / 2 + pct * Math.PI * 2);
+      ctx.stroke();
+    }
+    // button face — original art when available
+    var faceKey = full ? 'hudCabtn100per.gif' : 'hudCabtn0per.gif';
+    var sc = (SP_BTN.r * 2 / 67) * pulse;
+    if (!drawUIFrame(faceKey, SP_BTN.x, SP_BTN.y, { scale: sc, alpha: full ? 0.85 : 0.4 })) {
+      ctx.globalAlpha = full ? 0.8 : 0.35;
+      ctx.fillStyle = full ? '#fde047' : '#0ea5e9';
+      ctx.beginPath(); ctx.arc(SP_BTN.x, SP_BTN.y, SP_BTN.r * pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.globalAlpha = 1;
+      text('SP', SP_BTN.x, SP_BTN.y + 4, 12, full ? '#000' : '#e0f2fe', 'center', true);
+    }
+    ctx.restore();
+
+    // Boss timeout: surfaced only for the final 10 seconds, in original art.
+    if (bossTimerOn && bossTimer <= 10) {
+      var flash = bossTimer <= 5 && Math.floor(state.frame / 15) % 2 === 0;
+      if (!flash) {
+        if (drawUIFrame('timeTxt.gif', W / 2 - 20, 34, { scale: 1 })) {
+          drawBitmapNum('bigNum', Math.max(0, bossTimer), W / 2 + 20, 24, { scale: 1 });
+        } else {
+          text('TIME ' + String(Math.max(0, bossTimer)).padStart(2, '0'), W / 2, 38, 12, '#f87171', 'center', true);
+        }
+      }
+    }
+  }
+
+  // Stage intro: original "STAGE" art + big number, then "FIGHT!" art.
+  function renderStageBanner() {
+    var a = Math.min(1, banner.timer / 40);
+    ctx.save();
+    ctx.globalAlpha = a;
+    if (banner.timer > 70) {
+      if (drawUIFrame('stageTitle.gif', W / 2 - 18, H / 2 - 20, { scale: 1.3 })) {
+        var numKey = 'stageNum' + banner.n + '.gif';
+        if (!drawUIFrame(numKey, W / 2 + 48, H / 2 - 20, { scale: 1.3 })) {
+          drawBitmapNum('bigNum', banner.n, W / 2 + 48, H / 2 - 33, { scale: 1.4 });
+        }
+      } else {
+        text('STAGE ' + banner.n, W / 2, H / 2 - 12, 26, '#fde047', 'center', true);
+      }
+    } else if (!drawUIFrame('stageFight.gif', W / 2, H / 2 - 16, { scale: 1.3 })) {
+      text('FIGHT!', W / 2, H / 2 - 8, 26, '#fff', 'center', true);
+    }
+    ctx.restore();
+  }
+
+  function renderClearOverlay() {
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(0, 0, W, H);
+    if (!drawUIFrame('stageclear.gif', W / 2, H / 2 - 44, { scale: 1.2 })) {
+      text('STAGE CLEAR', W / 2, H / 2 - 36, 24, '#fde047', 'center', true);
+    }
+    drawScoreRow('scoreTxt.gif', state.score, W / 2, H / 2 + 6, 1);
+    drawScoreRow('hiScoreTxt.gif', state.hiScore, W / 2, H / 2 + 62, 1);
+  }
+
+  function renderTitle() {
+    // attract-mode player craft
+    var pd = R.playerData || {};
+    var bob = Math.sin(titleFrame * 0.03) * 5;
+    drawShadow(0, 60, 34);
+    drawSprite3D(anim(pd.texture || [], titleFrame, 0.35), 0, PLAYER_ALT + 8 + bob, 60, { scale: 1.6 });
+    ctx.fillStyle = 'rgba(0,0,0,0.35)';
+    ctx.fillRect(0, 30, W, 96);
+    if (drawUIFrame('logo.gif', W / 2, 68, { scale: 1.05 })) {
+      var subKey = uiFrames['subTitleEn.gif'] ? 'subTitleEn.gif' : 'subTitle.gif';
+      drawUIFrame(subKey, W / 2, 112, { scale: 1.05 });
+    } else {
+      text((DATA.name || '2019 TURBO').toUpperCase(), W / 2, 74, 26, '#fde047', 'center', true);
+      text('SUPER SCALER 3D', W / 2, 98, 14, '#7dd3fc', 'center', true);
+    }
+    // EX roundel, same mark as the 2D title screen's unlock badge
+    var bx = W / 2 + 148, by = 68;
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.beginPath(); ctx.arc(bx, by, 14, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = 'rgba(253,224,71,0.9)'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(bx, by, 14, 0, Math.PI * 2); ctx.stroke();
+    ctx.restore();
+    text('EX', bx, by + 4, 11, '#fde047', 'center', true);
+
+    if (Math.floor(titleFrame / 40) % 2 === 0) {
+      if (!drawUIFrame('titleStartText.gif', W / 2, H - 64, { scale: 1.1 })) {
+        text('PRESS ENTER / TAP TO START', W / 2, H - 60, 13, '#fff', 'center', true);
+      }
+    }
+    drawScoreRow('hiScoreTxt.gif', state.hiScore, W / 2, H - 40, 0.8);
+  }
+
+  function renderEnding() {
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.fillRect(0, 0, W, H);
+    if (!drawUIFrame('congraTxt0.gif', W / 2, H / 2 - 62, { scale: 1 })) {
+      text('CONGRATULATIONS!', W / 2, H / 2 - 56, 24, '#fde047', 'center', true);
+    }
+    drawScoreRow('scoreTxt.gif', state.score, W / 2, H / 2 - 12, 1);
+    drawScoreRow('hiScoreTxt.gif', state.hiScore, W / 2, H / 2 + 44, 1);
+    if (Math.floor(titleFrame / 40) % 2 === 0) {
+      if (!drawUIFrame('titleStartText.gif', W / 2, H - 34, { scale: 1 })) {
+        text('PRESS ENTER / TAP', W / 2, H - 30, 12, '#fff', 'center', true);
+      }
+    }
+  }
+
+  function renderGameOver() {
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(0, 0, W, H);
+    if (!drawUIFrame('continueGameOver.gif', W / 2, H / 2 - 56, { scale: 1.1 })) {
+      text('GAME OVER', W / 2, H / 2 - 48, 28, '#ef4444', 'center', true);
+    }
+    drawScoreRow('scoreTxt.gif', state.score, W / 2, H / 2 - 8, 1);
+    drawScoreRow('hiScoreTxt.gif', state.hiScore, W / 2, H / 2 + 48, 1);
+    if (gameOverTimer > 90 && Math.floor(gameOverTimer / 40) % 2 === 0) {
+      if (!drawUIFrame('titleStartText.gif', W / 2, H - 34, { scale: 1 })) {
+        text('PRESS ENTER / TAP TO CONTINUE', W / 2, H - 30, 12, '#fde047', 'center', true);
+      }
+    }
+  }
+
+  // ================== MAIN LOOP ==================
+  var last = 0, acc = 0;
+  function loop(ts) {
+    if (!last) last = ts;
+    var dt = Math.min(ts - last, MAX_FRAME_MS);
+    last = ts;
+    acc += dt;
+    while (acc >= STEP_MS) { acc -= STEP_MS; update(1); }
+    render();
+    requestAnimationFrame(loop);
+  }
+
+  // Debug/testing hooks (harmless in production; lets automated tests and the
+  // editor's E2E harness drive the game deterministically).
+  window.__G3D__ = {
+    getState: function () { return { mode: state.mode, stageId: state.stageId, score: state.score, cagage: state.cagage, combo: state.combo, enemies: enemies ? enemies.length : 0, items: items ? items.length : 0, eshots: enemyShots ? enemyShots.length : 0, boss: boss ? { name: boss.name, hp: boss.hp, entered: boss.entered } : null, playerHp: player ? player.hp : 0, shootMode: player ? player.shootMode : null, waveCount: waveCount, waves: waves ? waves.length : 0 }; },
+    start: function () { confirmEdge = true; },
+    god: function (on) { godMode = !!on; },
+    skipToBoss: function () { if (state.mode === 'game') { waves = []; waveCount = 0; } },
+    damageBoss: function (n) { if (boss) damageEnemy(boss, n || 50); },
+    giveCa: function () { state.cagage = CA_MAX; },
+    ca: function () { caRequested = true; },
+    spawnItem: function (name) { items.push({ name: name || 'big', wx: player.wx, alt: 30, z: 300, animT: 0, bob: 0 }); },
+    hurt: function (n) { if (player) { player.invuln = 0; var g = godMode; godMode = false; damagePlayer(n || 1); godMode = g; } },
+    move: function (wx) { if (player) { player.wx = Math.max(-210, Math.min(210, wx)); } },
+  };
+
+  // ================== BOOT ==================
+  atlasImg.onload = function () {
+    EXPLOSION_FRAMES = framesByPrefix('explosion');
+    SP_EXPLOSION_FRAMES = framesByPrefix('spExplosion');
+    if (!SP_EXPLOSION_FRAMES.length) SP_EXPLOSION_FRAMES = EXPLOSION_FRAMES;
+    ITEM_FRAMES = {};
+    for (var k in ITEM_PREFIX) ITEM_FRAMES[k] = framesByPrefix(ITEM_PREFIX[k]);
+    state.mode = 'title';
+    requestAnimationFrame(loop);
+  };
+  atlasImg.onerror = function () {
+    ctx.fillStyle = '#f87171';
+    ctx.font = '14px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('Failed to load atlas image', W / 2, H / 2);
+  };
+  atlasImg.src = (DATA.atlas && DATA.atlas.imageDataURL) || '';
+  // UI atlas loads in parallel; helpers fall back to text until it's ready.
+  if (DATA.uiAtlas && DATA.uiAtlas.imageDataURL) {
+    uiImg = new Image();
+    uiImg.onload = function () { uiReady = true; };
+    uiImg.src = DATA.uiAtlas.imageDataURL;
+  }
+}
 
         // ================== TITLE EDITOR ==================
         let titleBgDataURL = null;
