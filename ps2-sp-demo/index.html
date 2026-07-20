@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>5velte-ps2 — ps2-sp demo</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #101014; color: #9aa0b0; font: 13px/1.6 monospace; }
+    body { display: grid; grid-template-rows: 1fr auto; }
+    #app { display: grid; place-items: center; min-height: 0; }
+    #app canvas { image-rendering: pixelated; }
+    #hint { text-align: center; padding: 6px 0 10px; }
+    #hint b { color: #e8eaf0; }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <div id="hint">
+    <b>&larr;&rarr;</b> move &middot; <b>Z</b> confirm/fire &middot; <b>X</b> back &middot;
+    <b>C</b> SP attack &middot; <b>Enter</b> START/pause &middot; <b>Shift</b> SELECT (turbo)
+  </div>
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

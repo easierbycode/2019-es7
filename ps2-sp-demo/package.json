@@ -1,0 +1,19 @@
+{
+  "name": "ps2-sp-demo",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser demo of the ps2-sp vertical shooter, running the @easierbycode/svelte-ps2 JSR module on Phaser 4.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@easierbycode/svelte-ps2": "npm:@jsr/easierbycode__svelte-ps2@^1.1.0",
+    "phaser": "^4.2.1"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}

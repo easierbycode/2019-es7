@@ -8,6 +8,12 @@
       "port": 3000,
       "autoPort": true,
       "url": "/phaser-game.html?lowmode=1"
+    },
+    {
+      "name": "ps2-sp-demo",
+      "runtimeExecutable": "cmd.exe",
+      "runtimeArgs": ["/c", "npx", "vite", "--config", "ps2-sp-demo/vite.config.ts", "--port", "5180", "--strictPort"],
+      "port": 5180
     }
   ]
 }
