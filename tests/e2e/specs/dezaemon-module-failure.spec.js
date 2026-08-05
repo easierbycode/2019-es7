@@ -52,7 +52,8 @@ test("the import button surfaces that message rather than opening a file picker"
     page.on("filechooser", () => { filePickerOpened = true; });
 
     await page.evaluate(() => window.openMenu());
-    await page.locator('#menu-panel button:has-text("Import .sav")').click();
+    // :text-is — "Import .sav from URL" also contains "Import .sav".
+    await page.locator('#menu-panel button:text-is("🛸 Import .sav")').click();
 
     await expect.poll(() => alerted).toContain("could not be fetched");
     expect(filePickerOpened).toBe(false);
