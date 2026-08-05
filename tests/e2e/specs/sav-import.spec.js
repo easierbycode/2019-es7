@@ -9,7 +9,8 @@ test("importing a real Dezaemon 2 .sav populates the modal and the editor", asyn
     await blockCdn(page);
     const errors = collectPageErrors(page);
     // applyDezaemonImport() reports import notes via alert() — auto-accept.
-    page.on("dialog", (d) => d.accept());
+    const notes = [];
+    page.on("dialog", (d) => { notes.push(d.message()); d.accept(); });
 
     await page.goto("/level-editor.html");
     await expect.poll(() => page.evaluate(() => !!window.Dezaemon)).toBe(true);
@@ -44,6 +45,17 @@ test("importing a real Dezaemon 2 .sav populates the modal and the editor", asyn
     expect(meta.source).toBe("dezaemon2");
     expect(meta.sourceComment).toBe("DEZA2 SGM");
     expect(meta.sourceFilename).toBe("DEZA2____01");
+
+    // The section decoders are still open work, so this import is a skeleton:
+    // it must say so rather than look like a success that plays as a black
+    // screen. Assert the user was actually told, not just the CLI.
+    const importNotes = notes.join("\n");
+    expect(importNotes).toContain("nothing will spawn");
+    expect(importNotes).toContain("none of its content yet");
+
+    // ...which is exactly what the emitted stage contains.
+    const waves = await page.evaluate(() => gameData.stage0.enemylist);
+    expect(waves.every((row) => row.every((cell) => cell === "00"))).toBe(true);
 
     expect(errors).toEqual([]);
 });
