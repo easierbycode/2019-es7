@@ -492,6 +492,9 @@
             <div class="menu-section-title">Dezaemon 2</div>
             <button class="menu-btn" onclick="startNewGame();closeMenu()">✨ New Game</button>
             <button class="menu-btn" onclick="openDezaemonImport();closeMenu()">🛸 Import .sav</button>
+            <input id="deza-url-input" type="url" placeholder="https://…/game.sav" class="menu-input"
+                   onkeydown="if(event.key==='Enter')document.getElementById('deza-url-btn').click()">
+            <button id="deza-url-btn" class="menu-btn" onclick="importDezaemonFromUrlInput()">🌐 Import .sav from URL</button>
         </div>
         <div class="menu-section">
             <div class="menu-section-title">Game Save (Cloud)</div>
@@ -2575,23 +2578,80 @@
         }
 
         async function handleDezaemonFile(file) {
-            if (!window.Dezaemon) { alert(dezaemonUnavailableMessage()); return; }
+            const u8 = new Uint8Array(await file.arrayBuffer());
+            return ingestDezaemonBytes(u8, file.name);
+        }
+
+        // Shared tail of both import paths (file picker and URL). `label`
+        // identifies the image in the modal header. Returns true on success so
+        // callers can react; all failures are reported to the user here.
+        async function ingestDezaemonBytes(u8, label) {
+            if (!window.Dezaemon) { alert(dezaemonUnavailableMessage()); return false; }
             let saves, kind;
             try {
-                const u8 = new Uint8Array(await file.arrayBuffer());
                 const norm = await window.Dezaemon.normalize(u8);
                 kind = norm.kind;
                 saves = window.Dezaemon.parse(norm.data);
             } catch (e) {
                 alert('Not a Saturn backup image: ' + e.message);
-                return;
+                return false;
             }
-            if (!saves.length) { alert('No save entries found in this image (empty cart?)'); return; }
-            dezaImportState = { containerKind: kind, saves, selectedSlot: null, decoded: null, fileName: file.name };
-            document.getElementById('deza-container-kind').textContent = `${file.name} · ${kind} · ${saves.length} ${saves.length === 1 ? 'entry' : 'entries'}`;
+            if (!saves.length) { alert('No save entries found in this image (empty cart?)'); return false; }
+            dezaImportState = { containerKind: kind, saves, selectedSlot: null, decoded: null, fileName: label };
+            document.getElementById('deza-container-kind').textContent = `${label} · ${kind} · ${saves.length} ${saves.length === 1 ? 'entry' : 'entries'}`;
             document.getElementById('deza-slot-detail').classList.add('hidden');
             renderDezaemonSlots();
             document.getElementById('dezaemon-import-modal').classList.remove('hidden');
+            return true;
+        }
+
+        // Derive a display label from a URL: the last path segment, decoded
+        // (".../Dezaemon%202%20(DAIOH).sav" -> "Dezaemon 2 (DAIOH).sav").
+        function dezaemonLabelFromUrl(url) {
+            try {
+                const p = new URL(url, location.href).pathname;
+                const last = p.split('/').filter(Boolean).pop() || url;
+                return decodeURIComponent(last);
+            } catch { return url; }
+        }
+
+        // Fetch a .sav over http(s) and run it through the same pipeline as the
+        // file picker. Cross-origin reads need CORS on the host serving the
+        // file, so a failure here is usually the remote's headers rather than a
+        // bad URL — say so instead of a bare "Failed to fetch".
+        async function loadDezaemonFromUrl(url) {
+            if (!window.Dezaemon) { alert(dezaemonUnavailableMessage()); return false; }
+            let resp;
+            try {
+                resp = await fetch(url, { mode: 'cors', credentials: 'omit' });
+            } catch (e) {
+                const sameOrigin = (() => {
+                    try { return new URL(url, location.href).origin === location.origin; }
+                    catch { return false; }
+                })();
+                alert('Could not fetch ' + url + '\n\n' + (e.message || e) + '\n\n'
+                    + (sameOrigin
+                        ? 'The request failed before a response arrived — check the path and that the server is reachable.'
+                        : 'This is a cross-origin request, so the server must send an '
+                          + 'Access-Control-Allow-Origin header that permits ' + location.origin + '. '
+                          + 'If you cannot change that host, download the .sav and use "Import .sav" instead.'));
+                return false;
+            }
+            if (!resp.ok) {
+                alert('Could not fetch ' + url + '\n\nHTTP ' + resp.status + ' ' + resp.statusText);
+                return false;
+            }
+            const u8 = new Uint8Array(await resp.arrayBuffer());
+            return ingestDezaemonBytes(u8, dezaemonLabelFromUrl(url));
+        }
+
+        async function importDezaemonFromUrlInput() {
+            const input = document.getElementById('deza-url-input');
+            const url = (input.value || '').trim();
+            if (!url) { alert('Enter the URL of a .sav / .bcr / .bkr file first.'); return false; }
+            const ok = await loadDezaemonFromUrl(url);
+            if (ok) closeMenu();
+            return ok;
         }
 
         function renderDezaemonSlots() {
@@ -5501,6 +5561,13 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
             await autoLoadFromServer();
             const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('new')) { startNewGame(); return; }
+            // ?sav=<url> opens the importer straight from a link.
+            const urlSav = urlParams.get('sav');
+            if (urlSav) {
+                document.getElementById('deza-url-input').value = urlSav;
+                await loadDezaemonFromUrl(urlSav);
+                return;
+            }
             const urlLevel = urlParams.get('level');
             if (urlLevel) {
                 document.getElementById('firebase-level-name').value = urlLevel;
