@@ -344,6 +344,28 @@ jobs:
           cp manifest.json dist/ || true
           cp favicon.ico dist/ || true
           cp app-original.js dist/ || true
+          # level-editor.html imports the Dezaemon importer as ES modules at
+          # runtime, so lib/ has to ship with it. Only lib/ — it is
+          # self-contained (relative imports only), and the rest of
+          # tools/dezaemon-import is CLI/test/fixture weight, including
+          # multi-MB .sav files.
+          mkdir -p dist/tools/dezaemon-import
+          cp -r tools/dezaemon-import/lib dist/tools/dezaemon-import/
+
+      - name: Verify the editor's runtime modules shipped
+        run: |
+          # Guards the failure this check was added for: level-editor.html
+          # deployed without tools/dezaemon-import/lib, so every import 404s
+          # and the .sav importer is dead on the live site.
+          missing=0
+          for f in $(find tools/dezaemon-import/lib -name '*.js' | sort); do
+            if [ ! -f "dist/$f" ]; then
+              echo "::error::$f is imported by level-editor.html but missing from dist/"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then exit 1; fi
+          echo "OK: $(find dist/tools/dezaemon-import/lib -name '*.js' | wc -l) importer modules present in dist/"
 
       - name: Download APK artifact
         uses: actions/download-artifact@v4

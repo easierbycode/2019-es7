@@ -44,10 +44,26 @@ test("mapSaveToGame on an undecoded save yields a valid skeleton", () => {
     assert.deepStrictEqual(errors, []);
     assert.ok(ok);
     assert.strictEqual(sprites.length, 0);
-    assert.deepStrictEqual(warnings, []);
     assert.strictEqual(gameJson.meta.source, "dezaemon2");
     assert.strictEqual(gameJson.meta.sourceComment, "DEZA2 SGM");
     assert.strictEqual(gameJson.meta.sourceFilename, "DEZA2____01");
+    // The skeleton is valid and playable, but it is empty — that has to be
+    // said, or the import reads as a success until you press play.
+    assert.ok(warnings.some((w) => w.includes("no CG/sprite data decoded")));
+    assert.ok(warnings.some((w) => w.includes("no enemy table decoded")));
+    assert.ok(warnings.some((w) => w.includes("nothing will spawn")));
+    assert.ok(warnings.some((w) => w.includes("none of its content yet")));
+});
+
+test("a partial decode only warns about the parts that are still missing", () => {
+    const decoded = emptyDecoded();
+    decoded.enemies = [{ name: "zako", hp: 2 }];
+    const { warnings } = mapSaveToGame(decoded);
+    assert.ok(!warnings.some((w) => w.includes("no enemy table decoded")));
+    assert.ok(warnings.some((w) => w.includes("no CG/sprite data decoded")));
+    assert.ok(warnings.some((w) => w.includes("nothing will spawn")));
+    // The catch-all only fires when nothing at all came through.
+    assert.ok(!warnings.some((w) => w.includes("none of its content yet")));
 });
 
 test("mapSaveToGame is deterministic", () => {

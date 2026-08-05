@@ -199,5 +199,29 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
     gameJson.continueComment = "";
     gameJson.continueCommentEn = "";
 
+    // A save can parse perfectly — container, block chain, section table,
+    // decompression — and still yield no game content, because the *meaning*
+    // of the decompressed sections is still being reverse-engineered
+    // (FORMAT.md, "Open: decoded section semantics"). Falling back to engine
+    // defaults without saying so looks like a successful import right up until
+    // you press play and get an empty stage, so name each gap.
+    if (!sprites.length) {
+        warnings.push("no CG/sprite data decoded from this save — using the default art");
+    }
+    if (!decodedEnemies.length) {
+        warnings.push("no enemy table decoded from this save — using the default starter enemy");
+    }
+    if (!decodedStages.length) {
+        warnings.push(
+            "no stage layout decoded from this save — every wave is empty, so nothing will spawn"
+        );
+    }
+    if (!sprites.length && !decodedEnemies.length && !decodedStages.length) {
+        warnings.push(
+            "this import carries the save's identity but none of its content yet; " +
+            "decoding the section contents is still open work (see FORMAT.md)"
+        );
+    }
+
     return { gameJson, sprites, warnings };
 }
