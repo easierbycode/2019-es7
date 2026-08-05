@@ -11,16 +11,33 @@
         // Dezaemon 2 importer — the same ESM modules the Node CLI + tests use
         // (tools/dezaemon-import). Module scripts are deferred, so
         // window.Dezaemon exists before any user interaction; entry points
-        // still guard on it in case the import fails (e.g. file:// serving).
-        import * as bupSource from "./tools/dezaemon-import/lib/bup-source.js";
-        import * as bupParse from "./tools/dezaemon-import/lib/bup-parse.js";
-        import * as payloadTable from "./tools/dezaemon-import/lib/payload-table.js";
-        import { decodeSave } from "./tools/dezaemon-import/lib/decode/index.js";
-        import * as mapToGame from "./tools/dezaemon-import/lib/map-to-game.js";
-        import { packShelf } from "./tools/dezaemon-import/lib/atlas-pack.js";
-        import { validateGameJson } from "./tools/dezaemon-import/lib/game-schema.js";
-        window.Dezaemon = Object.assign({}, bupSource, bupParse, payloadTable, mapToGame,
-            { decodeSave, packShelf, validateGameJson });
+        // still guard on it in case the import fails.
+        //
+        // Imports are dynamic so a failure is *catchable*. With static imports
+        // a missing/mis-served module aborts the whole script silently, leaving
+        // window.Dezaemon undefined with no clue why — the UI then had to guess
+        // at a cause. Record the real error instead and let the UI report it.
+        const BASE = "./tools/dezaemon-import/lib/";
+        try {
+            const [bupSource, bupParse, payloadTable, decodeMod, mapToGame, atlasPack, schema] =
+                await Promise.all([
+                    import(BASE + "bup-source.js"),
+                    import(BASE + "bup-parse.js"),
+                    import(BASE + "payload-table.js"),
+                    import(BASE + "decode/index.js"),
+                    import(BASE + "map-to-game.js"),
+                    import(BASE + "atlas-pack.js"),
+                    import(BASE + "game-schema.js"),
+                ]);
+            window.Dezaemon = Object.assign({}, bupSource, bupParse, payloadTable, mapToGame, {
+                decodeSave: decodeMod.decodeSave,
+                packShelf: atlasPack.packShelf,
+                validateGameJson: schema.validateGameJson,
+            });
+        } catch (err) {
+            window.DezaemonLoadError = err;
+            console.error("Dezaemon module failed to load:", err);
+        }
         window.dispatchEvent(new Event("dezaemon-ready"));
     </script>
     <style>
@@ -2528,13 +2545,37 @@
             document.getElementById('status').innerHTML = '<span style="color:#84cc16">New game (unsaved)</span>';
         }
 
+        // Explain an unavailable window.Dezaemon using the error the module
+        // loader actually recorded, rather than assuming a cause. The failure
+        // modes look identical from the UI but need different fixes.
+        function dezaemonUnavailableMessage() {
+            const err = window.DezaemonLoadError;
+            const why = err ? (err.message || String(err)) : 'the module script never ran';
+            let hint;
+            if (location.protocol === 'file:') {
+                hint = 'The editor is open over file:// — browsers block ES module imports there. '
+                    + 'Serve the folder over http instead (e.g. `npx vite` from the repo root, or '
+                    + '`node tests/e2e/static-server.js 3210`) and open it via http://localhost/…';
+            } else if (/failed to fetch|networkerror|importing a module script failed|error loading dynamically imported module|404/i.test(why)) {
+                hint = 'tools/dezaemon-import/lib/*.js could not be fetched from ' + location.origin + '. '
+                    + 'If this is a deployed copy of the editor, that folder most likely was not uploaded '
+                    + 'alongside level-editor.html — the importer modules must ship with it.';
+            } else if (/mime|expected a javascript/i.test(why)) {
+                hint = 'The server sent the module with a non-JavaScript MIME type. '
+                    + 'Configure it to serve .js as text/javascript.';
+            } else {
+                hint = 'See the browser console for the failing import.';
+            }
+            return 'Dezaemon module failed to load.\n\n' + why + '\n\n' + hint;
+        }
+
         function openDezaemonImport() {
-            if (!window.Dezaemon) { alert('Dezaemon module failed to load (serve the editor over http, not file://)'); return; }
+            if (!window.Dezaemon) { alert(dezaemonUnavailableMessage()); return; }
             document.getElementById('deza-file-input').click();
         }
 
         async function handleDezaemonFile(file) {
-            if (!window.Dezaemon) { alert('Dezaemon module failed to load'); return; }
+            if (!window.Dezaemon) { alert(dezaemonUnavailableMessage()); return; }
             let saves, kind;
             try {
                 const u8 = new Uint8Array(await file.arrayBuffer());
