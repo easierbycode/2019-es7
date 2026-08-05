@@ -1,0 +1,204 @@
+{
+  "stage0": {
+    "enemylist": [
+      [
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00"
+      ],
+      [
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00"
+      ],
+      [
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00"
+      ],
+      [
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00"
+      ],
+      [
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00"
+      ],
+      [
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00"
+      ],
+      [
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00"
+      ],
+      [
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00",
+        "00"
+      ]
+    ]
+  },
+  "playerData": {
+    "name": "G",
+    "maxHp": 3,
+    "spDamage": 50,
+    "defaultShootName": "normal",
+    "defaultShootSpeed": "speed_normal",
+    "texture": [
+      "player00.gif",
+      "player01.gif",
+      "player02.gif",
+      "player03.gif",
+      "player04.gif",
+      "player05.gif"
+    ],
+    "shootNormal": {
+      "name": "normal",
+      "damage": 1,
+      "hp": 1,
+      "interval": 23,
+      "texture": [
+        "shot00.gif",
+        "shot01.gif",
+        "shot02.gif",
+        "shot03.gif"
+      ]
+    },
+    "shootBig": {
+      "name": "big",
+      "damage": 2,
+      "hp": 100,
+      "interval": 39,
+      "texture": [
+        "shotBig00.gif",
+        "shotBig01.gif",
+        "shotBig02.gif",
+        "shotBig03.gif"
+      ]
+    },
+    "shoot3way": {
+      "name": "3way",
+      "damage": 1,
+      "hp": 1,
+      "interval": 31,
+      "texture": [
+        "shot00.gif",
+        "shot01.gif",
+        "shot02.gif",
+        "shot03.gif"
+      ]
+    },
+    "barrier": {
+      "time": 4,
+      "texture": [
+        "barrier0.gif",
+        "barrier1.gif",
+        "barrier2.gif",
+        "barrier3.gif"
+      ]
+    }
+  },
+  "enemyData": {
+    "enemyA": {
+      "name": "soliderA",
+      "score": 100,
+      "spgage": 4,
+      "hp": 1,
+      "speed": 0.8,
+      "interval": 300,
+      "texture": [
+        "soliderA0.gif",
+        "soliderA1.gif",
+        "soliderA2.gif"
+      ],
+      "shadowReverse": true,
+      "shadowOffsetY": 10,
+      "bulletData": {
+        "score": 100,
+        "spgage": 2,
+        "hp": 1,
+        "speed": 1,
+        "damage": 1,
+        "texture": [
+          "normalProjectile0.gif",
+          "normalProjectile1.gif",
+          "normalProjectile2.gif"
+        ]
+      }
+    }
+  },
+  "bossData": {
+    "boss0": {
+      "name": "bison",
+      "score": 2200,
+      "spgage": 30,
+      "hp": 150,
+      "interval": 100,
+      "shadowReverse": true,
+      "shadowOffsetY": 50,
+      "anim": {
+        "idle": [
+          "bison_idle0.gif",
+          "bison_idle1.gif",
+          "bison_idle2.gif",
+          "bison_idle3.gif"
+        ],
+        "attack": [
+          "bison_attack0.gif",
+          "bison_attack1.gif"
+        ]
+      },
+      "bulletData": {}
+    }
+  },
+  "meta": {
+    "version": "1.0"
+  },
+  "continueComment": "",
+  "continueCommentEn": ""
+}

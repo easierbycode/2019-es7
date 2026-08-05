@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-"use strict";
-
 // Differential analysis helper for reverse-engineering the Dezaemon 2 save
-// format. Give it two .sav files and it prints the contiguous byte ranges
-// that differ (after de-interleave). Used to localize data regions:
+// format. Give it two save files and it prints the contiguous byte ranges
+// that differ (after container normalization — gzip .bcr, interleaved cart
+// dumps, and raw images all work). Used to localize data regions:
 //
 //   - Two *different games*   → ranges that are IDENTICAL reveal fixed
 //                               structure (headers, default tables).
@@ -15,10 +14,11 @@
 // --min-gap merges changed ranges separated by fewer than N identical bytes
 // (default 8) so a single struct doesn't fragment into noise.
 
-const fs = require("fs");
-const { deinterleave } = require("../lib/bup-deinterleave");
+import fs from "node:fs";
+import { normalize } from "../lib/bup-source.js";
+import { coalesceDiffRanges, totalDiffBytes } from "../lib/diff-ranges.js";
 
-function main() {
+async function main() {
     const args = process.argv.slice(2);
     let minGap = 8;
     const files = [];
@@ -31,31 +31,13 @@ function main() {
         process.exit(2);
     }
 
-    const a = deinterleave(fs.readFileSync(files[0]));
-    const b = deinterleave(fs.readFileSync(files[1]));
-    const n = Math.min(a.length, b.length);
+    const a = (await normalize(fs.readFileSync(files[0]))).data;
+    const b = (await normalize(fs.readFileSync(files[1]))).data;
 
-    // Collect raw differing offsets, then coalesce into ranges.
-    const ranges = [];
-    let runStart = -1;
-    let lastDiff = -1;
-    for (let i = 0; i < n; i++) {
-        if (a[i] !== b[i]) {
-            if (runStart === -1) runStart = i;
-            else if (i - lastDiff > minGap) {
-                ranges.push([runStart, lastDiff]);
-                runStart = i;
-            }
-            lastDiff = i;
-        }
-    }
-    if (runStart !== -1) ranges.push([runStart, lastDiff]);
-
-    let totalDiff = 0;
-    for (const [s, e] of ranges) totalDiff += e - s + 1;
+    const ranges = coalesceDiffRanges(a, b, minGap);
 
     console.log(`# diff ${files[0]} vs ${files[1]}`);
-    console.log(`# logical sizes: ${a.length} / ${b.length}; ${ranges.length} changed ranges, ${totalDiff} bytes differ\n`);
+    console.log(`# logical sizes: ${a.length} / ${b.length}; ${ranges.length} changed ranges, ${totalDiffBytes(ranges)} bytes differ\n`);
     console.log(`${"start".padStart(10)} ${"end".padStart(10)} ${"len".padStart(8)}`);
     for (const [s, e] of ranges) {
         const len = e - s + 1;

@@ -1,0 +1,11 @@
+{
+  "name": "e2e",
+  "private": true,
+  "description": "Playwright end-to-end tests for the level editor (Dezaemon 2 flows) and the Phaser editorPlay handoff.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0"
+  }
+}

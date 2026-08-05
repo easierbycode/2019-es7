@@ -6,8 +6,7 @@
       "runtimeExecutable": "cmd.exe",
       "runtimeArgs": ["/c", "npx", "serve", "--no-clipboard", "."],
       "port": 3000,
-      "autoPort": true,
-      "url": "/phaser-game.html?lowmode=1"
+      "autoPort": true
     },
     {
       "name": "ps2-sp-demo",

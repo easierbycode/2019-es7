@@ -6,7 +6,10 @@
   "scripts": {
     "electron": "electron .",
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "test": "npm run test:unit && npm run test:e2e",
+    "test:unit": "node --test tools/dezaemon-import/test/",
+    "test:e2e": "npm --prefix tests/e2e run test"
   },
   "devDependencies": {
     "electron": "^35.0.0",

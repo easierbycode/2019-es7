@@ -2,6 +2,7 @@
   "name": "dezaemon-import",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Import a Sega Saturn Dezaemon 2 user-created game from a .sav into the level editor's game.json + atlas format.",
   "bin": "./index.js",
   "scripts": {

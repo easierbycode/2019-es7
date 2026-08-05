@@ -2,3 +2,11 @@
 .claude/worktrees/
 node_modules/
 assets/custom-bgm/build/
+
+# e2e + Dezaemon RE artifacts
+tests/e2e/playwright-report/
+tests/e2e/test-results/
+tools/dezaemon-import/dev-fixtures/
+tools/dezaemon-import/dev-out/
+tools/dezaemon-import/harness/local/
+tools/dezaemon-import/out/

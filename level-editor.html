@@ -7,6 +7,22 @@
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js"></script>
+    <script type="module">
+        // Dezaemon 2 importer — the same ESM modules the Node CLI + tests use
+        // (tools/dezaemon-import). Module scripts are deferred, so
+        // window.Dezaemon exists before any user interaction; entry points
+        // still guard on it in case the import fails (e.g. file:// serving).
+        import * as bupSource from "./tools/dezaemon-import/lib/bup-source.js";
+        import * as bupParse from "./tools/dezaemon-import/lib/bup-parse.js";
+        import * as payloadTable from "./tools/dezaemon-import/lib/payload-table.js";
+        import { decodeSave } from "./tools/dezaemon-import/lib/decode/index.js";
+        import * as mapToGame from "./tools/dezaemon-import/lib/map-to-game.js";
+        import { packShelf } from "./tools/dezaemon-import/lib/atlas-pack.js";
+        import { validateGameJson } from "./tools/dezaemon-import/lib/game-schema.js";
+        window.Dezaemon = Object.assign({}, bupSource, bupParse, payloadTable, mapToGame,
+            { decodeSave, packShelf, validateGameJson });
+        window.dispatchEvent(new Event("dezaemon-ready"));
+    </script>
     <style>
         @font-face {
             font-family: 'Orbitron';
@@ -456,6 +472,11 @@
             <button class="menu-btn" onclick="play3D();closeMenu()">▶ Play 3D</button>
         </div>
         <div class="menu-section">
+            <div class="menu-section-title">Dezaemon 2</div>
+            <button class="menu-btn" onclick="startNewGame();closeMenu()">✨ New Game</button>
+            <button class="menu-btn" onclick="openDezaemonImport();closeMenu()">🛸 Import .sav</button>
+        </div>
+        <div class="menu-section">
             <div class="menu-section-title">Game Save (Cloud)</div>
             <div style="font-size:10px;color:#888;margin-bottom:6px;line-height:1.4;">Saves everything: title screen, story, sprites, levels, enemies &amp; bosses</div>
             <input id="firebase-level-name" type="text" placeholder="My game name" class="menu-input">
@@ -620,6 +641,27 @@
                 <button class="audio-clear-all-btn" onclick="clearAllCustomAudioUI()">Clear All Custom</button>
             </div>
             <div class="audio-grid" id="audio-grid"></div>
+        </div>
+    </div>
+
+    <!-- DEZAEMON 2 IMPORT MODAL -->
+    <input id="deza-file-input" type="file" accept=".sav,.bcr,.bkr" style="display:none" onchange="if(this.files[0])handleDezaemonFile(this.files[0]);this.value=''">
+    <div id="dezaemon-import-modal" class="picker-overlay hidden" onclick="if(event.target===this)this.classList.add('hidden')">
+        <div class="picker-panel" style="max-height:85vh;max-width:800px;">
+            <div class="picker-title">DEZAEMON 2 IMPORT
+                <span id="deza-container-kind" style="margin-left:12px;font-size:11px;font-family:monospace;color:#888;"></span>
+            </div>
+            <div style="font-size:11px;color:#888;margin-bottom:8px;font-family:monospace;">Saturn backup saves: .sav (cart dump) / .bcr (Mednafen cart) / .bkr (internal RAM)</div>
+            <div id="deza-slot-list" style="padding:0 4px;"></div>
+            <div id="deza-slot-detail" class="hidden">
+                <div id="deza-decoded-summary" style="font-size:11px;font-family:monospace;color:#94a3b8;margin:8px 0;line-height:1.7;"></div>
+                <div id="deza-sprite-preview" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(48px,1fr));gap:6px;margin-bottom:8px;"></div>
+                <pre id="deza-hex-preview" style="max-height:200px;overflow:auto;background:#0f172a;color:#94a3b8;font-size:10px;line-height:1.5;padding:8px;border-radius:4px;margin:0 0 12px;"></pre>
+                <div style="display:flex;gap:8px;">
+                    <button id="deza-import-btn" class="menu-btn" style="background:#84cc16;color:#000;font-weight:700;flex:1;justify-content:center;" onclick="applyDezaemonImport()">Import into editor</button>
+                    <button class="menu-btn" style="background:#475569;flex:1;justify-content:center;" onclick="document.getElementById('dezaemon-import-modal').classList.add('hidden')">Cancel</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1154,6 +1196,10 @@
         async function checkMissingTextures() {
             if (!atlasData || !atlasData.frames) return;
             const frames = Object.assign({}, atlasData.frames);
+            // Sprites added in-memory (imports, Firebase pulls) but not yet
+            // repacked into the atlas still count as present.
+            for (const s of extraSprites) frames[s.key] = true;
+            for (const k in replacedFrames) frames[k] = true;
 
             // Also load game_ui and game_asset atlases from root for cross-atlas verification
             for (const altKey of ['game_ui', 'game_asset']) {
@@ -1371,6 +1417,8 @@
             ap.onclick = () => {
                 const nums = keys.map(k => parseInt(k.replace('stage', '')));
                 const next = nums.length ? Math.max(...nums) + 1 : 0;
+                // BootScene clamps stages to 0..4 and only stage_loop0..4 backgrounds exist.
+                if (next > 4 && !confirm(`Phaser only plays stages 0-4 — stage${next} will be unreachable in-game. Add anyway?`)) return;
                 currentStageKey = `stage${next}`;
                 gameData[currentStageKey] = { enemylist: normalizeGrid([]) };
                 populateStagePills();
@@ -2416,6 +2464,239 @@
             a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }));
             a.download = `${currentStageKey}-level.json`; a.click();
         }
+
+        // ================== DEZAEMON 2 (NEW GAME + .SAV IMPORT) ==================
+        // Parsing/mapping lives in tools/dezaemon-import (window.Dezaemon, loaded
+        // as an ESM in <head>) so the CLI, tests and editor share one pipeline.
+        let dezaImportState = null;      // { containerKind, saves, selectedSlot, decoded, fileName }
+        let defaultGameSnapshot = null;  // pristine defaults captured before the first overwrite
+
+        function dezaClone(o) { return JSON.parse(JSON.stringify(o)); }
+
+        function snapshotDefaultsOnce() {
+            if (defaultGameSnapshot || !gameData) return;
+            try {
+                defaultGameSnapshot = {
+                    playerData: (playerData && Object.keys(playerData).length) ? dezaClone(playerData) : null,
+                    starterEnemy: enemyData && enemyData.enemyA ? dezaClone(enemyData.enemyA) : null,
+                    starterBoss: bossData && bossData.boss0 ? dezaClone(bossData.boss0) : null,
+                };
+            } catch (e) { /* leave null — BUILTIN_DEFAULTS covers it */ }
+        }
+
+        function getDezaemonDefaults() {
+            const base = window.Dezaemon ? dezaClone(window.Dezaemon.BUILTIN_DEFAULTS) : null;
+            if (!base) return null;
+            const snap = defaultGameSnapshot || {};
+            if (snap.playerData) base.playerData = dezaClone(snap.playerData);
+            if (snap.starterEnemy) base.starterEnemy = dezaClone(snap.starterEnemy);
+            if (snap.starterBoss) base.starterBoss = dezaClone(snap.starterBoss);
+            return base;
+        }
+
+        // Blank game without the module: reuse whatever's currently loaded.
+        function createBlankGameFallback() {
+            if (!gameData || !enemyData.enemyA || !bossData.boss0) return null;
+            const emptyWave = () => new Array(8).fill("00");
+            return {
+                stage0: { enemylist: Array.from({ length: 8 }, emptyWave) },
+                playerData: dezaClone(playerData),
+                enemyData: { enemyA: dezaClone(enemyData.enemyA) },
+                bossData: { boss0: dezaClone(bossData.boss0) },
+                meta: { version: "1.0" },
+                continueComment: "",
+                continueCommentEn: "",
+            };
+        }
+
+        function startNewGame() {
+            snapshotDefaultsOnce();
+            let blank = null;
+            if (window.Dezaemon) blank = window.Dezaemon.buildBlankGame(getDezaemonDefaults());
+            else blank = createBlankGameFallback();
+            if (!blank) { alert('Editor data is still loading — try again in a moment.'); return; }
+            replacedFrames = {}; extraSprites = []; customFrameKeys = new Set();
+            gameData = blank;
+            enemyData = gameData.enemyData;
+            bossData = gameData.bossData;
+            playerData = gameData.playerData;
+            currentStageKey = 'stage0';
+            storeBossDataForViewers();
+            populateStagePills(); loadCurrentStage(); renderEnemyList(); updateToolUI();
+            const nameInput = document.getElementById('firebase-level-name');
+            if (nameInput) nameInput.value = '';
+            document.getElementById('status').innerHTML = '<span style="color:#84cc16">New game (unsaved)</span>';
+        }
+
+        function openDezaemonImport() {
+            if (!window.Dezaemon) { alert('Dezaemon module failed to load (serve the editor over http, not file://)'); return; }
+            document.getElementById('deza-file-input').click();
+        }
+
+        async function handleDezaemonFile(file) {
+            if (!window.Dezaemon) { alert('Dezaemon module failed to load'); return; }
+            let saves, kind;
+            try {
+                const u8 = new Uint8Array(await file.arrayBuffer());
+                const norm = await window.Dezaemon.normalize(u8);
+                kind = norm.kind;
+                saves = window.Dezaemon.parse(norm.data);
+            } catch (e) {
+                alert('Not a Saturn backup image: ' + e.message);
+                return;
+            }
+            if (!saves.length) { alert('No save entries found in this image (empty cart?)'); return; }
+            dezaImportState = { containerKind: kind, saves, selectedSlot: null, decoded: null, fileName: file.name };
+            document.getElementById('deza-container-kind').textContent = `${file.name} · ${kind} · ${saves.length} ${saves.length === 1 ? 'entry' : 'entries'}`;
+            document.getElementById('deza-slot-detail').classList.add('hidden');
+            renderDezaemonSlots();
+            document.getElementById('dezaemon-import-modal').classList.remove('hidden');
+        }
+
+        function renderDezaemonSlots() {
+            const list = document.getElementById('deza-slot-list');
+            list.innerHTML = '';
+            dezaImportState.saves.forEach((save, i) => {
+                const isGame = window.Dezaemon.isGameSave(save);
+                const card = document.createElement('div');
+                card.className = 'deza-slot-card';
+                card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:8px 12px;margin-bottom:6px;background:#1e293b;border:1px solid ' +
+                    (dezaImportState.selectedSlot === i ? '#84cc16' : '#334155') + ';border-radius:4px;' +
+                    (isGame && save.payload ? 'cursor:pointer;' : 'opacity:0.45;');
+                const date = window.Dezaemon.bupDateToDate(save.date);
+                card.innerHTML =
+                    '<div style="flex:1;min-width:0;">' +
+                        '<div style="font-size:13px;color:#e2e8f0;font-weight:700;">' + (save.comment || save.filename) + '</div>' +
+                        '<div style="font-size:10px;font-family:monospace;color:#64748b;">' + save.filename +
+                        ' · ' + date.toISOString().slice(0, 10) + ' · ' + (save.datasize / 1024).toFixed(0) + ' KB' +
+                        (isGame ? '' : ' · system record') +
+                        (save.payloadError ? ' · <span style="color:#f87171">payload error</span>' : '') + '</div>' +
+                    '</div>' +
+                    (isGame && save.payload ? '<div style="font-size:11px;color:#84cc16;font-family:monospace;">select ›</div>' : '');
+                if (isGame && save.payload) card.onclick = () => selectDezaemonSlot(i);
+                list.appendChild(card);
+            });
+        }
+
+        function selectDezaemonSlot(i) {
+            const save = dezaImportState.saves[i];
+            dezaImportState.selectedSlot = i;
+            dezaImportState.decoded = window.Dezaemon.decodeSave(save.payload.buffer);
+            renderDezaemonSlots();
+            const d = dezaImportState.decoded;
+            const lines = [];
+            lines.push('Title: ' + (d.title ? d.title + ' <span style="color:#84cc16">(' + (d.confidence.title || 'decoded') + ')</span>' : '<span style="color:#64748b">not decoded yet</span>'));
+            lines.push('Payload: ' + save.payload.buffer.length.toLocaleString() + ' bytes, ' + save.blocks.length + ' blocks (block-accurate)');
+            if (d.sections) {
+                const badges = d.sections.map(s => {
+                    const ok = s.sizeMatchesKnown;
+                    const label = 'sec' + s.index + ' ' + (s.size / 1024).toFixed(1) + 'K→' +
+                        (s.decompressedSize !== null ? (s.decompressedSize / 1024).toFixed(0) + 'K' : '?');
+                    return '<span title="' + (s.hint || '') + '" style="display:inline-block;padding:1px 6px;margin:1px;border-radius:3px;background:' +
+                        (ok ? '#14532d;color:#86efac' : '#1e293b;color:#64748b') +
+                        ';border:1px solid #334155;">' + label + '</span>';
+                }).join('');
+                lines.push('Sections (checksums OK, ' + (d.confidence.decompression === 'confirmed' ? 'LZSS decompressed' : 'decompression partial') + '): ' + badges);
+            } else if (d.tableError) {
+                lines.push('<span style="color:#f87171">Section table: ' + d.tableError + '</span>');
+            }
+            lines.push('<span style="color:#64748b">Field-level decoding (sprites/enemies/stages) is still being reverse-engineered — importing yields a playable skeleton carrying this save\'s metadata. Decoded content will appear here as it lands.</span>');
+            document.getElementById('deza-decoded-summary').innerHTML = lines.join('<br>');
+            const spriteGrid = document.getElementById('deza-sprite-preview');
+            spriteGrid.innerHTML = '';
+            for (const sp of d.sprites) {
+                const c = document.createElement('canvas');
+                c.width = sp.w; c.height = sp.h;
+                c.style.cssText = 'width:100%;image-rendering:pixelated;background:#0f172a;border:1px solid #334155;border-radius:3px;';
+                c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(sp.rgba), sp.w, sp.h), 0, 0);
+                c.title = sp.key;
+                spriteGrid.appendChild(c);
+            }
+            document.getElementById('deza-hex-preview').textContent = renderDezaemonHexPreview(save.payload.buffer, 512);
+            document.getElementById('deza-slot-detail').classList.remove('hidden');
+        }
+
+        function renderDezaemonHexPreview(u8, maxBytes) {
+            const n = Math.min(maxBytes, u8.length);
+            const lines = [];
+            for (let off = 0; off < n; off += 16) {
+                const bytes = [];
+                let ascii = '';
+                for (let j = 0; j < 16; j++) {
+                    if (off + j < n) {
+                        const b = u8[off + j];
+                        bytes.push(b.toString(16).padStart(2, '0'));
+                        ascii += b >= 0x20 && b < 0x7f ? String.fromCharCode(b) : '.';
+                    } else bytes.push('  ');
+                }
+                lines.push(off.toString(16).padStart(8, '0') + '  ' + bytes.slice(0, 8).join(' ') + '  ' + bytes.slice(8).join(' ') + '  |' + ascii + '|');
+            }
+            if (u8.length > n) lines.push('… ' + (u8.length - n).toLocaleString() + ' more bytes');
+            return lines.join('\n');
+        }
+
+        function applyDezaemonImport() {
+            const st = dezaImportState;
+            if (!st || st.selectedSlot === null || !st.decoded) return;
+            const save = st.saves[st.selectedSlot];
+            snapshotDefaultsOnce();
+            const { gameJson, sprites, warnings } = window.Dezaemon.mapSaveToGame(st.decoded, {
+                defaults: getDezaemonDefaults(),
+                sourceEntry: save,
+                importedAt: new Date().toISOString(),
+            });
+            // Reset per-level atlas customization state (same discipline as
+            // loadFromFirebase) BEFORE adding this import's sprites.
+            replacedFrames = {}; extraSprites = []; customFrameKeys = new Set();
+            const existing = new Set(Object.keys((atlasData && atlasData.frames) || {}));
+            for (const sp of sprites) {
+                let key = sp.key;
+                if (existing.has(key)) {
+                    const base = key.replace(/\.gif$/, '');
+                    let n = 2;
+                    while (existing.has(key)) key = base + '_' + (n++) + '.gif';
+                    // Keep enemy texture references in sync with the renamed key.
+                    for (const rec of Object.values(gameJson.enemyData)) {
+                        if (Array.isArray(rec.texture)) rec.texture = rec.texture.map(t => t === sp.key ? key : t);
+                        if (rec.bulletData && Array.isArray(rec.bulletData.texture)) {
+                            rec.bulletData.texture = rec.bulletData.texture.map(t => t === sp.key ? key : t);
+                        }
+                    }
+                }
+                existing.add(key);
+                const c = document.createElement('canvas');
+                c.width = sp.w; c.height = sp.h;
+                c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(sp.rgba), sp.w, sp.h), 0, 0);
+                extraSprites.push({ key, canvas: c, w: sp.w, h: sp.h });
+                customFrameKeys.add(key);
+            }
+            gameData = gameJson;
+            enemyData = gameData.enemyData;
+            bossData = gameData.bossData;
+            playerData = gameData.playerData;
+            currentStageKey = 'stage0';
+            storeBossDataForViewers();
+            populateStagePills(); loadCurrentStage(); renderEnemyList(); renderAtlas(); updateToolUI();
+            checkMissingTextures();
+            const nameInput = document.getElementById('firebase-level-name');
+            if (nameInput) nameInput.value = '';
+            const title = st.decoded.title || save.comment || 'Dezaemon 2 game';
+            document.getElementById('status').innerHTML = '<span style="color:#84cc16">Imported: ' + title + ' (Dezaemon 2)</span>';
+            document.getElementById('dezaemon-import-modal').classList.add('hidden');
+            const notes = warnings.slice();
+            if (sprites.length) notes.push('Imported sprites appear in Play In Phaser only after Repack Atlas or Save Game (Cloud).');
+            if (notes.length) alert('Import notes:\n- ' + notes.join('\n- '));
+        }
+
+        // Test hook for the e2e suite (and console debugging).
+        window.__editorState = () => ({
+            stageKeys: gameData ? Object.keys(gameData).filter(k => /^stage\d+$/.test(k)) : [],
+            currentStageKey,
+            waveCount: currentGrid.length,
+            enemyKeys: Object.keys(enemyData || {}),
+            extraSpriteCount: extraSprites.length,
+            status: (document.getElementById('status') || {}).textContent || '',
+        });
 
         // ================== SAVE AS 3D (SUPER SCALER) ==================
         // Exports the loaded game as a single self-contained HTML file that plays
@@ -4652,7 +4933,7 @@ function GAME3D_RUNTIME(DATA) {
                 document.getElementById('status').innerHTML = `<span style="color:#f59e0b">Game: ${name} (cloud)</span>`;
 // Restore sprite thumbnails from Firebase data
                 if (d.frameThumbnails) restoreFrameThumbnails(d.frameThumbnails);
-                renderGrid(); renderPreview(); updateToolUI(); renderEnemyList();
+                renderGrid(); updateToolUI(); renderEnemyList();
                 return true;
             } catch (e) { alert('Load failed: ' + e.message); return false; }
         }
@@ -5177,7 +5458,9 @@ if (!name) { name = prompt('Level name:'); if (!name) return; }
             updateToolUI();
             // Auto-load local data first so Firebase can override it
             await autoLoadFromServer();
-            const urlLevel = new URLSearchParams(window.location.search).get('level');
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('new')) { startNewGame(); return; }
+            const urlLevel = urlParams.get('level');
             if (urlLevel) {
                 document.getElementById('firebase-level-name').value = urlLevel;
                 initFirebase();

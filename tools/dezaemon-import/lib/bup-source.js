@@ -1,5 +1,3 @@
-"use strict";
-
 // Container-format normalizer: turns whatever shape the user hands us into a
 // raw Saturn BUP byte image that `bup-parse.js` can walk.
 //
@@ -10,19 +8,24 @@
 //     set to 0xFF (the unused high half of each backup-RAM word). 1MB on disk,
 //     512KB logical.
 //   - raw: 32KB internal-RAM dumps (.bkr) and already-unwrapped cart images.
+//
+// Environment-neutral ESM: gunzip uses DecompressionStream, which exists as a
+// global in both browsers and Node >= 18 — which is why normalize() is async.
 
-const zlib = require("zlib");
-const { detect: detectInterleave, deinterleave } = require("./bup-deinterleave");
+import { detect as detectInterleave, deinterleave } from "./bup-deinterleave.js";
 
-function isGzip(buf) {
+export function isGzip(buf) {
     return buf.length >= 2 && buf[0] === 0x1f && buf[1] === 0x8b;
 }
 
-// Returns { kind, data } where data is the raw BUP bytes.
-function normalize(buf) {
-    if (isGzip(buf)) return { kind: "gzip", data: zlib.gunzipSync(buf) };
-    if (detectInterleave(buf)) return { kind: "interleaved", data: deinterleave(buf) };
-    return { kind: "raw", data: Buffer.from(buf) };
+export async function gunzip(buf) {
+    const stream = new Response(buf).body.pipeThrough(new DecompressionStream("gzip"));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
-module.exports = { normalize, isGzip };
+// Returns { kind, data } where data is the raw BUP bytes as a Uint8Array.
+export async function normalize(buf) {
+    if (isGzip(buf)) return { kind: "gzip", data: await gunzip(buf) };
+    if (detectInterleave(buf)) return { kind: "interleaved", data: deinterleave(buf) };
+    return { kind: "raw", data: Uint8Array.prototype.slice.call(buf) };
+}

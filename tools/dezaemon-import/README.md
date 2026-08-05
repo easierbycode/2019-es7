@@ -11,15 +11,18 @@ sprites and fonts baked into a save are Athena's copyright.
 
 | Stage | State |
 |-------|-------|
-| Saturn BUP container parse (de-interleave + directory) | **done** |
+| Saturn BUP container parse (partitions + directory + block-accurate payload) | **done** — validated by section checksums |
+| Payload section table (8 sections, byte-sum checksums) | **done** (`lib/payload-table.js`) |
 | Differential analysis tooling | **done** (`dev/diff-saves.js`) |
-| Payload region decoders (sprite / palette / enemy / bullet / stage) | **not started** — blocked on format RE |
-| game.json + atlas emit | not started |
+| Section decompression (Okumura LZSS) | **done** (`lib/decompress.js`) — all 16 fixture sections decode to exact region sizes |
+| Payload region decoders (sprite / palette / enemy / bullet / stage) | not started — needs delta captures / Ghidra for field offsets |
+| game.json + atlas emit | in progress |
 | BGM | out of scope for v1 (drop in your own MP3) |
 
-The container layout is reverse-engineered and validated against two real saves
-(see `FORMAT.md`). The per-region decoders need **controlled-delta sample saves**
-to bootstrap — see "Helping the RE" below.
+The container layout is fully reverse-engineered and validated against real
+saves (see `FORMAT.md`). Field-level decoding is blocked on the section
+compression; **controlled-delta sample saves** localize fields to sections
+even before that's solved — see "Helping the RE" below.
 
 ## Usage
 
