@@ -208,7 +208,22 @@ literal pools; they tile the 396,640 bytes exactly, with no gaps:
 | `+0x5A780` | `0x60` | **Global settings** — see the byte map below | mostly decoded |
 | `+0x5A7E0` | 10 × `0x478` | **Per-stage enemy definitions**: 60 records × 18 B (`0x438`) + a `0x40` trailer the engine indexes separately. Record N defines the Nth zako id. | **located**; internal fields partly characterised |
 | `+0x5D490` | `0x1D0` | **Global sprite composition bank**: 232 u16be cell refs (player ship frames, bullets, item icons, explosions, the drawn title logo, credit glyphs) | decoded (structure) |
-| `+0x5D660` | 10 × `0x580` | **Per-stage sprite composition**: 704 u16be cell refs = 11 character slots × 64 refs; within a slot the animation frames run contiguously in row-major w×h runs (64 frames of 1×1, 16 of 2×2, 4 of 4×4, 1 of 8×8) | decoded (structure) |
+| `+0x5D660` | 10 × `0x580` | **Per-stage sprite composition**: 704 u16be cell refs = 11 character slots × 64. The slots are the 7 zako classes (placement id high nibble `0x8`–`0xE`) then the 4 boss classes. A class's 64 refs split evenly among its ids, four animation frames each; a frame's cells form a rectangle read row-major, its shape given by page adjacency (`+1` = wider, `+8` = taller). | **decoded** |
+
+Per-class geometry, from the id counts:
+
+| class | `0x8` | `0x9` | `0xA` | `0xB` | `0xC` | `0xD` | `0xE` |
+|-------|------|------|------|------|------|------|------|
+| ids | 16 | 8 | 8 | 16 | 4 | 4 | 4 |
+| refs/id | 4 | 8 | 8 | 4 | 16 | 16 | 16 |
+| cells/frame | 1 | 2 | 2 | 1 | 4 | 4 | 4 |
+
+Unused slots point every ref at the CG editor's unpainted-cell placeholder
+(the most-referenced cell in the bank by an order of magnitude), so extraction
+skips them and, since art is per stage, falls back to another stage that
+places the same enemy. On DAIOH this resolves 204 of 215 placed ids directly
+and the rest via fallback, yielding its aircraft, jets and capsules with their
+4-frame animations.
 
 Composition words use the same encoding as the background map: `0xFFFF` =
 empty, else bit15/bit14 = flips and bits 0–9 = CG cell index. The two banks

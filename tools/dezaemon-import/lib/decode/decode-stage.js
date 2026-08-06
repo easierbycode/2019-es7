@@ -229,6 +229,17 @@ export function projectForEditor(stages) {
         }
     }
     const roster = [...uses.keys()].sort((a, b) => uses.get(b) - uses.get(a) || a - b);
+    // Every stage that places each record — sprite art is per stage, so an
+    // enemy can take its art from any stage that uses it.
+    const stagesUsing = new Map();
+    stages.forEach((st, i) => {
+        for (const o of st.placement.objects) {
+            if (o.kind !== "zako") continue;
+            if (!stagesUsing.has(o.record)) stagesUsing.set(o.record, []);
+            const list = stagesUsing.get(o.record);
+            if (!list.includes(i)) list.push(i);
+        }
+    });
     const letterOf = new Map(roster.map((r, i) => [r, i]));
     const enemies = roster.map((r) => ({
         name: `deza${String(r).padStart(2, "0")}`,
@@ -248,7 +259,7 @@ export function projectForEditor(stages) {
         const rows = [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r));
         return { rows, boss: st.placement.boss || null };
     });
-    return { enemies, stages: projected };
+    return { enemies, stages: projected, stagesUsing };
 }
 
 // Raw slices of the still-undecoded regions, so callers can surface them

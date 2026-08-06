@@ -2710,7 +2710,11 @@
                     (d.enemies ? d.enemies.length : 0) + '</span>' +
                     (d.songCount ? ' · BGM: <span style="color:#84cc16">' + d.songCount + '</span>/24 songs' : ''));
             }
-            lines.push('<span style="color:#64748b">Enemy <em>attributes</em> (hp/speed/fire) and sprite art are still being reverse-engineered, so imported enemies use the default art and stats. Backgrounds, placement, palettes and music are decoded — see FORMAT.md.</span>');
+            if (d.sprites && d.sprites.length) {
+                lines.push('Sprites: <span style="color:#84cc16">' + d.sprites.length +
+                    '</span> enemy animation frames extracted from this save\'s CG pages');
+            }
+            lines.push('<span style="color:#64748b">Enemy <em>attributes</em> (hp/speed/fire) are still being reverse-engineered, so imported enemies keep the default stats. Art, backgrounds, placement, palettes and music are decoded — see FORMAT.md.</span>');
             document.getElementById('deza-decoded-summary').innerHTML = lines.join('<br>');
             const spriteGrid = document.getElementById('deza-sprite-preview');
             spriteGrid.innerHTML = '';
@@ -2786,6 +2790,12 @@
             playerData = gameData.playerData;
             currentStageKey = 'stage0';
             storeBossDataForViewers();
+            // Fold the save's sprites into the atlas straight away. Without
+            // this the imported enemies reference frames that only exist in
+            // extraSprites, so every picker cell and grid cell falls back to a
+            // placeholder (or the default art) until the user happens to find
+            // the Repack Atlas button.
+            if (sprites.length) repackAtlas();
             populateStagePills(); loadCurrentStage(); renderEnemyList(); renderAtlas(); updateToolUI();
             checkMissingTextures();
             const nameInput = document.getElementById('firebase-level-name');
@@ -2794,7 +2804,7 @@
             document.getElementById('status').innerHTML = '<span style="color:#84cc16">Imported: ' + title + ' (Dezaemon 2)</span>';
             document.getElementById('dezaemon-import-modal').classList.add('hidden');
             const notes = warnings.slice();
-            if (sprites.length) notes.push('Imported sprites appear in Play In Phaser only after Repack Atlas or Save Game (Cloud).');
+            if (sprites.length) notes.push(sprites.length + ' sprites from the save were packed into the atlas.');
             if (notes.length) alert('Import notes:\n- ' + notes.join('\n- '));
         }
 

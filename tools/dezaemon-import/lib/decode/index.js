@@ -19,6 +19,7 @@ import { decompress, SECTION_SIZES, SECTION_HINTS } from "../decompress.js";
 import { decodeCg } from "./decode-cg.js";
 import { decodeStages, sec5Regions, projectForEditor } from "./decode-stage.js";
 import { decodeSongs } from "./decode-song.js";
+import { extractEnemySprites } from "./decode-sprites.js";
 
 export function decodeSave(payload) {
     const result = {
@@ -99,6 +100,27 @@ export function decodeSave(payload) {
                 result.stages = projected.stages;
                 result.confidence.enemies = "heuristic";
                 result.confidence.stages = "confirmed";
+                // Enemy art: pull each enemy's 4 animation frames out of the
+                // sprite composition bank of a stage that places it.
+                if (result.cg) {
+                    try {
+                        const { sprites, spriteKeysByRecord } = extractEnemySprites(
+                            assembly.decompressed,
+                            result.sections.slice(0, 4).map((s) => s.decompressed),
+                            result.cg.palettes,
+                            result.enemies,
+                            projected.stagesUsing,
+                        );
+                        result.sprites = sprites;
+                        for (const e of result.enemies) {
+                            const keys = spriteKeysByRecord.get(e.record);
+                            if (keys) e.spriteKeys = keys;
+                        }
+                        if (sprites.length) result.confidence.sprites = "heuristic";
+                    } catch (err) {
+                        result.spriteError = err.message;
+                    }
+                }
             } catch (err) {
                 result.backgroundError = err.message;
             }
