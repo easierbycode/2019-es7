@@ -16,11 +16,22 @@
 
 import { parseSectionTable } from "../payload-table.js";
 import { decompress, SECTION_SIZES, SECTION_HINTS } from "../decompress.js";
+import { decodeCg } from "./decode-cg.js";
+import { decodeStages, sec5Regions, projectForEditor } from "./decode-stage.js";
+import { decodeSongs } from "./decode-song.js";
 
 export function decodeSave(payload) {
     const result = {
         title: null,
         confidence: {},
+        cg: null,      // {palettes, pages} from decode-cg.js (art pages + palette bank)
+        cgError: null,
+        backgrounds: null, // per-stage background tilemaps from decode-stage.js
+        backgroundError: null,
+        stageCount: 0,
+        songs: null,   // 24 BGM slots from decode-song.js
+        songError: null,
+        songCount: 0,
         sprites: [],   // {key, w, h, rgba: Uint8ClampedArray}
         enemies: [],   // {name?, hp?, score?, speed?, interval?, spriteKeys?}
         stages: [],    // {rows: [[null | {enemy: idx, drop: 0..9}, ...8], ...]} in spawn order
@@ -55,11 +66,63 @@ export function decodeSave(payload) {
         result.confidence.decompression = result.sections.every((s) => s.sizeMatchesKnown)
             ? "confirmed"
             : "heuristic";
+        // CG layer (art pages sec0-3 + palette bank sec4) — layout confirmed
+        // by cross-corpus + disc analysis (FORMAT.md "Section semantics").
+        const cgSections = [0, 1, 2, 3].map((i) => result.sections[i]);
+        const palSection = result.sections[4];
+        if (cgSections.every((s) => s?.sizeMatchesKnown) && palSection?.sizeMatchesKnown) {
+            try {
+                result.cg = decodeCg(cgSections.map((s) => s.decompressed), palSection.decompressed);
+                result.confidence.cg = "confirmed";
+            } catch (err) {
+                result.cgError = err.message;
+            }
+        }
+        // Stage backgrounds (sec5 stage banks) — layout confirmed from engine
+        // code and by rendering coherent level art in every sample game.
+        const assembly = result.sections[5];
+        if (assembly?.sizeMatchesKnown) {
+            try {
+                const { stages, stageCount } = decodeStages(assembly.decompressed);
+                result.backgrounds = stages;
+                result.stageCount = stageCount;
+                result.confidence.backgrounds = "confirmed";
+                result.sec5Regions = sec5Regions(assembly.decompressed);
+                // Editor-facing projection: the enemy roster and per-stage
+                // spawn rows the level editor renders. Enemy *attributes*
+                // (hp/speed/...) are deliberately left unset — the 18-byte
+                // record's fields are located but not yet named, so the
+                // mapper falls back to engine defaults rather than inventing
+                // numbers (see FORMAT.md).
+                const projected = projectForEditor(stages.slice(0, stageCount));
+                result.enemies = projected.enemies;
+                result.stages = projected.stages;
+                result.confidence.enemies = "heuristic";
+                result.confidence.stages = "confirmed";
+            } catch (err) {
+                result.backgroundError = err.message;
+            }
+        }
+        // BGM (sec6): 24 song slots of 4228 bytes.
+        const bgm = result.sections[6];
+        if (bgm?.sizeMatchesKnown) {
+            try {
+                const { songs, usedCount } = decodeSongs(bgm.decompressed);
+                result.songs = songs;
+                result.songCount = usedCount;
+                result.confidence.songs = "confirmed";
+            } catch (err) {
+                result.songError = err.message;
+            }
+        }
         result.regions = result.sections.map((s) => ({
             name: `sec${s.index}: ${s.hint}`,
             offset: s.offset,
             length: s.size,
-            decoded: false,
+            decoded:
+                (Boolean(result.cg) && s.index <= 4) ||
+                (Boolean(result.backgrounds) && s.index === 5) ||
+                (Boolean(result.songs) && s.index === 6),
             decompressedSize: s.decompressedSize,
         }));
     } catch (err) {

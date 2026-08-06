@@ -6,6 +6,8 @@ assets/custom-bgm/build/
 # e2e + Dezaemon RE artifacts
 tests/e2e/playwright-report/
 tests/e2e/test-results/
+# save/disc images used for reverse engineering — never commit these
+dev-fixtures/
 tools/dezaemon-import/dev-fixtures/
 tools/dezaemon-import/dev-out/
 tools/dezaemon-import/harness/local/

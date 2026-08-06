@@ -84,9 +84,9 @@ A game payload is a 0x6C-byte table + **8 concatenated sections** consuming
 | Off  | Type      | Field | Meaning                                          |
 |------|-----------|-------|--------------------------------------------------|
 | 0x00 | u32       | checksumTotal | sum of the 8 section checksums           |
-| 0x04 | u32       | tableAddr | LWRAM staging address of this table (`0x002C8A84` in both saves); sections start at `tableAddr + 0x6C` |
+| 0x04 | u32       | tableAddr | LWRAM address where the **compressed save image** is staged (`0x002C8A84` in both saves); sections start at `tableAddr + 0x6C` |
 | 0x08 | u32       | endAddr | last section's addr + size                     |
-| 0x0C | u32×3 × 8 | per-section `(checksum, lwramAddr, size)` — checksum is a plain 32-bit byte-sum; addresses chain contiguously |
+| 0x0C | u32×3 × 8 | per-section `(checksum, addr, size)` — checksum is a plain 32-bit byte-sum; `addr`/`size` describe each **compressed** chunk, chaining by compressed size (ramsie: sec0 @0x2C8AF0+21065 → sec1 @0x2CDD39 …). They say nothing about where the *decompressed* live regions sit. |
 
 Section sizes (Ramsie / Mucha): 21065/19310, 25320/24188, 26710/17909,
 21853/21877, **447/448**, **56643/53492**, 14676/15977, 689/706.
@@ -130,13 +130,158 @@ region sizes:
 
 Locked by `test/decompress.test.js`.
 
-## Open: decoded section semantics
+## Disc image (confirmed — probed 2026-08-05)
 
-With decompression solved, these regions still need field-level mapping:
-title/text, sprite/CG table + palettes (BGR555), enemy table, bullet-pattern
-table, stage script, background tilemap, BGM sequence + samples. (No ASCII or
-Shift-JIS title text was found in the decompressed data — titles are likely
-stored as graphics/tile indices.)
+The retail disc (`dev-fixtures/Dezaemon 2 (Japan)/`, MODE1/2352 track 1 +
+one CD-DA track) is a Rosetta stone for the section contents. Extract the
+ISO9660 files (2048B user data at sector offset 16); findings:
+
+- **`.CMP` container**: every `.CMP` file is `u32LE compressedSize` (== file
+  size − 4) followed by **the same Okumura LZSS stream** as save sections.
+  Our `lib/decompress.js` opens all of them unmodified.
+- **`SGM_*.CMP` = complete games** (DAIO, RAMS, ELFI, MIYA, GUST + INIT):
+  each decompresses to **exactly 766,596 bytes = the 8 raw sections in live
+  MEMORY order `sec0,1,2,3,5,4,6,7`** (CG pages ×4, assembly, palettes, BGM,
+  3D — no 0x6C table; that and the per-section recompression happen at save
+  time). Under that slicing `SGM_RAMS` matches the `ramsie.sav` fixture
+  byte-for-byte on **all 8 sections** — the Ramsie cart save is the untouched
+  built-in sample. `SGM_INIT` == `SGM_GUST` byte-identical: the factory "New
+  Game" state is the Bio Metal Gust sample. ELFI (hidden: L+R on Ramsie) and
+  MIYA (雅, hidden: L+R on Gust) are full games not in any cart save.
+  `dev/decode-corpus.js` ingests all six as corpus entries `disc-*`.
+- **sec6 = BGM, proven**: `SMP_BGM.BIN` is uncompressed and exactly 101,472
+  bytes = sec6's size = **24 song slots × 4,228 bytes**. `M_DATA01–73.BIN`
+  (4,228 B each) are the preset songs: DAIOH-g0's sec6 is literally
+  `M_DATA01..14` concatenated; Ramsie's sec6 matches 12 other presets
+  slot-for-slot. Song format: small header (`0c 0f 05 xx …`) then 8-byte
+  step rows, `0x80` = rest.
+- **`MDLDT_01–56.CMP` = preset 3D models for ポリ吉** (the 3D-to-sprite
+  editor, overlay `POLYKITI`): SGL-style compiled meshes loaded at LWRAM
+  `0x2F0000` — 12 PDATA pointers, then vertex tables (12 B XYZ) and polygon
+  tables (20 B = normal + 4 vertex indices), verified exactly. This is a
+  *different* format from sec7's part lists (presets render from MDLDT
+  directly; sec7 stores only user-built part compositions).
+- **`BACK00–14.CMP` = preset backgrounds** (decode to ~72KB); `BACK00` has an
+  RGB555 gray-ramp palette at +0x14 (byte-swapped), `BK_CHECK.CMP` opens with
+  big-endian RGB555 ramps.
+- **`DEMO_?N.BIN`** = per-stage input recordings ((u16 frames, u16 buttons)
+  runs) for D=Daio×5, E=Elfi×3, G=Gust×5, M=Miya×4, R=Rams×5 → sample games
+  have 3–5 stages.
+- **`0KERNEL.BIN`** (SH-2 main program) holds 34 references to `0x002C8A84`
+  (the save/load compression staging buffer). Editor overlays are code:
+  `KUMITATE` = 組み子さん (game assembly), `S_PAINT` = 絵太郎 (CG),
+  `POLYKITI` = ポリ吉 (3D), `GAME.CMP` = play-mode engine (165,628 B
+  decompressed). **Caveat**: an early literal-pool xref scan
+  (`dev-out/xref-offsets.txt`) assumed the *decompressed* sections lived at
+  `0x2C8AF0+` — wrong (that range stages the *compressed* image), so its
+  per-section offset map is mislabeled. Redo by first recovering the live
+  region base addresses from the LZSS-decompress call sites (src = staging
+  addrs, dst = live regions), then re-basing the constants.
+- `DEZA2.PAL` = 576 B = 18 × 16 RGB555 colors (editor UI palette).
+- `GAME.CMP` = play-mode engine code (165,628 B decompressed) — the target
+  for tracing exact field semantics (enemy HP, stage script opcodes).
+
+## Section semantics (2026-08-05 corpus + disc analysis)
+
+The 8 sections map onto the game's own LOAD-menu grouping (ALL / CG /
+game-settings / MUSIC / 3D) and its four editors (絵太郎 CG, 組み子さん
+assembly, 音まろ music, ポリ吉 3D):
+
+| Section | Content | Status |
+|---------|---------|--------|
+| sec0–3  | **CG art pages 1–4**: each a headerless **128×512** 8bpp bitmap stored as 256 consecutive 16×16-px cells of 256 B (cell t at t·256; in-cell offset = y·16+x; **8 cells per row**). Pixel byte = `(palette<<4) \| colorIndex` — the high nibble *is* the palette selector, so no external sprite-attribute table exists. Byte 0x00 = background; empty cells are zero-filled. | confirmed |
+| sec4    | **Palette bank**: 16 palettes × 16 colors, u16be RGB555 (R bits 0–4, G 5–9, B 10–14, bit15 = CRAM RGB-mode flag). Rows 0–11 (0x000–0x17F) = 12 preset ramps, byte-identical across all games, bit15 clear; rows 12–15 (0x180–0x1FF) = the 4 user palettes (= the editor's "192 system + 64 user colors"), stored `0x8000\|color`, 0x0000 empty. u16[0] varies per game (meaning open). | confirmed |
+| sec5    | **Game assembly data** (組み子さん) — see the sec5 region map below. Regions are proven from engine-code multiplications and tile exactly; the **background tilemap** (`+0x00000`) is fully decoded, other regions' record fields are open. | partial |
+| sec6    | **BGM**: 24 song slots × 4,228 B (disc `M_DATA*` presets match verbatim). Song = 4-byte header + **32 measures × 132 B**, each measure = 4 control bytes + **4 parts × 32 steps**, part-major. Step: 0x00 empty, 0x01–0x3B note (~5 octaves), 0x80–0x88 sustain. | confirmed |
+| sec7    | **3D models** (ポリ吉): u32be magic `0x12345678` (absent = never opened the 3D editor; section then all-zero or residual RAM — ELFI's "custom" sec7 is just uninitialized garbage), then 16 model slots × 328 B (u16be part count 0–9, u16be model color, 9 part records × 36 B: u16 shape descriptor, s32be 16.16 X/Y/Z position, s16be rotations (65536=360°), s32be signed 16.16 scales, negative = mirror), then 576 residual bytes. POLYKITI.bin literal pools confirm (HWRAM working base `0x06097E90`, stride 0x148, end 0x1484). | confirmed |
+
+### sec5 region map
+
+Boundaries and strides come from explicit multiplications in KUMITATE/GAME
+literal pools; they tile the 396,640 bytes exactly, with no gaps:
+
+| Offset | Layout | Content | Status |
+|--------|--------|---------|--------|
+| `+0x00000` | 10 × `0x5400` | **Background tilemap** per stage: 14 cols × 768 rows of u16be = 48 parts × 16 rows. `0xFFFF` = empty; else bit15 H-flip, bit14 V-flip, bits 0–9 = CG cell index (1024-cell space). Part = 224×256 px. | **decoded** |
+| `+0x34800` | 10 × `0xC0` | **Per-stage scroll curve**: 192 bytes, one per 4 map rows (64 px of scroll). Values move in long runs and ramp down through the stage; the non-zero extent tracks the stage's used rows (`lastNonZero ≈ lastUsedRow/4`, always slightly short of it). Not a record array — no stride shows column specialisation. | decoded (shape), field meaning open |
+| `+0x34F80` | 10 × `0x3C00` | **Object placement grid**: 20 columns × 768 rows of *bytes* over the 320-px screen (the 224-px playfield sits at columns 3–16), sharing the background's rows and 48-part division. See the id table below. | **decoded** |
+| `+0x5A780` | `0x60` | **Global settings** — see the byte map below | mostly decoded |
+| `+0x5A7E0` | 10 × `0x478` | **Per-stage enemy definitions**: 60 records × 18 B (`0x438`) + a `0x40` trailer the engine indexes separately. Record N defines the Nth zako id. | **located**; internal fields partly characterised |
+| `+0x5D490` | `0x1D0` | **Global sprite composition bank**: 232 u16be cell refs (player ship frames, bullets, item icons, explosions, the drawn title logo, credit glyphs) | decoded (structure) |
+| `+0x5D660` | 10 × `0x580` | **Per-stage sprite composition**: 704 u16be cell refs = 11 character slots × 64 refs; within a slot the animation frames run contiguously in row-major w×h runs (64 frames of 1×1, 16 of 2×2, 4 of 4×4, 1 of 8×8) | decoded (structure) |
+
+Composition words use the same encoding as the background map: `0xFFFF` =
+empty, else bit15/bit14 = flips and bits 0–9 = CG cell index. The two banks
+close the section exactly (`0x5D490 + 232·2 = 0x5D660`; `0x5D660 + 10·1408 =
+0x60D60`), and both bases are SH-2 literals in the engine.
+
+**Placement ids** — exactly 72 distinct non-zero values in eight disjoint
+ranges across all 17 games:
+
+| Ids | Meaning |
+|-----|---------|
+| `0x80`–`0x97`, `0xA0`–`0xA7`, `0xB0`–`0xBF`, `0xC0`–`0xC3`, `0xD0`–`0xD3`, `0xE0`–`0xE3` | the **60 zako slots**, in the same order as the 60 enemy records |
+| `0xE8`–`0xEF` | the editor's **8 item slots** |
+| `0xF0`–`0xF3` | **boss**, one of 4 size classes — at most one per stage |
+
+A placed zako id has a non-empty enemy record 99.9% of the time (8 misses in
+7740 checks), which is what ties the two regions together. Bosses sit deep in
+the level (Ramsie stage 0: row 423 of 768, landing exactly on the boss-chamber
+artwork), and zako appear in formations symmetric about the 20-column centre.
+Stage count is taken from this grid rather than the background map — the two
+disagree in 6 of 17 games (a cut-scene stage can carry objects with no painted
+background), while placement and the enemy blocks always agree.
+
+**Enemy record (18 B)** — not yet fully mapped, but strongly field-specialised:
+96.5% of its nibbles are ≤ 8 across 6799 populated records, and per-byte
+distinct-value counts are 200, 108, 138, 68, 94, 79, **16**, 65, **14**, 40,
+51, **14**, 33, 77, **12**, **16**, 72, **15** — the low-cardinality columns
+are 0–8 sliders, 0–4 enums and outright booleans, matching the editor's
+attribute model (LIFE / speed / fire timing / anim speed are 1–8; fire type is
+a 5-way choice). The layout falls into a 6-byte head plus four 3-byte groups.
+
+**Settings byte map** (`+0x5A780`, 96 B):
+
+| Offset | Content |
+|--------|---------|
+| `+0x00` | game mode, values 0–3 (2 bits; scroll orientation + player count candidates) |
+| `+0x0C`, `+0x10` | always `0x10` or `0x11` — the two player-ship config blocks start here (`+0x0C`–`+0x0F` and `+0x10`–`+0x13` mirror each other's value sets) |
+| `+0x1C`–`+0x23` | 8-entry table, all values ≤ 38 — the 8 item slots |
+| `+0x2D`–`+0x40` | 20 **always-even** bytes (10 pairs, max 48 = 2×24) |
+| `+0x41`–`+0x58` | **BGM assignment table**: 24 entries, every value ≤ 23 in every game, indexing sec6's 24 song slots. Three special tracks first, then (main, boss) pairs per stage — DAIOH reads `12,11,13, 1,6, 2,7, 3,8, 4,9, 5,10`. No entry ever points at an empty song slot. |
+| `+0x59` | **SFX set**: 1, 2 or 3 = the editor's REAL / COMIC / SF banks |
+
+Background-map occupancy recovers each game's stage count, cross-checked by
+the disc's per-stage `DEMO_?N.BIN` recordings: Ramsie 5 stages (31/29/46/32/12
+parts used), Gust 6, DAIOH 5 + a 12-part stage 6, Devil Blade 2 up to 10.
+
+### Live LWRAM map (from SH-2 disassembly of 0KERNEL/S_OPT/GAME/KUMITATE)
+
+Sections live contiguously at: sec0 `0x00200000`, sec1 `0x00210000`, sec2
+`0x00220000`, sec3 `0x00230000`, sec5 `0x00240000`, sec4 `0x002A0D60`, sec6
+`0x002A0F60`, sec7 `0x002B9BC0`, end `0x002BB284` (= base + 766,596; RAM
+order sec0,1,2,3,5,4,6,7 — matching the SGM stream, which GAME.bin
+decompresses straight to `0x00200000`). The LZSS decompressor core is at
+`0x06004FF8` (kernel file +0xFF8; r4=src r5=dst r6=len), its `.CMP` wrapper
+(u32LE compressed-size header) at `0x060050F8`; the compressor and the
+save-image builder live in S_OPT.bin (staging `0x002C8A84`, 0x6C header =
+{checksumSum, base, endPtr} + 8 × {byte-sum, absAddr, compSize}; save blocks
+shown = (end−base+32)>>6). Editor overlays load to HWRAM `0x06064000` via 18
+kernel loader stanzas; MDLDT models decompress to scratch `0x002F0000`;
+DEMO recordings load raw at `0x002FF000`; sec6 song pointer = songIdx ×
+0x1084 + sec6 base (engine proof of the 24×4,228 grid); the play engine
+fetches CG cells as cellIndex×256 from `0x00200000` into VDP1 VRAM.
+
+Known editor facts to guide the sec5 field map (GameFAQs editor FAQ +
+Dezaemon DB): up to 10 stages × 48 map screens with spatial enemy placement;
+7 zako size classes (16×16 up to 128×128, 1–6 anim frames); 4 boss classes
+with 4 patterns × 3 fire points and 16-entry phase loops; 3 global bullet
+types + 2 blast anims; weapons 7 main / 7 sub / 7 bomb / 3 charge; 8 item
+slots; titles are **drawn** (TITLE 1/2 tile compositions + 15-slot entrance
+effect sequencer) — which is why no title text exists anywhere in the data.
+
+Prior art: Madroms' **D2SGM / D2SGM2** save managers (satakore.com, source
+released) — the Lemureal saves' `D2SGM2` comment is that tool's signature.
 
 **Controlled-delta captures** localize fields to sections *without*
 decompression (a one-field edit changes exactly that section's checksum).

@@ -63,15 +63,15 @@ export function decompress(input) {
 // game seen so far because each section is a fixed-size memory region.
 export const SECTION_SIZES = [65536, 65536, 65536, 65536, 512, 396640, 101472, 5828];
 
-// What each section appears to hold (heuristic characterization from
-// cross-game diffing; 'confirmed' labels require delta captures or Ghidra).
+// What each section holds (see FORMAT.md "Section semantics" — established
+// by 17-game corpus analysis + the disc image's SGM/M_DATA/MDLDT files).
 export const SECTION_HINTS = [
-    "game data A (64KB, game-specific)",
-    "game data B (64KB, game-specific)",
-    "game data C (64KB, game-specific)",
-    "game data D (64KB, game-specific)",
-    "settings (512B, ~98% game-invariant)",
-    "CG / sprite pages (387KB, sparse)",
-    "game data E (99KB)",
-    "engine table (5.7KB, ~99.8% game-invariant)",
+    "CG art page 1 (128x512 8bpp, 16x16 cells, pixel=(pal<<4)|color)",
+    "CG art page 2",
+    "CG art page 3",
+    "CG art page 4",
+    "palettes: 16x16 u16be RGB555 (12 preset + 4 user)",
+    "game assembly: backgrounds/placement/enemies/sprites/settings",
+    "BGM: 24 song slots x 4228B (4 parts x 32 measures x 32 steps)",
+    "3D models: magic + 16 slots x 328B part lists (poly-kichi editor)",
 ];

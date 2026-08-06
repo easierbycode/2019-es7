@@ -2701,7 +2701,16 @@
             } else if (d.tableError) {
                 lines.push('<span style="color:#f87171">Section table: ' + d.tableError + '</span>');
             }
-            lines.push('<span style="color:#64748b">Field-level decoding (sprites/enemies/stages) is still being reverse-engineered — importing yields a playable skeleton carrying this save\'s metadata. Decoded content will appear here as it lands.</span>');
+            // Report what actually decoded, rather than a blanket "not yet".
+            const stageCount = d.stageCount || (d.stages ? d.stages.length : 0);
+            if (stageCount) {
+                const waves = (d.stages || []).reduce((n, s) => n + ((s.rows && s.rows.length) || 0), 0);
+                lines.push('Stages: <span style="color:#84cc16">' + stageCount + '</span> decoded, ' +
+                    waves.toLocaleString() + ' populated spawn rows · Enemy types: <span style="color:#84cc16">' +
+                    (d.enemies ? d.enemies.length : 0) + '</span>' +
+                    (d.songCount ? ' · BGM: <span style="color:#84cc16">' + d.songCount + '</span>/24 songs' : ''));
+            }
+            lines.push('<span style="color:#64748b">Enemy <em>attributes</em> (hp/speed/fire) and sprite art are still being reverse-engineered, so imported enemies use the default art and stats. Backgrounds, placement, palettes and music are decoded — see FORMAT.md.</span>');
             document.getElementById('deza-decoded-summary').innerHTML = lines.join('<br>');
             const spriteGrid = document.getElementById('deza-sprite-preview');
             spriteGrid.innerHTML = '';

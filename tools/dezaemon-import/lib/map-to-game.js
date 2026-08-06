@@ -200,13 +200,24 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
     gameJson.continueCommentEn = "";
 
     // A save can parse perfectly — container, block chain, section table,
-    // decompression — and still yield no game content, because the *meaning*
-    // of the decompressed sections is still being reverse-engineered
-    // (FORMAT.md, "Open: decoded section semantics"). Falling back to engine
-    // defaults without saying so looks like a successful import right up until
-    // you press play and get an empty stage, so name each gap.
+    // decompression — and still yield less than the whole game, because parts
+    // of the section *meaning* are still being reverse-engineered (FORMAT.md,
+    // "sec5 region map"). Falling back to engine defaults without saying so
+    // looks like a successful import right up until you press play, so name
+    // each gap.
     if (!sprites.length) {
-        warnings.push("no CG/sprite data decoded from this save — using the default art");
+        warnings.push(
+            decodedEnemies.length
+                ? "no CG/sprite data decoded for these enemies — using the default art " +
+                  "(their identity and placement are real)"
+                : "no CG/sprite data decoded from this save — using the default art"
+        );
+    }
+    if (decodedEnemies.length && !decodedEnemies.some((e) => NUMERIC_ENEMY_FIELDS.some((f) => Number.isFinite(e[f])))) {
+        warnings.push(
+            "enemy attributes (hp/speed/interval) are not decoded yet — every imported " +
+            "enemy uses the default stats"
+        );
     }
     if (!decodedEnemies.length) {
         warnings.push("no enemy table decoded from this save — using the default starter enemy");
