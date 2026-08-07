@@ -5,6 +5,7 @@ import {
     mapSaveToGame,
     emptyWave,
     BUILTIN_DEFAULTS,
+    EVIL_INVADERS_PLAYER,
     GRID_COLS,
     MAX_ENEMIES,
     MAX_STAGES,
@@ -135,6 +136,55 @@ test("sprite keys are sanitized, .gif-suffixed, and deduped", () => {
         sprites.map((s) => s.key),
         ["ship_a.gif", "ship_a_2.gif", "deza_cg2.gif"]
     );
+});
+
+test("an import always flies the Evil Invaders character, whatever the defaults say", () => {
+    // The editor derives `defaults` from the game that happens to be open, and
+    // its player can reference frames that live only in that level's atlas —
+    // which the import drops. Taking the player from there would ship an
+    // invisible ship firing invisible bullets, so it comes from the built-in
+    // character instead.
+    const customPlayer = {
+        name: "borrowed",
+        maxHp: 9,
+        spDamage: 1,
+        defaultShootName: "normal",
+        defaultShootSpeed: "speed_normal",
+        texture: ["someLevelOnlyShip0.gif"],
+        shootNormal: { name: "normal", damage: 1, hp: 1, interval: 5, texture: ["someLevelOnlyShot0.gif"] },
+        shootBig: { name: "big", damage: 1, hp: 1, interval: 5, texture: ["someLevelOnlyShot0.gif"] },
+        shoot3way: { name: "3way", damage: 1, hp: 1, interval: 5, texture: ["someLevelOnlyShot0.gif"] },
+        barrier: { time: 1, texture: ["someLevelOnlyBarrier0.gif"] },
+    };
+    const defaults = { ...BUILTIN_DEFAULTS, playerData: customPlayer };
+    const { gameJson } = mapSaveToGame(emptyDecoded(), { defaults });
+
+    assert.deepStrictEqual(gameJson.playerData, EVIL_INVADERS_PLAYER);
+    assert.deepStrictEqual(gameJson.playerData.texture, [
+        "player00.gif", "player01.gif", "player02.gif",
+        "player03.gif", "player04.gif", "player05.gif",
+    ]);
+    assert.deepStrictEqual(gameJson.playerData.shootNormal.texture,
+        ["shot00.gif", "shot01.gif", "shot02.gif", "shot03.gif"]);
+    assert.deepStrictEqual(gameJson.playerData.shootBig.texture,
+        ["shotBig00.gif", "shotBig01.gif", "shotBig02.gif", "shotBig03.gif"]);
+    assert.deepStrictEqual(gameJson.playerData.shoot3way.texture,
+        ["shot00.gif", "shot01.gif", "shot02.gif", "shot03.gif"]);
+    assert.deepStrictEqual(gameJson.playerData.barrier.texture,
+        ["barrier0.gif", "barrier1.gif", "barrier2.gif", "barrier3.gif"]);
+    // ...and it is a copy, so editing the imported game cannot mutate the
+    // character every later import is seeded from.
+    gameJson.playerData.texture.push("mutated.gif");
+    assert.strictEqual(EVIL_INVADERS_PLAYER.texture.length, 6);
+    // The enemy/boss halves of `defaults` are still honoured.
+    assert.strictEqual(gameJson.enemyData.enemyA.name, BUILTIN_DEFAULTS.starterEnemy.name);
+});
+
+test("the Evil Invaders player matches what the Phaser runtime ships", () => {
+    // src/phaser/game-objects/Player.js and Bullet.js hardcode these same keys
+    // as their fallbacks, and every one is a frame in assets/game_asset.
+    assert.strictEqual(BUILTIN_DEFAULTS.playerData, EVIL_INVADERS_PLAYER);
+    assert.deepStrictEqual(buildBlankGame().playerData, EVIL_INVADERS_PLAYER);
 });
 
 test("enemies with decoded sprites get their texture repointed by sprite index", () => {
