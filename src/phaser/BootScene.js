@@ -160,6 +160,134 @@ function getAllCustomAudioEntries() {
     });
 }
 
+// The level editor keeps its working atlas — stock frames plus anything added
+// by a sprite upload or a Dezaemon import — in this IndexedDB bridge, rewritten
+// on every atlas change. "Play" hands over a recipe through localStorage but no
+// art, so without reading this the runtime only has the on-disk game_asset and
+// every imported deza*.gif resolves to game_asset's frame 0 (the player), which
+// is why an imported save used to play as an army of G clones.
+// Records are keyed per atlas ("atlas:game_asset", "atlas:game_ui"), so which
+// atlas the editor happens to have open does not decide what the game gets.
+var EDITOR_BRIDGE_DB_NAME = "editorViewerBridge";
+var EDITOR_BRIDGE_STORE = "assets";
+var EDITOR_BRIDGE_GAME_ASSET_KEY = "atlas:game_asset";
+
+function readEditorAtlasBridge() {
+    if (typeof indexedDB === "undefined") {
+        return Promise.resolve(null);
+    }
+    return new Promise(function (resolve) {
+        var req;
+        try {
+            // Open without a version so an existing bridge is read at whatever
+            // version the editor made it.
+            req = indexedDB.open(EDITOR_BRIDGE_DB_NAME);
+        } catch (error) {
+            resolve(null);
+            return;
+        }
+        // Opening a database that does not exist creates it. If that happens
+        // here — the editor has never run in this browser — the empty v1 we
+        // just made would stop the editor's own `open(name, 1)` from ever
+        // firing onupgradeneeded, so it could never create the store and the
+        // bridge would be dead for good. Throw our accidental creation away.
+        var created = false;
+        req.onupgradeneeded = function () { created = true; };
+        req.onerror = function () { resolve(null); };
+        req.onsuccess = function (e) {
+            var db = e.target.result;
+            if (created || !db.objectStoreNames.contains(EDITOR_BRIDGE_STORE)) {
+                try {
+                    db.close();
+                    if (created) indexedDB.deleteDatabase(EDITOR_BRIDGE_DB_NAME);
+                } catch (error) {}
+                resolve(null);
+                return;
+            }
+            try {
+                var tx = db.transaction(EDITOR_BRIDGE_STORE, "readonly");
+                var recordReq = tx.objectStore(EDITOR_BRIDGE_STORE).get(EDITOR_BRIDGE_GAME_ASSET_KEY);
+                tx.oncomplete = function () {
+                    var record = recordReq.result;
+                    if (!record || !record.frames || !record.blob) {
+                        resolve(null);
+                        return;
+                    }
+                    resolve({ frames: record.frames, blob: record.blob });
+                };
+                tx.onerror = function () { resolve(null); };
+            } catch (error) {
+                resolve(null);
+            }
+        };
+    });
+}
+
+function blobToImage(blob) {
+    return new Promise(function (resolve) {
+        var url = URL.createObjectURL(blob);
+        var img = new Image();
+        img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+        img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+        img.src = url;
+    });
+}
+
+// Stack `image` under the loaded game_asset texture and rebuild the frame map so
+// both sets resolve from one texture. Incoming frames win on a name collision —
+// they are the customization — and .gif/.png spellings of the same name are
+// treated as the same frame, since the editor and Firebase disagree on suffix.
+//
+// Merging rather than replacing matters: the incoming atlas may be missing
+// frames the runtime needs (player00.gif and friends), and those keep resolving
+// from the local copy instead of disappearing.
+function mergeAtlasIntoGameAsset(scene, image, frames) {
+    var localAtlas = scene.textures.get("game_asset");
+    var localSource = localAtlas && localAtlas.source && localAtlas.source[0] ? localAtlas.source[0].image : null;
+    var localFrames = localAtlas ? localAtlas.frames : {};
+    if (!localSource) {
+        return false;
+    }
+
+    var localW = localSource.width;
+    var localH = localSource.height;
+    var mergedCanvas = document.createElement("canvas");
+    mergedCanvas.width = Math.max(localW, image.width);
+    mergedCanvas.height = localH + image.height;
+    var mctx = mergedCanvas.getContext("2d");
+    mctx.drawImage(localSource, 0, 0);
+    mctx.drawImage(image, 0, localH);
+
+    var mergedFrameMap = {};
+    for (var lk in localFrames) {
+        if (lk === "__BASE") continue;
+        var lf = localFrames[lk];
+        if (lf && lf.cutX !== undefined) {
+            mergedFrameMap[lk] = { frame: { x: lf.cutX, y: lf.cutY, w: lf.cutWidth, h: lf.cutHeight } };
+        }
+    }
+    for (var fname in frames) {
+        var decodedName = fname.replace(/․/g, ".");
+        var fd = frames[fname];
+        if (!fd || !fd.frame) continue;
+        var frameData = { frame: { x: fd.frame.x, y: fd.frame.y + localH, w: fd.frame.w, h: fd.frame.h } };
+        mergedFrameMap[decodedName] = frameData;
+        var altName = null;
+        if (decodedName.endsWith(".png")) {
+            altName = decodedName.slice(0, -4) + ".gif";
+        } else if (decodedName.endsWith(".gif")) {
+            altName = decodedName.slice(0, -4) + ".png";
+        }
+        if (altName && mergedFrameMap[altName]) {
+            mergedFrameMap[altName] = frameData;
+        }
+    }
+
+    scene.textures.remove("game_asset");
+    scene.textures.addAtlas("game_asset", mergedCanvas, { frames: mergedFrameMap });
+    return true;
+}
+
 function primeGameStateForStage(recipe, stageId) {
     if (recipe && recipe.playerData) {
         gameState.spDamage = recipe.playerData.spDamage;
@@ -392,7 +520,22 @@ export class BootScene extends Phaser.Scene {
         // Editor play requests use localStorage recipe, skip Firebase
         var editorPlay = readEditorPlayRequest();
         if (editorPlay) {
-            this._finishBoot();
+            // ...but the recipe carries texture *names* only, so pull the
+            // editor's working atlas across before anything draws. Any failure
+            // here is non-fatal: boot with the on-disk art rather than not at all.
+            readEditorAtlasBridge().then(function (bridge) {
+                if (!bridge) {
+                    return null;
+                }
+                return blobToImage(bridge.blob).then(function (img) {
+                    if (!img) return null;
+                    return mergeAtlasIntoGameAsset(self, img, bridge.frames);
+                });
+            }).catch(function (err) {
+                console.warn("Editor atlas bridge unavailable, using on-disk art:", err);
+            }).then(function () {
+                self._finishBoot();
+            });
             return;
         }
 
@@ -634,57 +777,7 @@ export class BootScene extends Phaser.Scene {
                 var fbImg = new Image();
                 fbImg.onload = function () {
                     try {
-                        // Get the local atlas source image
-                        var localAtlas = self.textures.get("game_asset");
-                        var localSource = localAtlas && localAtlas.source && localAtlas.source[0] ? localAtlas.source[0].image : null;
-                        var localFrames = localAtlas ? localAtlas.frames : {};
-                        if (!localSource) { finishLevelLoad(); return; }
-
-                        // Create merged canvas: stack local image on top, Firebase image below
-                        var mergedCanvas = document.createElement("canvas");
-                        var localW = localSource.width, localH = localSource.height;
-                        var fbW = fbImg.width, fbH = fbImg.height;
-                        mergedCanvas.width = Math.max(localW, fbW);
-                        mergedCanvas.height = localH + fbH;
-                        var mctx = mergedCanvas.getContext("2d");
-                        mctx.drawImage(localSource, 0, 0);
-                        mctx.drawImage(fbImg, 0, localH);
-
-                        // Build merged frame map: local frames stay as-is, Firebase frames offset by localH
-                        var mergedFrameMap = {};
-                        for (var lk in localFrames) {
-                            if (lk === "__BASE") continue;
-                            var lf = localFrames[lk];
-                            if (lf && lf.cutX !== undefined) {
-                                mergedFrameMap[lk] = { frame: { x: lf.cutX, y: lf.cutY, w: lf.cutWidth, h: lf.cutHeight } };
-                            }
-                        }
-                        // Add Firebase frames with Y offset
-                        for (var fname in data.atlasFrames) {
-                            var decodedName = fname.replace(/\u2024/g, ".");
-                            var fd = data.atlasFrames[fname];
-                            if (fd && fd.frame) {
-                                var frameData = {
-                                    frame: { x: fd.frame.x, y: fd.frame.y + localH, w: fd.frame.w, h: fd.frame.h }
-                                };
-                                mergedFrameMap[decodedName] = frameData;
-                                // Firebase frames stored as .png should also overwrite matching .gif
-                                // local frames (and vice versa) so animations find the replacements
-                                var altName = null;
-                                if (decodedName.endsWith(".png")) {
-                                    altName = decodedName.slice(0, -4) + ".gif";
-                                } else if (decodedName.endsWith(".gif")) {
-                                    altName = decodedName.slice(0, -4) + ".png";
-                                }
-                                if (altName && mergedFrameMap[altName]) {
-                                    mergedFrameMap[altName] = frameData;
-                                }
-                            }
-                        }
-
-                        // Replace game_asset with merged atlas
-                        self.textures.remove("game_asset");
-                        self.textures.addAtlas("game_asset", mergedCanvas, { frames: mergedFrameMap });
+                        mergeAtlasIntoGameAsset(self, fbImg, data.atlasFrames);
                     } catch (atlasErr) {
                         console.warn("Failed to merge Firebase atlas:", atlasErr);
                     }
