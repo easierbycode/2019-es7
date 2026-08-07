@@ -2351,6 +2351,39 @@
             saveAtlasFiles(result.canvas, { frames: result.frames, meta: { ...(atlasData.meta || {}), image: cfg.png, size: { w: result.canvas.width, h: result.canvas.height } } });
         }
 
+        // Fold extraSprites/replacedFrames into the in-memory atlas so the
+        // grid, enemy picker and enemy list can draw them. Everything that
+        // renders art goes through frameThumbs, which is built from
+        // atlasData.frames alone — sprites sitting in extraSprites are
+        // invisible until they land there.
+        //
+        // Deliberately NOT repackAtlas(): that routes through saveAtlasFiles(),
+        // which downloads _game_asset.png/.json when no directory handle is
+        // open. Importing a save should not spit files at the user.
+        function mergeExtraSpritesIntoAtlas() {
+            if (!atlasData || !atlasImage) return Promise.resolve(false);
+            if (!extraSprites.length && !Object.keys(replacedFrames).length) return Promise.resolve(false);
+            const result = buildAtlasWithReplacements();
+            const cfg = ATLAS_CONFIGS[currentAtlasKey];
+            const json = {
+                frames: result.frames,
+                meta: { ...(atlasData.meta || {}), image: cfg.png, size: { w: result.canvas.width, h: result.canvas.height } },
+            };
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    atlasData = json;
+                    atlasImage = img;
+                    extraSprites = [];
+                    replacedFrames = {};
+                    buildFrameThumbs();
+                    resolve(true);
+                };
+                img.onerror = () => resolve(false);
+                img.src = result.canvas.toDataURL('image/png');
+            });
+        }
+
         async function saveAtlasFiles(canvas, json) {
             const cfg = ATLAS_CONFIGS[currentAtlasKey];
             // Save with _ prefix so only Phaser picks up repacked atlases (PIXI keeps originals)
@@ -2749,7 +2782,7 @@
             return lines.join('\n');
         }
 
-        function applyDezaemonImport() {
+        async function applyDezaemonImport() {
             const st = dezaImportState;
             if (!st || st.selectedSlot === null || !st.decoded) return;
             const save = st.saves[st.selectedSlot];
@@ -2790,12 +2823,11 @@
             playerData = gameData.playerData;
             currentStageKey = 'stage0';
             storeBossDataForViewers();
-            // Fold the save's sprites into the atlas straight away. Without
-            // this the imported enemies reference frames that only exist in
-            // extraSprites, so every picker cell and grid cell falls back to a
-            // placeholder (or the default art) until the user happens to find
-            // the Repack Atlas button.
-            if (sprites.length) repackAtlas();
+            // Fold the save's sprites into the atlas before the first paint —
+            // otherwise the imported enemies reference frames that live only
+            // in extraSprites, frameThumbs has no entry for them, and every
+            // grid cell draws empty.
+            if (sprites.length) await mergeExtraSpritesIntoAtlas();
             populateStagePills(); loadCurrentStage(); renderEnemyList(); renderAtlas(); updateToolUI();
             checkMissingTextures();
             const nameInput = document.getElementById('firebase-level-name');

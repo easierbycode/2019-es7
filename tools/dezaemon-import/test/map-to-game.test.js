@@ -114,7 +114,13 @@ test("spawns referencing dropped enemies become empty cells with warnings", () =
     const { gameJson, warnings } = mapSaveToGame(decoded);
     assert.strictEqual(gameJson.stage0.enemylist[0][0], "00");
     assert.strictEqual(gameJson.stage0.enemylist[0][1], "A9");
-    assert.ok(warnings.some((w) => w.includes("dropped enemy #5")));
+    // Dropped spawns are counted, not listed one per line — a real game drops
+    // hundreds and the per-spawn warnings buried every other note.
+    const dropped = warnings.find((w) => w.includes("spawns reference enemies beyond"));
+    assert.ok(dropped, "dropped spawns are reported");
+    assert.match(dropped, /^1 spawns reference enemies beyond the 26-letter limit/);
+    assert.match(dropped, /stage 0: 1/);
+    assert.equal(warnings.filter((w) => w.includes("beyond the")).length, 1);
 });
 
 test("sprite keys are sanitized, .gif-suffixed, and deduped", () => {

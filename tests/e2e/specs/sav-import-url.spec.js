@@ -55,11 +55,24 @@ test("imports a .sav from a same-origin URL via the menu field", async ({ page }
     // And it imports through to the editor.
     await slot.click();
     await expect(page.locator("#deza-decoded-summary")).toContainText("167,511 bytes, 331 blocks");
+
+    // Importing folds the save's sprites into the atlas in memory; it must not
+    // hand the user _game_asset.png/.json downloads to do it.
+    const downloads = [];
+    page.on("download", (d) => downloads.push(d.suggestedFilename()));
+
     await page.locator("#deza-import-btn").click();
     await expect(page.locator("#dezaemon-import-modal")).toBeHidden();
     const state = await page.evaluate(() => window.__editorState());
     expect(state.status).toContain("Imported: DEZA2 SGM");
 
+    // The grid draws the imported art, not empty cells.
+    await expect.poll(async () => await page.evaluate(() => {
+        const cells = [...document.querySelectorAll(".grid-cell.occupied")];
+        return cells.length && cells.every((c) => c.querySelector("img.enemy-img"));
+    })).toBeTruthy();
+
+    expect(downloads).toEqual([]);
     expect(errors).toEqual([]);
 });
 

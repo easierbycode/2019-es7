@@ -38,24 +38,49 @@ test("importing a real Dezaemon 2 .sav populates the modal and the editor", asyn
 
     const state = await page.evaluate(() => window.__editorState());
     expect(state.status).toContain("Imported: DEZA2 SGM");
-    expect(state.stageKeys).toEqual(["stage0"]);
-    expect(state.enemyKeys).toEqual(["enemyA"]);
+    // Ramsie's own stages and enemy roster, not a one-stage skeleton.
+    expect(state.stageKeys).toEqual(["stage0", "stage1", "stage2", "stage3", "stage4"]);
+    expect(state.enemyKeys.length).toBe(26);
 
     const meta = await page.evaluate(() => gameData.meta);
     expect(meta.source).toBe("dezaemon2");
     expect(meta.sourceComment).toBe("DEZA2 SGM");
     expect(meta.sourceFilename).toBe("DEZA2____01");
 
-    // The section decoders are still open work, so this import is a skeleton:
-    // it must say so rather than look like a success that plays as a black
-    // screen. Assert the user was actually told, not just the CLI.
-    const importNotes = notes.join("\n");
-    expect(importNotes).toContain("nothing will spawn");
-    expect(importNotes).toContain("none of its content yet");
-
-    // ...which is exactly what the emitted stage contains.
+    // The stage carries the save's real spawn layout.
     const waves = await page.evaluate(() => gameData.stage0.enemylist);
-    expect(waves.every((row) => row.every((cell) => cell === "00"))).toBe(true);
+    expect(waves.length).toBeGreaterThan(50);
+    const placed = waves.flat().filter((cell) => cell !== "00");
+    expect(placed.length).toBeGreaterThan(100);
+    for (const cell of placed) expect(cell).toMatch(/^[A-Z][0-9]$/);
+
+    // Enemies are textured from the save's own CG pages. A handful of slots
+    // are genuinely unpainted in every stage that places them, and those keep
+    // the default art — so require the bulk, not all, to come from the save.
+    const textures = await page.evaluate(() =>
+        Object.values(gameData.enemyData).map((e) => (e.texture || [])[0]));
+    const fromSave = textures.filter((t) => /^deza\d+_\d+\.gif$/.test(t));
+    expect(fromSave.length).toBeGreaterThanOrEqual(textures.length - 3);
+
+    // ...and those frames resolve to real art in the grid, rather than the
+    // empty cells you get when the sprites never reach the atlas.
+    const grid = await page.evaluate(() => {
+        const cells = [...document.querySelectorAll(".grid-cell.occupied")];
+        const imgs = cells.filter((c) => c.querySelector("img.enemy-img"));
+        return {
+            occupied: cells.length,
+            withSprite: imgs.length,
+            distinct: new Set(imgs.map((c) => c.querySelector("img.enemy-img").src)).size,
+        };
+    });
+    expect(grid.occupied).toBeGreaterThan(0);
+    expect(grid.withSprite).toBe(grid.occupied);
+    expect(grid.distinct).toBeGreaterThan(1);
+
+    // Importing must not push files at the user.
+    const importNotes = notes.join("\n");
+    expect(importNotes).not.toContain("Repack Atlas");
+    expect(importNotes).toContain("sprites from the save were packed into the atlas");
 
     expect(errors).toEqual([]);
 });

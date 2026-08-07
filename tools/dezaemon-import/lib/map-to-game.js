@@ -157,6 +157,10 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
         );
     }
     const gameJson = {};
+    // A real game drops hundreds of spawns when its roster overflows the 26
+    // letters; one warning each buries every other note, so count them per
+    // stage and report a single line.
+    const droppedSpawns = new Map();
     const stageCount = Math.max(1, Math.min(decodedStages.length, MAX_STAGES));
     for (let s = 0; s < stageCount; s++) {
         const rows = decodedStages[s] ? decodedStages[s].rows || [] : [];
@@ -167,7 +171,7 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
                 if (!cell) continue;
                 const letter = enemyLetterByIndex[cell.enemy];
                 if (letter === undefined) {
-                    warnings.push(`stage ${s}: spawn references dropped enemy #${cell.enemy} — left empty`);
+                    droppedSpawns.set(s, (droppedSpawns.get(s) || 0) + 1);
                     continue;
                 }
                 const drop = Number.isInteger(cell.drop) && cell.drop >= 0 && cell.drop <= 9 ? cell.drop : 0;
@@ -180,6 +184,17 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
         gameJson[`stage${s}`] = {
             enemylist: enemylist.length ? enemylist : Array.from({ length: BLANK_WAVES }, emptyWave),
         };
+    }
+
+    if (droppedSpawns.size) {
+        const total = [...droppedSpawns.values()].reduce((a, b) => a + b, 0);
+        const perStage = [...droppedSpawns.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([s, n]) => `stage ${s}: ${n}`)
+            .join(", ");
+        warnings.push(
+            `${total} spawns reference enemies beyond the ${MAX_ENEMIES}-letter limit and were left empty (${perStage})`
+        );
     }
 
     // One boss per stage (runtime spawns bossData["boss" + stageId]).
