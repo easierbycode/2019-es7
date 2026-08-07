@@ -166,10 +166,11 @@ function getAllCustomAudioEntries() {
 // art, so without reading this the runtime only has the on-disk game_asset and
 // every imported deza*.gif resolves to game_asset's frame 0 (the player), which
 // is why an imported save used to play as an army of G clones.
+// Records are keyed per atlas ("atlas:game_asset", "atlas:game_ui"), so which
+// atlas the editor happens to have open does not decide what the game gets.
 var EDITOR_BRIDGE_DB_NAME = "editorViewerBridge";
 var EDITOR_BRIDGE_STORE = "assets";
-var EDITOR_BRIDGE_IMAGE_KEY = "atlasImage";
-var EDITOR_BRIDGE_FRAMES_KEY = "atlasFrames";
+var EDITOR_BRIDGE_GAME_ASSET_KEY = "atlas:game_asset";
 
 function readEditorAtlasBridge() {
     if (typeof indexedDB === "undefined") {
@@ -205,17 +206,14 @@ function readEditorAtlasBridge() {
             }
             try {
                 var tx = db.transaction(EDITOR_BRIDGE_STORE, "readonly");
-                var store = tx.objectStore(EDITOR_BRIDGE_STORE);
-                var imageReq = store.get(EDITOR_BRIDGE_IMAGE_KEY);
-                var framesReq = store.get(EDITOR_BRIDGE_FRAMES_KEY);
+                var recordReq = tx.objectStore(EDITOR_BRIDGE_STORE).get(EDITOR_BRIDGE_GAME_ASSET_KEY);
                 tx.oncomplete = function () {
-                    var record = framesReq.result;
-                    var blob = imageReq.result;
-                    if (!blob || !record || !record.frames) {
+                    var record = recordReq.result;
+                    if (!record || !record.frames || !record.blob) {
                         resolve(null);
                         return;
                     }
-                    resolve({ atlasKey: record.atlasKey || null, frames: record.frames, blob: blob });
+                    resolve({ frames: record.frames, blob: record.blob });
                 };
                 tx.onerror = function () { resolve(null); };
             } catch (error) {
@@ -526,7 +524,7 @@ export class BootScene extends Phaser.Scene {
             // editor's working atlas across before anything draws. Any failure
             // here is non-fatal: boot with the on-disk art rather than not at all.
             readEditorAtlasBridge().then(function (bridge) {
-                if (!bridge || (bridge.atlasKey && bridge.atlasKey !== "game_asset")) {
+                if (!bridge) {
                     return null;
                 }
                 return blobToImage(bridge.blob).then(function (img) {
