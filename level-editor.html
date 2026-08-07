@@ -791,29 +791,84 @@
             try { sessionStorage.setItem('editorBossData', JSON.stringify(bossData)); } catch (e) {}
             storeAtlasForViewers();
         }
+        // Publish the working atlas for the other pages that render this game's
+        // art: the boss/attack viewers, and the Phaser runtime when you press
+        // Play. Play hands over a recipe of texture *names* through
+        // localStorage, so without the art here the runtime falls back to the
+        // on-disk game_asset and anything the editor added — an uploaded sprite,
+        // a Dezaemon import — resolves to frame 0.
+        //
+        // The frames go to IndexedDB alongside the image rather than relying on
+        // the sessionStorage copy below: a window.open'd tab only inherits a
+        // snapshot of sessionStorage, so that copy is a dead end for anything
+        // opened before the atlas changed. The sessionStorage write stays for
+        // the viewers that already read it. Returns a promise that settles once
+        // the bridge is durable, so callers can hand off without racing it.
         function storeAtlasForViewers() {
             // Store atlas frames JSON in sessionStorage
             if (atlasData && atlasData.frames) {
                 try { sessionStorage.setItem('editorAtlasFrames', JSON.stringify(atlasData)); } catch (e) {}
             }
-            // Store atlas image in IndexedDB (too large for sessionStorage)
-            if (atlasImage && atlasImage.complete && atlasImage.naturalWidth > 0) {
+            if (!atlasData || !atlasData.frames) return Promise.resolve(false);
+            if (!(atlasImage && atlasImage.complete && atlasImage.naturalWidth > 0)) return Promise.resolve(false);
+            // Snapshot the key with the frames: the editor can be pointed at
+            // game_ui, and dropping that atlas onto the runtime's game_asset
+            // would swap every sprite in the game for the wrong art.
+            const record = { atlasKey: currentAtlasKey, frames: atlasData.frames };
+            return new Promise((resolve) => {
                 try {
                     const cv = document.createElement('canvas');
                     cv.width = atlasImage.naturalWidth; cv.height = atlasImage.naturalHeight;
                     cv.getContext('2d').drawImage(atlasImage, 0, 0);
-                    cv.toBlob(function(blob) {
-                        if (!blob) return;
-                        const req = indexedDB.open('editorViewerBridge', 1);
-                        req.onupgradeneeded = function(e) { e.target.result.createObjectStore('assets'); };
-                        req.onsuccess = function(e) {
-                            const db = e.target.result;
-                            const tx = db.transaction('assets', 'readwrite');
-                            tx.objectStore('assets').put(blob, 'atlasImage');
-                        };
+                    cv.toBlob(function (blob) {
+                        if (!blob) { resolve(false); return; }
+                        openViewerBridge().then((db) => {
+                            if (!db) { resolve(false); return; }
+                            try {
+                                const tx = db.transaction('assets', 'readwrite');
+                                tx.objectStore('assets').put(blob, 'atlasImage');
+                                tx.objectStore('assets').put(record, 'atlasFrames');
+                                tx.oncomplete = function () { resolve(true); };
+                                tx.onerror = function () { resolve(false); };
+                            } catch (e2) { resolve(false); }
+                        });
                     }, 'image/png');
-                } catch (e) {}
-            }
+                } catch (e) { resolve(false); }
+            });
+        }
+
+        // Open the bridge with its 'assets' store guaranteed to exist. A plain
+        // open(name, 1) is not enough: another page on this origin can create
+        // the database first (any open() of a missing name creates it), and
+        // then version 1 already exists with no store, so onupgradeneeded never
+        // fires and every write throws NotFoundError forever. Reopen a version
+        // up to add the store when we find it missing.
+        function openViewerBridge() {
+            return new Promise((resolve) => {
+                let req;
+                try { req = indexedDB.open('editorViewerBridge', 1); }
+                catch (e) { resolve(null); return; }
+                req.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('assets')) db.createObjectStore('assets');
+                };
+                req.onerror = () => resolve(null);
+                req.onsuccess = (e) => {
+                    const db = e.target.result;
+                    if (db.objectStoreNames.contains('assets')) { resolve(db); return; }
+                    const version = db.version + 1;
+                    db.close();
+                    let up;
+                    try { up = indexedDB.open('editorViewerBridge', version); }
+                    catch (e2) { resolve(null); return; }
+                    up.onupgradeneeded = (ev) => {
+                        const udb = ev.target.result;
+                        if (!udb.objectStoreNames.contains('assets')) udb.createObjectStore('assets');
+                    };
+                    up.onsuccess = (ev) => resolve(ev.target.result);
+                    up.onerror = () => resolve(null);
+                };
+            });
         }
         let pendingTextureUploads = {};  // textureName -> { key, canvas, w, h }
         let currentMissingSet = new Set(); // textures shown in the missing panel
@@ -2388,7 +2443,10 @@
                     extraSprites = [];
                     replacedFrames = {};
                     buildFrameThumbs();
-                    resolve(true);
+                    // Publish before resolving: the caller (an import) is the
+                    // last step before the user can press Play, and the runtime
+                    // reads this bridge for the art it just folded in.
+                    storeAtlasForViewers().then(() => resolve(true));
                 };
                 img.onerror = () => resolve(false);
                 img.src = result.canvas.toDataURL('image/png');
@@ -2511,7 +2569,7 @@
             return r;
         }
 
-        function playCurrentStage() {
+        async function playCurrentStage() {
             if (!gameData) { alert('Load directory first'); return; }
             if (!syncEnemyEditorForm(true)) return;
             const sid = getCurrentStageId();
@@ -2519,6 +2577,12 @@
                 localStorage.setItem(EDITOR_PLAY_RECIPE_KEY, JSON.stringify(buildRuntimeRecipe()));
                 localStorage.setItem(EDITOR_PLAY_STAGE_KEY, String(sid));
             } catch (e) { alert('Error: ' + e.message); return; }
+            // The recipe is only texture names — republish the art it points at
+            // before opening the game, so a frame edited since the last publish
+            // is the one that plays. Every mutation path already publishes, so
+            // this is normally a fast no-op rewrite; it settles well inside the
+            // window where a click still authorizes window.open.
+            await storeAtlasForViewers();
             window.open(`phaser-game.html?editorPlay=1&stage=${sid}`, '_blank');
         }
 

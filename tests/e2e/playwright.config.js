@@ -20,14 +20,15 @@ module.exports = defineConfig({
     projects: [
         {
             name: "editor",
-            testIgnore: /editor-play-smoke/,
+            testIgnore: /editor-play-smoke|sav-import-play/,
             use: { browserName: "chromium" },
         },
         {
-            // The Phaser boot smoke is the slow/flaky one (7MB asset load) —
-            // isolated so its retries never slow the editor specs.
+            // Specs that boot Phaser for real are the slow/flaky ones (7MB
+            // asset load) — isolated so their retries never slow the editor
+            // specs.
             name: "game-smoke",
-            testMatch: /editor-play-smoke/,
+            testMatch: /editor-play-smoke|sav-import-play/,
             timeout: 240_000,
             workers: 1,
             use: { browserName: "chromium" },
