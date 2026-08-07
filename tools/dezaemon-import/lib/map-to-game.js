@@ -18,33 +18,44 @@ export const MAX_STAGES = 5;
 export const MAX_ENEMIES = 26;
 export const BLANK_WAVES = 8;
 
+// The Evil Invaders player character, exactly as the Phaser 4 runtime draws
+// it: player00..player05 are the idle animation Player.js builds, shot*/shotBig*
+// are the bullet frames Bullet.js fires for each shoot mode, and barrier0..3 is
+// the shield. Every one of these frames ships in assets/game_asset — the atlas
+// BootScene loads — so a game seeded with this record plays with no extra art.
+//
+// Kept as its own export because a Dezaemon 2 save carries no player: the
+// format's own ship art and stats live in sections we do not decode, so an
+// import has to supply one, and this is the character it supplies.
+export const EVIL_INVADERS_PLAYER = {
+    name: "G",
+    maxHp: 3,
+    spDamage: 50,
+    defaultShootName: "normal",
+    defaultShootSpeed: "speed_normal",
+    texture: ["player00.gif", "player01.gif", "player02.gif", "player03.gif", "player04.gif", "player05.gif"],
+    shootNormal: {
+        name: "normal", damage: 1, hp: 1, interval: 23,
+        texture: ["shot00.gif", "shot01.gif", "shot02.gif", "shot03.gif"],
+    },
+    shootBig: {
+        name: "big", damage: 2, hp: 100, interval: 39,
+        texture: ["shotBig00.gif", "shotBig01.gif", "shotBig02.gif", "shotBig03.gif"],
+    },
+    shoot3way: {
+        name: "3way", damage: 1, hp: 1, interval: 31,
+        texture: ["shot00.gif", "shot01.gif", "shot02.gif", "shot03.gif"],
+    },
+    barrier: {
+        time: 4,
+        texture: ["barrier0.gif", "barrier1.gif", "barrier2.gif", "barrier3.gif"],
+    },
+};
+
 // Default records copied from the shipped assets/game.json — every texture
 // here exists in the stock game_asset atlas.
 export const BUILTIN_DEFAULTS = {
-    playerData: {
-        name: "G",
-        maxHp: 3,
-        spDamage: 50,
-        defaultShootName: "normal",
-        defaultShootSpeed: "speed_normal",
-        texture: ["player00.gif", "player01.gif", "player02.gif", "player03.gif", "player04.gif", "player05.gif"],
-        shootNormal: {
-            name: "normal", damage: 1, hp: 1, interval: 23,
-            texture: ["shot00.gif", "shot01.gif", "shot02.gif", "shot03.gif"],
-        },
-        shootBig: {
-            name: "big", damage: 2, hp: 100, interval: 39,
-            texture: ["shotBig00.gif", "shotBig01.gif", "shotBig02.gif", "shotBig03.gif"],
-        },
-        shoot3way: {
-            name: "3way", damage: 1, hp: 1, interval: 31,
-            texture: ["shot00.gif", "shot01.gif", "shot02.gif", "shot03.gif"],
-        },
-        barrier: {
-            time: 4,
-            texture: ["barrier0.gif", "barrier1.gif", "barrier2.gif", "barrier3.gif"],
-        },
-    },
+    playerData: EVIL_INVADERS_PLAYER,
     starterEnemy: {
         name: "soliderA",
         score: 100,
@@ -109,6 +120,10 @@ const NUMERIC_ENEMY_FIELDS = ["score", "spgage", "hp", "speed", "interval", "sha
 // Map a decodeSave() result onto the editor's game.json shape.
 // Returns { gameJson, sprites, warnings }; sprites is the (key-sanitized)
 // list of {key, w, h, rgba} to add to the atlas.
+//
+// `defaults` supplies the enemy and boss records that decoded data is layered
+// onto (starterEnemy / starterBoss); the player is not taken from it — see the
+// EVIL_INVADERS_PLAYER assignment below.
 export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntry = null, importedAt = null } = {}) {
     const warnings = [];
     const usedKeys = new Set();
@@ -201,7 +216,14 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
     const bossData = {};
     for (let s = 0; s < stageCount; s++) bossData[`boss${s}`] = clone(defaults.starterBoss);
 
-    gameJson.playerData = clone(defaults.playerData);
+    // Player + bullets always come from the Evil Invaders character, never from
+    // `defaults`. The editor derives `defaults` from whatever game is currently
+    // open, and its player may be a custom one whose frames live only in that
+    // level's atlas — which the import drops when it resets the atlas to make
+    // room for the save's sprites. Seeding from it would leave the imported
+    // game pointing at frames that no longer exist: an invisible ship firing
+    // invisible shots. The stock character's frames are always in game_asset.
+    gameJson.playerData = clone(EVIL_INVADERS_PLAYER);
     gameJson.enemyData = enemyData;
     gameJson.bossData = bossData;
     gameJson.meta = { version: "1.0", source: "dezaemon2" };

@@ -77,10 +77,91 @@ test("importing a real Dezaemon 2 .sav populates the modal and the editor", asyn
     expect(grid.withSprite).toBe(grid.occupied);
     expect(grid.distinct).toBeGreaterThan(1);
 
+    // A Dezaemon save has no player of its own, so the import flies the Evil
+    // Invaders character — and every frame it references, ship and bullets
+    // alike, has to resolve in the atlas the editor just rebuilt around the
+    // save's sprites. Frames that only live in some other level's atlas would
+    // read as a successful import until you press play and see nothing.
+    const player = await page.evaluate(() => {
+        const frames = Object.assign({}, (atlasData && atlasData.frames) || {});
+        for (const s of extraSprites) frames[s.key] = true;
+        for (const k in replacedFrames) frames[k] = true;
+        const pd = gameData.playerData;
+        const referenced = [
+            ...pd.texture,
+            ...pd.shootNormal.texture,
+            ...pd.shootBig.texture,
+            ...pd.shoot3way.texture,
+            ...pd.barrier.texture,
+        ];
+        return {
+            texture: pd.texture,
+            shootNormal: pd.shootNormal.texture,
+            shootBig: pd.shootBig.texture,
+            missing: referenced.filter((f) => !frames[f]),
+        };
+    });
+    expect(player.texture).toEqual([
+        "player00.gif", "player01.gif", "player02.gif",
+        "player03.gif", "player04.gif", "player05.gif",
+    ]);
+    expect(player.shootNormal).toEqual(["shot00.gif", "shot01.gif", "shot02.gif", "shot03.gif"]);
+    expect(player.shootBig).toEqual(["shotBig00.gif", "shotBig01.gif", "shotBig02.gif", "shotBig03.gif"]);
+    expect(player.missing).toEqual([]);
+
     // Importing must not push files at the user.
     const importNotes = notes.join("\n");
     expect(importNotes).not.toContain("Repack Atlas");
     expect(importNotes).toContain("sprites from the save were packed into the atlas");
+    expect(importNotes).toContain("Player and bullets: the Evil Invaders character");
+
+    expect(errors).toEqual([]);
+});
+
+test("importing over a level with a custom player still flies the Evil Invaders ship", async ({ page }) => {
+    await blockCdn(page);
+    const errors = collectPageErrors(page);
+    page.on("dialog", (d) => d.accept());
+
+    await page.goto("/level-editor.html");
+    await expect.poll(() => page.evaluate(() => !!window.Dezaemon)).toBe(true);
+    await expect.poll(() => page.evaluate(() => !!(atlasData && atlasData.frames))).toBe(true);
+
+    // Stand in for a loaded Firebase level whose player is custom art: the
+    // frames live in that level's atlas, not the stock one, and the import
+    // clears them to make room for the save's sprites.
+    await page.evaluate(() => {
+        playerData = {
+            name: "borrowed",
+            maxHp: 5,
+            spDamage: 10,
+            defaultShootName: "normal",
+            defaultShootSpeed: "speed_normal",
+            texture: ["levelOnlyShip0.gif"],
+            shootNormal: { name: "normal", damage: 1, hp: 1, interval: 9, texture: ["levelOnlyShot0.gif"] },
+            shootBig: { name: "big", damage: 2, hp: 1, interval: 9, texture: ["levelOnlyShot0.gif"] },
+            shoot3way: { name: "3way", damage: 1, hp: 1, interval: 9, texture: ["levelOnlyShot0.gif"] },
+            barrier: { time: 2, texture: ["levelOnlyBarrier0.gif"] },
+        };
+        gameData.playerData = playerData;
+    });
+
+    await page.setInputFiles("#deza-file-input", RAMSIE);
+    await page.locator("#deza-slot-list > div").first().click();
+    await page.locator("#deza-import-btn").click();
+    await expect(page.locator("#dezaemon-import-modal")).toBeHidden();
+
+    const after = await page.evaluate(() => ({
+        texture: gameData.playerData.texture,
+        shootNormal: gameData.playerData.shootNormal.texture,
+        // The panel that flags unresolvable frames must stay shut — the whole
+        // point is that nothing the player references went missing.
+        missingPanelHidden: document.getElementById("missing-tex-overlay").classList.contains("hidden"),
+    }));
+    expect(after.texture[0]).toBe("player00.gif");
+    expect(after.texture).not.toContain("levelOnlyShip0.gif");
+    expect(after.shootNormal).toEqual(["shot00.gif", "shot01.gif", "shot02.gif", "shot03.gif"]);
+    expect(after.missingPanelHidden).toBe(true);
 
     expect(errors).toEqual([]);
 });

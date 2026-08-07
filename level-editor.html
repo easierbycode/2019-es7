@@ -1258,6 +1258,17 @@
                 if (b.anim) { for (const [k, animFrames] of Object.entries(b.anim)) { if (!k.startsWith('_')) collectTextures(animFrames); } }
                 if (b.bulletData) collectTextures(b.bulletData.texture);
             }
+            // The player was long assumed to be stock art, so it went unchecked —
+            // but a level (or an import) can point it at frames that are not in
+            // the atlas, and an invisible ship firing invisible shots is exactly
+            // the failure this panel exists to catch.
+            if (playerData) {
+                collectTextures(playerData.texture);
+                for (const shoot of ['shootNormal', 'shootBig', 'shoot3way']) {
+                    if (playerData[shoot]) collectTextures(playerData[shoot].texture);
+                }
+                if (playerData.barrier) collectTextures(playerData.barrier.texture);
+            }
 
             if (missing.size > 0) {
                 console.warn('Level editor: missing textures in atlas:', [...missing]);
@@ -2537,6 +2548,11 @@
             } catch (e) { /* leave null — BUILTIN_DEFAULTS covers it */ }
         }
 
+        // Records a new game / an import is seeded from: the currently loaded
+        // game where it has one, the module's built-ins otherwise. Note that a
+        // .sav import ignores `playerData` here and always uses the Evil
+        // Invaders character (see applyDezaemonImport) — this override only
+        // reaches "New Game", which keeps editing the player you already have.
         function getDezaemonDefaults() {
             const base = window.Dezaemon ? dezaClone(window.Dezaemon.BUILTIN_DEFAULTS) : null;
             if (!base) return null;
@@ -2787,6 +2803,9 @@
             if (!st || st.selectedSlot === null || !st.decoded) return;
             const save = st.saves[st.selectedSlot];
             snapshotDefaultsOnce();
+            // mapSaveToGame supplies the Evil Invaders player and its bullets
+            // regardless of `defaults` — a Dezaemon save has no player of its
+            // own, and the atlas reset below would strip a custom one's frames.
             const { gameJson, sprites, warnings } = window.Dezaemon.mapSaveToGame(st.decoded, {
                 defaults: getDezaemonDefaults(),
                 sourceEntry: save,
@@ -2836,6 +2855,8 @@
             document.getElementById('status').innerHTML = '<span style="color:#84cc16">Imported: ' + title + ' (Dezaemon 2)</span>';
             document.getElementById('dezaemon-import-modal').classList.add('hidden');
             const notes = warnings.slice();
+            notes.push('Player and bullets: the Evil Invaders character (' +
+                playerData.texture.length + ' idle frames + shot/big/3way), since Dezaemon saves carry no player.');
             if (sprites.length) notes.push(sprites.length + ' sprites from the save were packed into the atlas.');
             if (notes.length) alert('Import notes:\n- ' + notes.join('\n- '));
         }
