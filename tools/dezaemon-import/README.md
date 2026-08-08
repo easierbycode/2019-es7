@@ -42,20 +42,26 @@ stages, 3,497 placements — the emitted game carries all of it:
 | Attributes | the 18-byte record travels verbatim on `enemyData.*.dezaemon.attributes`. The field *names* are still open, so imported enemies play with default stats — but the data is there for a later decode to name, without re-importing |
 
 A Dezaemon save carries no player of its own, so the import supplies one: the
-**Mutoid character** (`lib/player-art.js`) — evil-invaders-phaser4's recipe
-`playerData`, the ship its `MutoidScene` flies, with the hadoken shot, the big
-projectile and the ten-frame shield. Those frames are not in this project's
-`game_asset` atlas, so the pixels are baked into that module (palette + RLE,
-~17 KB) and travel with the import rather than being referenced. Regenerate
-after changing the source art:
+**Duke character** (`lib/player-art.js`) — the Firebase record
+`characters/dukeNukem` that the live Evil Invaders build loads over its recipe
+at boot, with the sparkler shot, the big projectile and the ten-frame shield.
+None of those frames are in this project's `game_asset` atlas, so the pixels
+are baked into that module (palette + RLE, ~22 KB) and travel with the import
+rather than being referenced. The character record and its `duke_atlas` frames
+are snapshotted from the database in `dev/duke/`; the rest come from
+evil-invaders-phaser4's atlas. Regenerate after changing the source art:
 
 ```bash
 node tools/dezaemon-import/dev/build-player-art.js         # rewrite lib/player-art.js
 node tools/dezaemon-import/dev/build-player-art.js --check # verify it is current
 ```
 
-"New Game" still seeds the stock Evil Invaders character, whose frames are
-already in `game_asset` — a blank game needs no extra art.
+"New Game" seeds the same character, so a blank game and an import fly the same
+ship. `buildBlankGame()` returns only the record, so whatever calls it must add
+`decodePlayerArt()` to the atlas as well — the level editor does that in
+`startNewGame()`. `EVIL_INVADERS_PLAYER` is still exported for anywhere that
+cannot ship pixels alongside a record: its frames are all already in
+`game_asset`.
 
 ## Usage
 

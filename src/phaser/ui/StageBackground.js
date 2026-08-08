@@ -18,6 +18,15 @@ export class PhaserStageBackground {
         this.stageEndBg.y = -this.stageEndBg.height;
         this.stageEndBg.setVisible(false);
 
+        // See GameScene: the custom-enemy background is a starfield with the
+        // corridor over it as a faster, semi-transparent parallax layer.
+        this.stageBgOverlay = null;
+        if (gameState.hasCustomEnemies && scene.textures.exists("stage_over_c")) {
+            this.stageBgOverlay = scene.add.tileSprite(0, 0, GW, GH, "stage_over_c");
+            this.stageBgOverlay.setOrigin(0, 0);
+            this.stageBgOverlay.setAlpha(0.6);
+        }
+
         this.coverOverlay = null;
         if (scene.textures.getFrame("game_asset", "stagebgOver.gif")) {
             this.coverOverlay = scene.add.tileSprite(0, 0, GW, GH, "game_asset", "stagebgOver.gif");
@@ -28,6 +37,7 @@ export class PhaserStageBackground {
 
     scroll(amount) {
         this.stageBg.tilePositionY -= amount;
+        if (this.stageBgOverlay) this.stageBgOverlay.tilePositionY -= amount * 3;
     }
 
     showEndBg() {
@@ -40,6 +50,7 @@ export class PhaserStageBackground {
         if (!this.bossAppearFlg) return;
         this.stageBg.y += scrollAmount;
         this.stageEndBg.y += scrollAmount;
+        if (this.stageBgOverlay) this.stageBgOverlay.y += scrollAmount;
         this.bossAppearScroll = (this.bossAppearScroll || 0) + scrollAmount;
         if (this.bossAppearScroll >= 214 || this.stageEndBg.y >= 42) {
             this.bossAppearFlg = false;

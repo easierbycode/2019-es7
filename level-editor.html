@@ -2659,26 +2659,47 @@
             if (defaultGameSnapshot || !gameData) return;
             try {
                 defaultGameSnapshot = {
-                    playerData: (playerData && Object.keys(playerData).length) ? dezaClone(playerData) : null,
                     starterEnemy: enemyData && enemyData.enemyA ? dezaClone(enemyData.enemyA) : null,
                     starterBoss: bossData && bossData.boss0 ? dezaClone(bossData.boss0) : null,
                 };
             } catch (e) { /* leave null — BUILTIN_DEFAULTS covers it */ }
         }
 
-        // Records a new game / an import is seeded from: the currently loaded
-        // game where it has one, the module's built-ins otherwise. Note that a
-        // .sav import ignores `playerData` here and always uses the Evil
-        // Invaders character (see applyDezaemonImport) — this override only
-        // reaches "New Game", which keeps editing the player you already have.
+        // Enemy and boss records a new game / an import is seeded from: the
+        // currently loaded game where it has them, the module's built-ins
+        // otherwise. The player is never taken from the open game — a new game
+        // and a .sav import both fly BUILTIN_DEFAULTS.playerData (Duke, with
+        // the sparkler shot), whose frames seedPlayerArt() puts in the atlas.
         function getDezaemonDefaults() {
             const base = window.Dezaemon ? dezaClone(window.Dezaemon.BUILTIN_DEFAULTS) : null;
             if (!base) return null;
             const snap = defaultGameSnapshot || {};
-            if (snap.playerData) base.playerData = dezaClone(snap.playerData);
             if (snap.starterEnemy) base.starterEnemy = dezaClone(snap.starterEnemy);
             if (snap.starterBoss) base.starterBoss = dezaClone(snap.starterBoss);
             return base;
+        }
+
+        // Queue the default player's baked frames (duke_0.., the sparkler shot,
+        // the big shot, the 3-way and the shield) for the atlas. None of them
+        // ship in game_asset, so without this the new player draws as nothing.
+        // Marked custom so Save Game writes them into the level's own atlas.
+        function seedPlayerArt() {
+            if (!window.Dezaemon || !window.Dezaemon.decodePlayerArt) return 0;
+            const existing = (atlasData && atlasData.frames) || {};
+            let n = 0;
+            for (const sp of window.Dezaemon.decodePlayerArt()) {
+                const c = document.createElement('canvas');
+                c.width = sp.w; c.height = sp.h;
+                c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(sp.rgba), sp.w, sp.h), 0, 0);
+                const entry = { key: sp.key, canvas: c, w: sp.w, h: sp.h };
+                // A key the atlas already has is a REPLACEMENT — pushing it into
+                // extraSprites would lay two frames on one slot in the repack.
+                if (existing[sp.key]) replacedFrames[sp.key] = entry;
+                else extraSprites.push(entry);
+                customFrameKeys.add(sp.key);
+                n++;
+            }
+            return n;
         }
 
         // Blank game without the module: reuse whatever's currently loaded.
@@ -2696,7 +2717,7 @@
             };
         }
 
-        function startNewGame() {
+        async function startNewGame() {
             snapshotDefaultsOnce();
             let blank = null;
             if (window.Dezaemon) blank = window.Dezaemon.buildBlankGame(getDezaemonDefaults());
@@ -2709,7 +2730,11 @@
             playerData = gameData.playerData;
             currentStageKey = 'stage0';
             storeBossDataForViewers();
-            populateStagePills(); loadCurrentStage(); renderEnemyList(); updateToolUI();
+            // Same discipline as an import: fold the player's frames into the
+            // atlas BEFORE the first paint, or the player row in the editor —
+            // and the ship at play time — draws empty.
+            if (seedPlayerArt()) await mergeExtraSpritesIntoAtlas();
+            populateStagePills(); loadCurrentStage(); renderEnemyList(); renderAtlas(); updateToolUI();
             const nameInput = document.getElementById('firebase-level-name');
             if (nameInput) nameInput.value = '';
             document.getElementById('status').innerHTML = '<span style="color:#84cc16">New game (unsaved)</span>';
@@ -2991,8 +3016,8 @@
                 ' enemy types and ' + spawnCount.toLocaleString() + ' spawns imported — nothing dropped.');
             notes.push('Grid is ' + gridWidth(currentGrid) + ' columns wide (the Saturn playfield), and each wave keeps the scroll row it spawned on, so the stage keeps its pacing.');
             if (bossCount) notes.push(bossCount + ' of ' + stageKeys.length + ' stages place a boss; those use the save\'s own boss art.');
-            notes.push('Player and bullets: the Mutoid character (' +
-                playerData.texture.length + ' idle frames + shot/big/3way + a ' +
+            notes.push('Player and bullets: the Duke character (' +
+                playerData.texture.length + ' idle frames + the sparkler shot/big/3way + a ' +
                 playerData.barrier.texture.length + '-frame shield), since Dezaemon saves carry no player. Its art came in with the import.');
             if (sprites.length) notes.push(sprites.length + ' sprites from the save were packed into the atlas.');
             if (notes.length) alert('Import notes:\n- ' + notes.join('\n- '));

@@ -12,7 +12,7 @@ import {
     SINGLE_LETTER_ENEMIES,
     FRAMES_PER_SOURCE_ROW,
     enemyLetters,
-    MUTOID_PLAYER,
+    DUKE_PLAYER,
     decodePlayerArt,
 } from "../lib/map-to-game.js";
 import { PLAYER_FRAMES } from "../lib/player-art.js";
@@ -31,8 +31,8 @@ test("buildBlankGame produces a valid, immediately-playable game", () => {
     }
     assert.ok(g.enemyData.enemyA);
     assert.ok(g.bossData.boss0);
-    // Every texture the blank game references comes from the shipped atlas
-    // defaults, so it plays in Phaser with zero extra assets.
+    // The enemy and boss records reference the shipped atlas; the player's own
+    // frames ride along in decodePlayerArt() instead.
     assert.deepStrictEqual(g.playerData.texture, BUILTIN_DEFAULTS.playerData.texture);
 });
 
@@ -218,7 +218,7 @@ test("sprite keys are sanitized, .gif-suffixed, and deduped", () => {
     );
 });
 
-test("an import always flies the Mutoid character, whatever the defaults say", () => {
+test("an import always flies the Duke character, whatever the defaults say", () => {
     // The editor derives `defaults` from the game that happens to be open, and
     // its player can reference frames that live only in that level's atlas —
     // which the import drops. Taking the player from there would ship an
@@ -239,11 +239,11 @@ test("an import always flies the Mutoid character, whatever the defaults say", (
     const defaults = { ...BUILTIN_DEFAULTS, playerData: customPlayer };
     const { gameJson, sprites } = mapSaveToGame(emptyDecoded(), { defaults });
 
-    assert.deepStrictEqual(gameJson.playerData, MUTOID_PLAYER);
+    assert.deepStrictEqual(gameJson.playerData, DUKE_PLAYER);
     assert.deepStrictEqual(gameJson.playerData.texture,
-        ["cyberLiberty0.png", "cyberLiberty1.png"]);
+        ["duke_0", "duke_1", "duke_2", "duke_3"]);
     assert.deepStrictEqual(gameJson.playerData.shootNormal.texture,
-        ["hadoken0.png", "hadoken1.png"]);
+        ["bigProjectile_0.png", "bigProjectile_1.png", "bigProjectile_2.png", "bigProjectile_3.png"]);
     assert.deepStrictEqual(gameJson.playerData.shootBig.texture,
         ["bigProjectile0.png", "bigProjectile1.png", "bigProjectile2.png"]);
     assert.deepStrictEqual(gameJson.playerData.shoot3way.texture,
@@ -265,7 +265,7 @@ test("an import always flies the Mutoid character, whatever the defaults say", (
     // ...and it is a copy, so editing the imported game cannot mutate the
     // character every later import is seeded from.
     gameJson.playerData.texture.push("mutated.gif");
-    assert.strictEqual(MUTOID_PLAYER.texture.length, 2);
+    assert.strictEqual(DUKE_PLAYER.texture.length, 4);
     // The enemy/boss halves of `defaults` are still honoured.
     assert.strictEqual(gameJson.enemyData.enemyA.name, BUILTIN_DEFAULTS.starterEnemy.name);
 });
@@ -280,21 +280,39 @@ test("the player's baked frames decode to real pixels at their atlas size", () =
         for (let p = 3; p < f.rgba.length; p += 4) if (f.rgba[p]) opaque++;
         assert.ok(opaque > 0, `${f.key} is not blank`);
     }
-    // the ship and its shield, at the sizes evil-invaders-phaser4 draws them
+    // the ship, its shot and its shield, at the sizes the live game draws them
     const byKey = new Map(art.map((f) => [f.key, f]));
+    assert.deepStrictEqual([byKey.get("duke_0").w, byKey.get("duke_0").h], [31, 38]);
     assert.deepStrictEqual(
-        [byKey.get("cyberLiberty0.png").w, byKey.get("cyberLiberty0.png").h], [32, 32]);
+        [byKey.get("bigProjectile_0.png").w, byKey.get("bigProjectile_0.png").h], [23, 8]);
     assert.deepStrictEqual(
         [byKey.get("shield0.png").w, byKey.get("shield0.png").h], [96, 96]);
 });
 
-test("New Game still flies the Evil Invaders character the runtime ships", () => {
-    // src/phaser/game-objects/Player.js and Bullet.js hardcode these same keys
-    // as their fallbacks, and every one is a frame in assets/game_asset — so a
-    // blank game needs no extra art, unlike an import.
-    assert.strictEqual(BUILTIN_DEFAULTS.playerData, EVIL_INVADERS_PLAYER);
-    assert.deepStrictEqual(buildBlankGame().playerData, EVIL_INVADERS_PLAYER);
+test("New Game flies Duke, and his frames are baked in rather than referenced", () => {
+    assert.strictEqual(BUILTIN_DEFAULTS.playerData, DUKE_PLAYER);
+    assert.deepStrictEqual(buildBlankGame().playerData, DUKE_PLAYER);
     assert.deepStrictEqual(buildBlankGame().playerData.texture, [
+        "duke_0", "duke_1", "duke_2", "duke_3",
+    ]);
+    // None of those live in assets/game_asset, so a caller seeding from here
+    // has to add decodePlayerArt() to the atlas or the ship draws as nothing.
+    const baked = new Set(decodePlayerArt().map((f) => f.key));
+    const p = buildBlankGame().playerData;
+    const referenced = [
+        ...p.texture,
+        ...p.shootNormal.texture,
+        ...p.shootBig.texture,
+        ...p.shoot3way.texture,
+        ...p.barrier.texture,
+    ];
+    assert.deepStrictEqual(referenced.filter((f) => !baked.has(f)), []);
+});
+
+test("the stock Evil Invaders player stays available as the pixel-free fallback", () => {
+    // src/phaser/game-objects/Player.js and Bullet.js hardcode these same keys
+    // as their fallbacks, and every one is a frame in assets/game_asset.
+    assert.deepStrictEqual(EVIL_INVADERS_PLAYER.texture, [
         "player00.gif", "player01.gif", "player02.gif",
         "player03.gif", "player04.gif", "player05.gif",
     ]);

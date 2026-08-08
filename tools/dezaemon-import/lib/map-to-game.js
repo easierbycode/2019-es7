@@ -3,8 +3,10 @@
 // import flow, so their output is identical.
 //
 // Also owns buildBlankGame(), the editor's "New Game" seed: a minimal valid
-// game whose every texture reference exists in the shipped atlas, so it plays
-// in Phaser immediately.
+// game whose enemy and boss records reference the shipped atlas, so they play
+// in Phaser immediately. Its player is Duke (lib/player-art.js), whose frames
+// are NOT in that atlas — a caller that seeds a game from here must also add
+// decodePlayerArt() to the atlas, exactly as an import does with `sprites`.
 //
 // Schema facts this module enforces (see src/phaser/ for the runtime side):
 //   - grid cells are "<UppercaseLetters><digit>" ("00" = empty). One letter is
@@ -18,9 +20,9 @@
 //     is reversed in lockstep so a wave keeps the scroll row it came from
 //   - BootScene plays stage0..stage9
 
-import { MUTOID_PLAYER, decodePlayerArt } from "./player-art.js";
+import { DUKE_PLAYER, decodePlayerArt } from "./player-art.js";
 
-export { MUTOID_PLAYER, decodePlayerArt };
+export { decodePlayerArt, DUKE_PLAYER };
 
 export const GRID_COLS = 8;          // blank-game / legacy grid width
 export const MAX_STAGES = 10;        // Dezaemon's own maximum, and the runtime's
@@ -43,14 +45,18 @@ export function enemyLetters(index) {
     return out;
 }
 
-// The Evil Invaders player character, exactly as the Phaser 4 runtime draws
-// it: player00..player05 are the idle animation Player.js builds, shot*/shotBig*
-// are the bullet frames Bullet.js fires for each shoot mode, and barrier0..3 is
-// the shield. Every one of these frames ships in assets/game_asset — the atlas
-// BootScene loads — so a game seeded with this record plays with no extra art.
+// The historical "New Game" player: the stock Evil Invaders ship, exactly as
+// the Phaser 4 runtime draws it — player00..player05 are the idle animation
+// Player.js builds, shot*/shotBig* are the bullet frames Bullet.js fires for
+// each shoot mode, and barrier0..3 is the shield. Every one of these frames
+// ships in assets/game_asset, so a game seeded with this record needs no extra
+// art at all.
 //
-// This is the "New Game" character. A .sav IMPORT flies MUTOID_PLAYER instead
-// (lib/player-art.js) — see the playerData assignment in mapSaveToGame.
+// Nothing here seeds it any more — a blank game and an import both fly
+// DUKE_PLAYER (see BUILTIN_DEFAULTS below and the playerData assignment in
+// mapSaveToGame). It stays exported because it is the one player record that is
+// pure atlas references, which makes it the fallback for anywhere that cannot
+// ship pixels alongside the record.
 export const EVIL_INVADERS_PLAYER = {
     name: "G",
     maxHp: 3,
@@ -76,10 +82,11 @@ export const EVIL_INVADERS_PLAYER = {
     },
 };
 
-// Default records copied from the shipped assets/game.json — every texture
-// here exists in the stock game_asset atlas.
+// Enemy and boss records copied from the shipped assets/game.json — every
+// texture on those two exists in the stock game_asset atlas. The player is
+// Duke, and his frames do not: they ride along in decodePlayerArt().
 export const BUILTIN_DEFAULTS = {
-    playerData: EVIL_INVADERS_PLAYER,
+    playerData: DUKE_PLAYER,
     starterEnemy: {
         name: "soliderA",
         score: 100,
@@ -150,7 +157,7 @@ const toHex = (bytes) =>
 //
 // `defaults` supplies the enemy and boss records that decoded data is layered
 // onto (starterEnemy / starterBoss); the player is not taken from it — see the
-// EVIL_INVADERS_PLAYER assignment below.
+// DUKE_PLAYER assignment below.
 export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntry = null, importedAt = null } = {}) {
     const warnings = [];
     const usedKeys = new Set();
@@ -164,8 +171,8 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
     });
 
     // The player's own frames, appended so the save's sprite indices above stay
-    // valid. They keep their real names (cyberLiberty0.png, hadoken0.png, ...):
-    // the record below references them by name, and none of them collide with a
+    // valid. They keep their real names (duke_0, bigProjectile_0.png, ...): the
+    // record below references them by name, and none of them collide with a
     // frame in the stock game_asset atlas.
     const playerArt = decodePlayerArt();
     for (const frame of playerArt) {
@@ -275,14 +282,14 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
         bossData[`boss${s}`] = rec;
     }
 
-    // Player + bullets always come from the Mutoid character, never from
+    // Player + bullets always come from the Duke character, never from
     // `defaults`. The editor derives `defaults` from whatever game is currently
     // open, and its player may be a custom one whose frames live only in that
     // level's atlas — which the import drops when it resets the atlas to make
     // room for the save's sprites. Seeding from it would leave the imported
     // game pointing at frames that no longer exist: an invisible ship firing
     // invisible shots. This character's frames travel with it, in `sprites`.
-    gameJson.playerData = clone(MUTOID_PLAYER);
+    gameJson.playerData = clone(DUKE_PLAYER);
     gameJson.enemyData = enemyData;
     gameJson.bossData = bossData;
     gameJson.meta = { version: "1.0", source: "dezaemon2" };

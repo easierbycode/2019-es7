@@ -1,0 +1,65 @@
+{
+  "barrier": {
+    "texture": [
+      "shield0.png",
+      "shield1.png",
+      "shield2.png",
+      "shield3.png",
+      "shield4.png",
+      "shield5.png",
+      "shield6.png",
+      "shield7.png",
+      "shield8.png",
+      "shield9.png"
+    ],
+    "time": 4
+  },
+  "caDamage": 50,
+  "defaultShootName": "normal",
+  "defaultShootSpeed": "speed_normal",
+  "frameRate": 1,
+  "maxHp": 3,
+  "name": "G",
+  "originX": 0,
+  "shoot3way": {
+    "damage": 1,
+    "hp": 1,
+    "interval": 31,
+    "name": "3way",
+    "texture": [
+      "hadoken0.png",
+      "hadoken1.png"
+    ]
+  },
+  "shootBig": {
+    "damage": 2,
+    "hp": 100,
+    "interval": 39,
+    "name": "big",
+    "postFX": true,
+    "texture": [
+      "bigProjectile0.png",
+      "bigProjectile1.png",
+      "bigProjectile2.png"
+    ]
+  },
+  "shootNormal": {
+    "damage": 1,
+    "hp": 1,
+    "interval": 23,
+    "name": "normal",
+    "texture": [
+      "bigProjectile_0.png",
+      "bigProjectile_1.png",
+      "bigProjectile_2.png",
+      "bigProjectile_3.png"
+    ]
+  },
+  "texture": [
+    "duke_0",
+    "duke_1",
+    "duke_2",
+    "duke_3"
+  ],
+  "textureKey": "duke_atlas"
+}

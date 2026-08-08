@@ -1,23 +1,36 @@
 #!/usr/bin/env node
-// Bakes the Mutoid scene's player art into lib/player-art.js.
+// Bakes the Duke Nukem player's art into lib/player-art.js.
 //
-// A Dezaemon 2 save carries no player, so an import has to supply one, and the
-// character it supplies is the one MutoidScene flies: evil-invaders-phaser4's
-// recipe playerData (assets/game.json) — the cyberLiberty ship, hadoken shots,
-// the big projectile and the ten-frame shield.
+// A Dezaemon 2 save carries no player, and a blank game has to start with one,
+// so the importer supplies the character the live Evil Invaders build flies:
+// the Firebase record `characters/dukeNukem`, which OverloadScene loads over
+// evil-invaders-phaser4's recipe at boot — Duke plus the sparkler shot.
 //
-// Those frames live in THAT project's atlas, not in this one's game_asset, so
-// pointing playerData at them without shipping the pixels would import an
+// Its frames come from two places and neither is this project's game_asset:
+//
+//   duke_0..duke_3          RTDB `atlases/duke_atlas` — snapshotted in dev/duke/
+//   bigProjectile_0..3.png  the sparkler; these and the rest (big shot, 3way,
+//   bigProjectile0..2.png   the ten-frame shield) live in
+//   hadoken0..1.png         evil-invaders-phaser4's assets/game_asset.png
+//   shield0..9.png
+//
+// Pointing playerData at them without shipping the pixels would import an
 // invisible ship firing invisible bullets. Rather than add a build-time
 // dependency on a sibling checkout, the frames are baked here into a committed,
 // dependency-free ESM module that the editor and the CLI both read.
 //
-// Palette + run-length encoded: the seventeen frames use 34 distinct colours
-// and are mostly flat, so 371 KB of RGBA compresses to ~17 KB of base64.
+// Palette + run-length encoded: the frames use few distinct colours and are
+// mostly flat, so hundreds of KB of RGBA compress to ~20 KB of base64.
 //
 //   node tools/dezaemon-import/dev/build-player-art.js [--check]
 //
 // Point somewhere else with EI_PHASER4_ROOT=/path/to/evil-invaders-phaser4.
+//
+// Refresh the dev/duke/ snapshot (record + atlas) straight from the database:
+//   curl -s https://evil-invaders-default-rtdb.firebaseio.com/characters/dukeNukem.json
+//   curl -s https://evil-invaders-default-rtdb.firebaseio.com/atlases/duke_atlas.json
+// The atlas node carries `json` (a JSON string) and `png` (base64); write them
+// out as dev/duke/duke_atlas.json and dev/duke/duke_atlas.png.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -25,6 +38,7 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const OUT = path.join(here, "..", "lib", "player-art.js");
+const DUKE = path.join(here, "duke");
 const SRC = process.env.EI_PHASER4_ROOT ??
     path.join(here, "..", "..", "..", "..", "evil-invaders-phaser4");
 
@@ -45,11 +59,23 @@ function loadPng(file) {
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 
+// A sheet is one PNG plus a name -> {x,y,w,h} map. The atlas JSON comes in two
+// shapes: an array of {filename, frame} (evil-invaders-phaser4's game_asset)
+// and a keyed object (the Atlas Builder's output, which is what the RTDB holds).
+function loadSheet(pngFile, jsonFile) {
+    const json = JSON.parse(fs.readFileSync(jsonFile, "utf8"));
+    const byName = new Map(
+        Array.isArray(json.frames)
+            ? json.frames.map((f) => [f.filename, f.frame])
+            : Object.entries(json.frames).map(([name, f]) => [name, f.frame]),
+    );
+    return { png: loadPng(pngFile), byName };
+}
+
 function main() {
     const atlasPng = path.join(SRC, "assets", "game_asset.png");
     const atlasJson = path.join(SRC, "assets", "game_asset.json");
-    const recipeJson = path.join(SRC, "assets", "game.json");
-    for (const f of [atlasPng, atlasJson, recipeJson]) {
+    for (const f of [atlasPng, atlasJson]) {
         if (!fs.existsSync(f)) {
             console.error(
                 `evil-invaders-phaser4 not found at ${SRC} (missing ${path.basename(f)}).\n` +
@@ -59,10 +85,14 @@ function main() {
         }
     }
 
-    const png = loadPng(atlasPng);
-    const atlas = JSON.parse(fs.readFileSync(atlasJson, "utf8"));
-    const byName = new Map(atlas.frames.map((f) => [f.filename, f.frame]));
-    const player = JSON.parse(fs.readFileSync(recipeJson, "utf8")).playerData;
+    const player = JSON.parse(fs.readFileSync(path.join(DUKE, "character.json"), "utf8"));
+    // duke_atlas first: its keys are unique, and a hit there means the frame is
+    // the character's own art rather than something the shared atlas happens to
+    // name the same way.
+    const sheets = [
+        loadSheet(path.join(DUKE, "duke_atlas.png"), path.join(DUKE, "duke_atlas.json")),
+        loadSheet(atlasPng, atlasJson),
+    ];
 
     const keys = [
         ...player.texture,
@@ -77,8 +107,10 @@ function main() {
     const palette = [];
     const paletteIndex = new Map();
     const pixelsOf = (key) => {
-        const f = byName.get(key);
-        if (!f) throw new Error(`frame ${key} is not in the atlas`);
+        const sheet = sheets.find((s) => s.byName.has(key));
+        if (!sheet) throw new Error(`frame ${key} is in none of the source atlases`);
+        const { png } = sheet;
+        const f = sheet.byName.get(key);
         const out = [];
         for (let y = 0; y < f.h; y++) {
             for (let x = 0; x < f.w; x++) {
@@ -147,10 +179,11 @@ function render({ palette, frames, player }) {
     }`;
     return `// GENERATED by dev/build-player-art.js — do not edit by hand.
 //
-// The player a Dezaemon 2 import flies: evil-invaders-phaser4's recipe
-// playerData, the character its MutoidScene creates. A save carries no player
-// of its own, and its frames are not in this project's game_asset atlas, so
-// the pixels are baked in here rather than referenced.
+// The player a blank game and a Dezaemon 2 import both fly: the Firebase
+// character \`characters/dukeNukem\`, which the live Evil Invaders build loads
+// over its recipe at boot. A save carries no player of its own, and none of
+// these frames are in this project's game_asset atlas, so the pixels are baked
+// in here rather than referenced.
 //
 // Frames are palette + run-length encoded (see the generator for why).
 
@@ -164,11 +197,12 @@ export const PLAYER_FRAMES = [
 ${frames.map((f) => `    { key: ${JSON.stringify(f.key)}, w: ${f.w}, h: ${f.h}, rle: "${f.rle}" },`).join("\n")}
 ];
 
-// The record itself, in this project's playerData shape. evil-invaders-phaser4
+// The record itself, in this project's playerData shape. The Firebase character
 // calls the special-attack field caDamage; the Phaser runtime here reads
-// spDamage (GameScene.js), so it is renamed on the way across.
-export const MUTOID_PLAYER = {
-    name: ${JSON.stringify(player.name)},
+// spDamage (GameScene.js), so it is renamed on the way across. \`name\` is the
+// label the level editor shows, so it says who this is.
+export const DUKE_PLAYER = {
+    name: "duke",
     maxHp: ${player.maxHp},
     spDamage: ${player.caDamage ?? player.spDamage ?? 50},
     speed: ${player.speed ?? 150},

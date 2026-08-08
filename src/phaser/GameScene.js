@@ -181,6 +181,18 @@ export class PhaserGameScene extends Phaser.Scene {
         this.stageEndBg.y = -this.stageEndBg.height;
         this.stageEndBg.setVisible(false);
 
+        // Second parallax layer, for the custom-enemy space background only: the
+        // corridor sits over the starfield at partial alpha and scrolls faster,
+        // so the stage reads as depth rather than as one flat tile. Added here,
+        // before any gameplay object and with no depth of its own, so it stays
+        // above the two background layers and below everything else.
+        this.stageBgOverlay = null;
+        if (gameState.hasCustomEnemies && this.textures.exists("stage_over_c")) {
+            this.stageBgOverlay = this.add.tileSprite(0, 0, GW, GH, "stage_over_c");
+            this.stageBgOverlay.setOrigin(0, 0);
+            this.stageBgOverlay.setAlpha(0.6);
+        }
+
         this.unitGroup = this.add.group();
         this.bulletGroup = this.add.group();
         this.enemyBulletGroup = this.add.group();
@@ -901,11 +913,14 @@ export class PhaserGameScene extends Phaser.Scene {
             if (!this.bossActive && !this.bossReached) {
                 var bgMove = this.gameStarted ? (this.stageBgAmountMove || 0.7) : 0.7;
                 this.stageBg.tilePositionY -= bgMove;
+                // Nearer layer, so it passes three times as fast.
+                if (this.stageBgOverlay) this.stageBgOverlay.tilePositionY -= bgMove * 3;
             }
             if (this.bossAppearBgFlg) {
                 var scrollAmt = this.stageBgAmountMove || 0.7;
                 this.stageBg.y += scrollAmt;
                 this.stageEndBg.y += scrollAmt;
+                if (this.stageBgOverlay) this.stageBgOverlay.y += scrollAmt;
                 this.bossAppearBgScroll = (this.bossAppearBgScroll || 0) + scrollAmt;
                 if (this.bossAppearBgScroll >= 214 || this.stageEndBg.y >= 42) {
                     this.bossAppearBgFlg = false;

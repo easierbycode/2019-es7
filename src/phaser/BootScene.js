@@ -473,25 +473,17 @@ export class BootScene extends Phaser.Scene {
             this.load.image("stage_loop" + i, "assets/img/stage/stage_loop" + i + ".png");
             this.load.image("stage_end" + i, "assets/img/stage/stage_end" + i + ".png");
         }
-        // Custom-enemy backgrounds (stages 0-3 share bg 3, stage 4 uses bg 4)
-        var customLoopPaths = [
-            "assets/img/stage/stage_loop3.png",
-            "assets/img/stage/stage_loop3.png",
-            "assets/img/stage/stage_loop3.png",
-            "assets/img/stage/stage_loop3.png",
-            "assets/img/stage/stage_loop4.png",
-        ];
-        var customEndPaths = [
-            "assets/img/stage/stage_end3.png",
-            "assets/img/stage/stage_end3.png",
-            "assets/img/stage/stage_end3.png",
-            "assets/img/stage/stage_end3.png",
-            "assets/img/stage/stage_end4.png",
-        ];
+        // Custom-enemy backgrounds — a level-editor game or a Dezaemon 2 import
+        // flies through space, not through the original game's stages. Every
+        // stage gets the same starfield, with the corridor over it as a faster
+        // parallax layer (GameScene), which is how evil-invaders-phaser4 draws
+        // it. The end-of-stage band is the starfield again so the boss scrolls
+        // in without a seam.
         for (var i = 0; i < 5; i++) {
-            this.load.image("stage_loop_c" + i, customLoopPaths[i]);
-            this.load.image("stage_end_c" + i, customEndPaths[i]);
+            this.load.image("stage_loop_c" + i, "assets/img/stage/space_stars.png");
+            this.load.image("stage_end_c" + i, "assets/img/stage/space_stars.png");
         }
+        this.load.image("stage_over_c", "assets/img/stage/space_corridor.png");
 
         this.load.image("loading_bg", "assets/img/loading/loading_bg.png");
         this.load.image("loading0", "assets/img/loading/loading0.gif");
