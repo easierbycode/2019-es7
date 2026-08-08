@@ -96,13 +96,20 @@ export function enemyWave(scene) {
     }
 
     var row = scene.stageEnemyPositionList[scene.waveCount] || [];
+    // The grid is as wide as the level says. Eight columns is the historical
+    // width; a Dezaemon 2 import is fourteen, matching the Saturn playfield it
+    // came from, so its formations keep their spacing instead of being binned.
+    var cols = row.length || 8;
+    var cellW = GW / cols;
 
     for (var i = 0; i < row.length; i++) {
         var code = String(row[i]);
         if (code === "00") continue;
 
-        var enemyType = code.substr(0, 1);
-        var itemCode = code.substr(1, 1);
+        // "<letters><drop digit>": one letter up to enemyZ, two past it. The
+        // drop is always the last character, so the key is everything before.
+        var enemyType = code.slice(0, -1);
+        var itemCode = code.slice(-1);
         var dataKey = "enemy" + enemyType;
         var enemyData = scene.recipe.enemyData ? scene.recipe.enemyData[dataKey] : null;
         if (!enemyData) continue;
@@ -116,7 +123,7 @@ export function enemyWave(scene) {
         case "9": itemName = PLAYER_STATES.BARRIER; break;
         }
 
-        createEnemy(scene, enemyData, 32 * i + 16, -16, itemName);
+        createEnemy(scene, enemyData, cellW * i + cellW / 2, -16, itemName);
     }
 
     scene.waveCount++;

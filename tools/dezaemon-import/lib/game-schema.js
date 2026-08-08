@@ -3,10 +3,17 @@
 // share it. The canary test validates the shipped assets/game.json, keeping
 // this in sync with reality.
 
-const CELL_RE = /^(00|[A-Z][0-9])$/;
-const ENEMY_KEY_RE = /^enemy[A-Z]$/;
+// A cell is "<letters><drop digit>", or "00" for empty. One letter is the
+// historical form; keys go two letters wide past enemyZ so a save's whole
+// roster fits (see lib/map-to-game.js).
+const CELL_RE = /^(00|[A-Z]+[0-9])$/;
+const ENEMY_KEY_RE = /^enemy[A-Z]+$/;
 const BOSS_KEY_RE = /^boss(\d+|Extra)$/;
 const STAGE_KEY_RE = /^stage(\d+)$/;
+// BootScene plays stage0..stage9 (Dezaemon 2's own maximum).
+const MAX_STAGE_ID = 9;
+// The widest grid the runtime lays out across the 256px playfield.
+const MAX_GRID_COLS = 20;
 
 function isObj(v) {
     return v !== null && typeof v === "object" && !Array.isArray(v);
@@ -32,13 +39,12 @@ export function validateGameJson(g) {
         err("enemyData must be an object");
     } else {
         const keys = Object.keys(g.enemyData);
-        if (keys.length > 26) err(`enemyData has ${keys.length} entries; grid codes support at most 26`);
         for (const k of keys) {
             if (!ENEMY_KEY_RE.test(k)) {
-                err(`enemyData key "${k}" must match enemy[A-Z]`);
+                err(`enemyData key "${k}" must match enemy[A-Z]+`);
                 continue;
             }
-            enemyLetters.add(k.slice(-1));
+            enemyLetters.add(k.slice(5));
             const e = g.enemyData[k];
             if (!isObj(e)) { err(`${k} must be an object`); continue; }
             // "infinity" is a runtime sentinel for indestructible enemies.
@@ -53,25 +59,46 @@ export function validateGameJson(g) {
     if (!g.stage0) err("stage0 is required");
     for (const k of stageKeys) {
         const num = Number(k.match(STAGE_KEY_RE)[1]);
-        if (num > 4) warn(`${k} is unreachable in Phaser (BootScene clamps stages to 0..4)`);
+        if (num > MAX_STAGE_ID) {
+            warn(`${k} is unreachable in Phaser (BootScene clamps stages to 0..${MAX_STAGE_ID})`);
+        }
         const st = g[k];
         if (!isObj(st) || !Array.isArray(st.enemylist) || st.enemylist.length === 0) {
             err(`${k}.enemylist must be a non-empty array of rows`);
             continue;
         }
+        // Rows are as wide as the level says, but every row in a stage has to
+        // agree — the runtime spreads one row across the screen and reads the
+        // width off it.
+        const width = Array.isArray(st.enemylist[0]) ? st.enemylist[0].length : 0;
+        if (!(width >= 1 && width <= MAX_GRID_COLS)) {
+            err(`${k}.enemylist rows must be 1..${MAX_GRID_COLS} cells wide (got ${width})`);
+            continue;
+        }
         st.enemylist.forEach((row, r) => {
-            if (!Array.isArray(row) || row.length !== 8) {
-                err(`${k}.enemylist[${r}] must be an array of exactly 8 cells`);
+            if (!Array.isArray(row) || row.length !== width) {
+                err(`${k}.enemylist[${r}] must be an array of exactly ${width} cells`);
                 return;
             }
             row.forEach((cell, c) => {
                 if (typeof cell !== "string" || !CELL_RE.test(cell)) {
-                    err(`${k}.enemylist[${r}][${c}] = ${JSON.stringify(cell)} is not "00" or "<A-Z><0-9>"`);
-                } else if (cell !== "00" && !enemyLetters.has(cell[0])) {
-                    err(`${k}.enemylist[${r}][${c}] references enemy${cell[0]}, which is not in enemyData`);
+                    err(`${k}.enemylist[${r}][${c}] = ${JSON.stringify(cell)} is not "00" or "<A-Z…><0-9>"`);
+                } else if (cell !== "00" && !enemyLetters.has(cell.slice(0, -1))) {
+                    err(`${k}.enemylist[${r}][${c}] references enemy${cell.slice(0, -1)}, which is not in enemyData`);
                 }
             });
         });
+        // Pacing, when present, is one scroll row per wave.
+        if (st.waveRows !== undefined) {
+            if (!Array.isArray(st.waveRows) || st.waveRows.length !== st.enemylist.length) {
+                err(`${k}.waveRows must have one entry per wave (${st.enemylist.length})`);
+            } else if (!st.waveRows.every((n) => Number.isInteger(n) && n >= 0)) {
+                err(`${k}.waveRows entries must be non-negative integers`);
+            }
+        }
+        if (st.waveInterval !== undefined && !(Number.isFinite(st.waveInterval) && st.waveInterval > 0)) {
+            err(`${k}.waveInterval must be a positive number`);
+        }
     }
 
     // --- playerData ---
@@ -104,7 +131,7 @@ export function validateGameJson(g) {
         // The runtime spawns bossData["boss"+stageId] after each stage's last wave.
         for (const k of stageKeys) {
             const num = Number(k.match(STAGE_KEY_RE)[1]);
-            if (num <= 4 && !g.bossData[`boss${num}`]) warn(`${k} has no matching boss${num} — boss spawn will fail`);
+            if (num <= MAX_STAGE_ID && !g.bossData[`boss${num}`]) warn(`${k} has no matching boss${num} — boss spawn will fail`);
         }
     }
 

@@ -199,38 +199,91 @@ export function decodeStageEnemies(sec5, stage) {
 // --- Editor-facing projection -----------------------------------------
 //
 // Turn the decoded stages into the shape lib/map-to-game.js consumes:
-// a flat enemy roster plus per-stage spawn rows in scroll order.
+// an enemy roster plus per-stage spawn rows in scroll order.
 //
-// The placement grid is 20 columns of 320px screen space with the 224px
-// playfield at columns 3..16; the editor's grid is 8 columns wide, so a
-// placement column is binned into the playfield's 14 columns. Rows that
-// hold nothing are dropped, so a stage yields one row per populated
-// scroll row, earliest first (map-to-game reverses them for the runtime).
+// The projection is lossless by construction — every placed object survives:
+//
+//   * Enemy identity is the (stage, record) PAIR, not the record. A save
+//     carries its own 60 enemy definitions per stage, and the same record
+//     index holds different bytes — and different art — in almost every
+//     stage that uses it (DAIOH's record 0 has nine distinct definitions
+//     across its nine stages, and 56 of its 60 records vary by stage).
+//     Keying on the record alone silently merged them into one enemy.
+//   * The grid is the placement grid's own 20 columns, so a cell holds
+//     exactly what the save's cell held and no two placements ever share
+//     one. The old 8-column binning collided 14% of DAIOH's spawns onto
+//     cells already taken, dropping them. Twenty rather than the 14-column
+//     playfield because games really do use the full width: 342 of Ramsie's
+//     2,308 placements sit outside columns 3..16, spread evenly enough that
+//     they are level design, not stray bytes.
+//   * Rows that hold nothing are still skipped, but each emitted row records
+//     the scroll row it came from (`waveRows`), so the stage's pacing — gaps
+//     of up to 177 rows between waves — survives the round trip.
 
-const EDITOR_COLS = 8;
+export const PLAYFIELD_COLS = PLAYFIELD_COL_END - PLAYFIELD_COL_START + 1; // 14
+const EDITOR_COLS = 8; // legacy width, kept for placementColumnToEditor()
 
+// Legacy 8-column binning. Superseded by the save's own column index for
+// imports; still exported because it defines the historical mapping.
 export function placementColumnToEditor(col) {
-    const span = PLAYFIELD_COL_END - PLAYFIELD_COL_START + 1;
-    const rel = Math.min(span - 1, Math.max(0, col - PLAYFIELD_COL_START));
-    return Math.min(EDITOR_COLS - 1, Math.floor((rel * EDITOR_COLS) / span));
+    const rel = Math.min(PLAYFIELD_COLS - 1, Math.max(0, col - PLAYFIELD_COL_START));
+    return Math.min(EDITOR_COLS - 1, Math.floor((rel * EDITOR_COLS) / PLAYFIELD_COLS));
 }
 
-// stages -> {enemies, stages} for mapSaveToGame().
-export function projectForEditor(stages) {
-    // Roster: every zako record referenced anywhere, ordered by how often it
-    // is placed. A game can use more enemy types than the editor's 26 letters
-    // allow, and the mapper keeps the first 26 — so the busiest enemies
-    // should come first, not the lowest-numbered ones. Ties break on record
-    // index to keep the ordering stable.
-    const uses = new Map();
-    for (const st of stages) {
+// A grid column is the placement column, unchanged — the whole point is that
+// the projection does not move anything. Clamped only so a corrupt byte
+// cannot index off the row.
+export function placementColumn(col) {
+    return Math.min(PLACEMENT_COLS - 1, Math.max(0, col));
+}
+
+// Identity key for a (stage, record) enemy.
+export function enemyPairKey(stage, record) {
+    return `${stage}:${record}`;
+}
+
+// stages -> {enemies, stages, stagesUsing} for mapSaveToGame().
+export function projectForEditor(stages, { cols = PLACEMENT_COLS } = {}) {
+    // Roster: every (stage, record) pair placed anywhere, in stage-then-record
+    // order. There is no cap to ration any more, and stage order is what makes
+    // a 340-entry roster readable in the editor's enemy picker.
+    const uses = new Map(); // "stage:record" -> placement count
+    stages.forEach((st, s) => {
         for (const o of st.placement.objects) {
-            if (o.kind === "zako") uses.set(o.record, (uses.get(o.record) || 0) + 1);
+            if (o.kind !== "zako") continue;
+            const key = enemyPairKey(s, o.record);
+            uses.set(key, (uses.get(key) || 0) + 1);
         }
-    }
-    const roster = [...uses.keys()].sort((a, b) => uses.get(b) - uses.get(a) || a - b);
-    // Every stage that places each record — sprite art is per stage, so an
-    // enemy can take its art from any stage that uses it.
+    });
+
+    const enemies = [];
+    const indexOf = new Map(); // "stage:record" -> roster index
+    stages.forEach((st, s) => {
+        const placed = new Set(
+            st.placement.objects.filter((o) => o.kind === "zako").map((o) => o.record),
+        );
+        for (const record of [...placed].sort((a, b) => a - b)) {
+            const key = enemyPairKey(s, record);
+            indexOf.set(key, enemies.length);
+            enemies.push({
+                // stage-qualified so two stages' record 7 stay distinct
+                name: `deza${s}_${String(record).padStart(2, "0")}`,
+                stage: s,
+                record,
+                key,
+                placements: uses.get(key),
+                // The 18-byte definition, carried verbatim. Its field layout is
+                // still open (FORMAT.md), so nothing here invents hp/speed
+                // numbers — but the bytes ride along instead of being dropped,
+                // and the mapper writes them into the game so a later decode
+                // can fill the attributes in without a re-import.
+                bytes: st.enemies.records[record] ? st.enemies.records[record].bytes : null,
+            });
+        }
+    });
+
+    // Every stage that places a record — art is per stage, so an enemy whose
+    // own stage left the sprite slot unpainted can still fall back to another.
     const stagesUsing = new Map();
     stages.forEach((st, i) => {
         for (const o of st.placement.objects) {
@@ -240,26 +293,62 @@ export function projectForEditor(stages) {
             if (!list.includes(i)) list.push(i);
         }
     });
-    const letterOf = new Map(roster.map((r, i) => [r, i]));
-    const enemies = roster.map((r) => ({
-        name: `deza${String(r).padStart(2, "0")}`,
-        record: r,
-        placements: uses.get(r),
-    }));
 
-    const projected = stages.map((st) => {
+    const projected = stages.map((st, s) => {
         const byRow = new Map();
+        const rowOf = (row) => {
+            if (!byRow.has(row)) byRow.set(row, new Array(cols).fill(null));
+            return byRow.get(row);
+        };
         for (const o of st.placement.objects) {
             if (o.kind !== "zako") continue;
-            const idx = letterOf.get(o.record);
+            const idx = indexOf.get(enemyPairKey(s, o.record));
             if (idx === undefined) continue;
-            if (!byRow.has(o.row)) byRow.set(o.row, new Array(EDITOR_COLS).fill(null));
-            byRow.get(o.row)[placementColumnToEditor(o.col)] = { enemy: idx, drop: 0 };
+            rowOf(o.row)[placementColumn(o.col)] = { enemy: idx, drop: 0 };
         }
-        const rows = [...byRow.keys()].sort((a, b) => a - b).map((r) => byRow.get(r));
-        return { rows, boss: st.placement.boss || null };
+        // Item pickups stand alone on the Dezaemon grid, but the Phaser runtime
+        // only drops items from a killed enemy. Hang each one on the nearest
+        // enemy in its own column so the pickup still exists in play; the raw
+        // slot and position are kept in `items` either way.
+        const items = st.placement.objects
+            .filter((o) => o.kind === "item")
+            .map((o) => ({ slot: o.slot, row: o.row, col: placementColumn(o.col) }));
+        const sortedRows = [...byRow.keys()].sort((a, b) => a - b);
+        for (const item of items) {
+            const host = nearestSpawn(byRow, sortedRows, item.row, item.col);
+            if (host) host.drop = ITEM_SLOT_DROPS[item.slot % ITEM_SLOT_DROPS.length];
+        }
+        return {
+            rows: sortedRows.map((r) => byRow.get(r)),
+            // Scroll row each wave came from, same order as `rows`.
+            waveRows: sortedRows,
+            cols,
+            boss: st.placement.boss || null,
+            items,
+        };
     });
     return { enemies, stages: projected, stagesUsing };
+}
+
+// Runtime drop codes, by Dezaemon item slot. The save's own slot table
+// (settings +0x1C) is not decoded, so which of the eight slots is a shot
+// upgrade and which is a bomb is still unknown; spreading the four runtime
+// pickups evenly across the eight slots keeps every placed item in the level
+// (and the untouched slot number stays in stage.items).
+export const ITEM_SLOT_DROPS = [1, 1, 2, 2, 3, 3, 9, 9];
+
+function nearestSpawn(byRow, sortedRows, row, col) {
+    let best = null;
+    let bestDist = Infinity;
+    for (const r of sortedRows) {
+        const d = Math.abs(r - row);
+        if (d >= bestDist) continue;
+        const cell = byRow.get(r)[col];
+        if (!cell) continue;
+        best = cell;
+        bestDist = d;
+    }
+    return best;
 }
 
 // Raw slices of the still-undecoded regions, so callers can surface them

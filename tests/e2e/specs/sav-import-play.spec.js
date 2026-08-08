@@ -58,29 +58,44 @@ test("an imported save plays with its own enemy art, not game_asset frame 0", as
         const frames = s.textures.get("game_asset").frames;
         return {
             missing: keys.filter((k) => !frames[k]),
-            playerPresent: !!frames["player00.gif"],
-            shotPresent: !!frames["shot00.gif"],
+            // The import's own player: its frames are not in the stock atlas,
+            // so they only exist here if the import carried them in.
+            mutoidShip: !!frames["cyberLiberty0.png"],
+            mutoidShot: !!frames["hadoken0.png"],
+            mutoidShield: !!frames["shield0.png"],
+            stockPlayerPresent: !!frames["player00.gif"],
+            stockShotPresent: !!frames["shot00.gif"],
         };
     }, wanted);
     expect(resolved.missing).toEqual([]);
+    expect(resolved.mutoidShip).toBe(true);
+    expect(resolved.mutoidShot).toBe(true);
+    expect(resolved.mutoidShield).toBe(true);
     // ...and folding the editor atlas in must not cost the stock art.
-    expect(resolved.playerPresent).toBe(true);
-    expect(resolved.shotPresent).toBe(true);
+    expect(resolved.stockPlayerPresent).toBe(true);
+    expect(resolved.stockShotPresent).toBe(true);
 
     // Run the stage far enough to spawn, then check the enemies on screen are
     // drawn from the save's frames rather than all collapsing onto one.
+    // Sample as the stage runs rather than only at the end: an imported stage
+    // keeps the save's own pacing, so waves come in bursts with quiet stretches
+    // between them and the final frame can legitimately be empty.
     const drawn = await gamePage.evaluate(async () => {
         const g = window.__PHASER_4_GAME__;
         const s = g.scene.getScene("PhaserGameScene");
-        for (let i = 0; i < 900; i++) g.loop.step(performance.now() + 3000 + i * 16.7);
+        const seen = new Set();
+        let count = 0;
+        const sample = () => {
+            for (const e of s.enemies || []) { seen.add(e.frame.name); count++; }
+        };
+        for (let i = 0; i < 900; i++) { g.loop.step(performance.now() + 3000 + i * 16.7); if (i % 30 === 0) sample(); }
         await new Promise((r) => setTimeout(r, 1500));
-        for (let i = 0; i < 900; i++) g.loop.step(performance.now() + 20000 + i * 16.7);
-        const frames = (s.enemies || []).map((e) => e.frame.name);
-        return { count: frames.length, distinct: [...new Set(frames)], playerFrame: s.playerSprite.frame.name };
+        for (let i = 0; i < 900; i++) { g.loop.step(performance.now() + 20000 + i * 16.7); if (i % 30 === 0) sample(); }
+        return { count, distinct: [...seen], playerFrame: s.playerSprite.frame.name };
     });
     expect(drawn.count).toBeGreaterThan(0);
     for (const f of drawn.distinct) expect(f).toMatch(/^deza/);
-    expect(drawn.playerFrame).toMatch(/^player0\d\.gif$/);
+    expect(drawn.playerFrame).toMatch(/^cyberLiberty\d\.png$/);
 
     expect(missingFrameWarnings).toEqual([]);
 });
@@ -133,7 +148,7 @@ test("switching the editor to another atlas does not strip the imported art from
     const resolved = await gamePage.evaluate((keys) => {
         const s = window.__PHASER_4_GAME__.scene.getScene("PhaserGameScene");
         const frames = s.textures.get("game_asset").frames;
-        return { missing: keys.filter((k) => !frames[k]), playerPresent: !!frames["player00.gif"] };
+        return { missing: keys.filter((k) => !frames[k]), playerPresent: !!frames["cyberLiberty0.png"] };
     }, wanted);
     expect(resolved.missing).toEqual([]);
     expect(resolved.playerPresent).toBe(true);

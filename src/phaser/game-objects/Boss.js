@@ -5,6 +5,7 @@
 import { GAME_DIMENSIONS } from "../../constants.js";
 import { gameState } from "../../gameState.js";
 import { triggerHaptic } from "../../haptics.js";
+import { assetStageId } from "../stages.js";
 import { createShadow, updateShadowPosition } from "./Shadow.js";
 import { showBossExplosion, showHitImpact } from "../effects/Explosions.js";
 import {
@@ -133,7 +134,7 @@ export function bossAdd(scene) {
     scene.enemies.push(scene.bossSprite);
 
     var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
-    var voiceKey = "boss_" + (bossNames[stageId] || "bison") + "_voice_add";
+    var voiceKey = "boss_" + (bossNames[assetStageId(stageId)] || "bison") + "_voice_add";
     scene.playSound(voiceKey, 0.7);
 
     // PIXI: bosses rest at unit.y = GAME_HEIGHT/4 (top-left origin), BossFang at y=48.
@@ -578,7 +579,7 @@ export function checkBossDanger(scene) {
         // automatically.  pivot.y = height makes the bottom edge sit at (x, y).
         // Each boss class sets a unique (x, y) relative to the unit top-left.
         var stageId = scene.bossStageId || 0;
-        var offsets = scene.bossIsGoki ? GOKI_BALLOON_OFFSET : (BOSS_BALLOON_OFFSETS[stageId] || BOSS_BALLOON_OFFSETS[0]);
+        var offsets = scene.bossIsGoki ? GOKI_BALLOON_OFFSET : (BOSS_BALLOON_OFFSETS[assetStageId(stageId)] || BOSS_BALLOON_OFFSETS[0]);
 
         // Convert PIXI top-left-relative offsets to Phaser center-relative.
         // PIXI: balloon at (offsets.x, offsets.y) from unit top-left
@@ -738,7 +739,7 @@ export function bossDie(scene, boss) {
 
     var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
     var stageId = gameState.stageId || 0;
-    var bossVoiceName = scene.bossIsGoki ? "goki" : (bossNames[stageId] || "bison");
+    var bossVoiceName = scene.bossIsGoki ? "goki" : (bossNames[assetStageId(stageId)] || "bison");
     var voiceKey = "boss_" + bossVoiceName + "_voice_ko";
     triggerHaptic("bossDefeat");
     scene.playSound(voiceKey, 0.9);

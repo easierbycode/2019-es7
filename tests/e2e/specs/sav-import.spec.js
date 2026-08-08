@@ -40,7 +40,13 @@ test("importing a real Dezaemon 2 .sav populates the modal and the editor", asyn
     expect(state.status).toContain("Imported: DEZA2 SGM");
     // Ramsie's own stages and enemy roster, not a one-stage skeleton.
     expect(state.stageKeys).toEqual(["stage0", "stage1", "stage2", "stage3", "stage4"]);
-    expect(state.enemyKeys.length).toBe(26);
+    // Ramsie's whole roster: one enemy per (stage, record) pair it places,
+    // not the 26 that one grid letter used to allow.
+    expect(state.enemyKeys.length).toBe(153);
+    expect(state.enemyKeys.slice(0, 26)).toEqual(
+        Array.from({ length: 26 }, (_, i) => "enemy" + String.fromCharCode(65 + i)));
+    expect(state.enemyKeys[26]).toBe("enemyAA");
+    expect(state.gridCols).toBe(20);
 
     const meta = await page.evaluate(() => gameData.meta);
     expect(meta.source).toBe("dezaemon2");
@@ -52,14 +58,21 @@ test("importing a real Dezaemon 2 .sav populates the modal and the editor", asyn
     expect(waves.length).toBeGreaterThan(50);
     const placed = waves.flat().filter((cell) => cell !== "00");
     expect(placed.length).toBeGreaterThan(100);
-    for (const cell of placed) expect(cell).toMatch(/^[A-Z][0-9]$/);
+    for (const cell of placed) expect(cell).toMatch(/^[A-Z]+[0-9]$/);
+    // Every spawn the save places survives — none binned onto a taken cell,
+    // none left empty for want of a grid letter.
+    const spawnTotal = await page.evaluate(() =>
+        Object.keys(gameData).filter((k) => /^stage\d+$/.test(k))
+            .reduce((n, k) => n + gameData[k].enemylist
+                .reduce((m, row) => m + row.filter((c) => c !== "00").length, 0), 0));
+    expect(spawnTotal).toBe(2308);
 
     // Enemies are textured from the save's own CG pages. A handful of slots
     // are genuinely unpainted in every stage that places them, and those keep
     // the default art — so require the bulk, not all, to come from the save.
     const textures = await page.evaluate(() =>
         Object.values(gameData.enemyData).map((e) => (e.texture || [])[0]));
-    const fromSave = textures.filter((t) => /^deza\d+_\d+\.gif$/.test(t));
+    const fromSave = textures.filter((t) => /^deza\d+_\d+_\d+\.gif$/.test(t));
     expect(fromSave.length).toBeGreaterThanOrEqual(textures.length - 3);
 
     // ...and those frames resolve to real art in the grid, rather than the
@@ -77,11 +90,12 @@ test("importing a real Dezaemon 2 .sav populates the modal and the editor", asyn
     expect(grid.withSprite).toBe(grid.occupied);
     expect(grid.distinct).toBeGreaterThan(1);
 
-    // A Dezaemon save has no player of its own, so the import flies the Evil
-    // Invaders character — and every frame it references, ship and bullets
+    // A Dezaemon save has no player of its own, so the import flies the Mutoid
+    // character — and every frame it references, ship, bullets and shield
     // alike, has to resolve in the atlas the editor just rebuilt around the
-    // save's sprites. Frames that only live in some other level's atlas would
-    // read as a successful import until you press play and see nothing.
+    // save's sprites. Those frames are not in the stock game_asset, so they
+    // ride in with the import; if that broke, this would read as a successful
+    // import until you pressed play and saw nothing.
     const player = await page.evaluate(() => {
         const frames = Object.assign({}, (atlasData && atlasData.frames) || {});
         for (const s of extraSprites) frames[s.key] = true;
@@ -101,24 +115,23 @@ test("importing a real Dezaemon 2 .sav populates the modal and the editor", asyn
             missing: referenced.filter((f) => !frames[f]),
         };
     });
-    expect(player.texture).toEqual([
-        "player00.gif", "player01.gif", "player02.gif",
-        "player03.gif", "player04.gif", "player05.gif",
+    expect(player.texture).toEqual(["cyberLiberty0.png", "cyberLiberty1.png"]);
+    expect(player.shootNormal).toEqual(["hadoken0.png", "hadoken1.png"]);
+    expect(player.shootBig).toEqual([
+        "bigProjectile0.png", "bigProjectile1.png", "bigProjectile2.png",
     ]);
-    expect(player.shootNormal).toEqual(["shot00.gif", "shot01.gif", "shot02.gif", "shot03.gif"]);
-    expect(player.shootBig).toEqual(["shotBig00.gif", "shotBig01.gif", "shotBig02.gif", "shotBig03.gif"]);
     expect(player.missing).toEqual([]);
 
     // Importing must not push files at the user.
     const importNotes = notes.join("\n");
     expect(importNotes).not.toContain("Repack Atlas");
     expect(importNotes).toContain("sprites from the save were packed into the atlas");
-    expect(importNotes).toContain("Player and bullets: the Evil Invaders character");
+    expect(importNotes).toContain("Player and bullets: the Mutoid character");
 
     expect(errors).toEqual([]);
 });
 
-test("importing over a level with a custom player still flies the Evil Invaders ship", async ({ page }) => {
+test("importing over a level with a custom player still flies the Mutoid ship", async ({ page }) => {
     await blockCdn(page);
     const errors = collectPageErrors(page);
     page.on("dialog", (d) => d.accept());
@@ -158,9 +171,9 @@ test("importing over a level with a custom player still flies the Evil Invaders 
         // point is that nothing the player references went missing.
         missingPanelHidden: document.getElementById("missing-tex-overlay").classList.contains("hidden"),
     }));
-    expect(after.texture[0]).toBe("player00.gif");
+    expect(after.texture[0]).toBe("cyberLiberty0.png");
     expect(after.texture).not.toContain("levelOnlyShip0.gif");
-    expect(after.shootNormal).toEqual(["shot00.gif", "shot01.gif", "shot02.gif", "shot03.gif"]);
+    expect(after.shootNormal).toEqual(["hadoken0.png", "hadoken1.png"]);
     expect(after.missingPanelHidden).toBe(true);
 
     expect(errors).toEqual([]);

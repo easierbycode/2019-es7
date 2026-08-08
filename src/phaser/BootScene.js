@@ -1,6 +1,7 @@
 import { RESOURCE_PATHS, GAME_DIMENSIONS } from "../constants.js";
 import { gameState } from "../gameState.js";
 import { globals } from "../globals.js";
+import { clampStageId } from "./stages.js";
 
 var EDITOR_PLAY_RECIPE_KEY = "__editorPhaserRecipe__";
 var EDITOR_PLAY_STAGE_KEY = "__editorPhaserStageId__";
@@ -72,12 +73,7 @@ function fetchFirebaseLevel(levelName) {
 }
 
 function parseStageId(value) {
-    var stageId = Number(value);
-    if (!Number.isFinite(stageId)) {
-        return 0;
-    }
-
-    return Math.max(0, Math.min(4, Math.floor(stageId)));
+    return clampStageId(value);
 }
 
 function readEditorPlayRequest() {

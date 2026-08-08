@@ -1,5 +1,6 @@
 import { GAME_DIMENSIONS } from "../../constants.js";
 import { gameState } from "../../gameState.js";
+import { assetStageId } from "../stages.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
 var GH = GAME_DIMENSIONS.HEIGHT;
@@ -30,7 +31,9 @@ export function showGameTitle(scene, onComplete) {
     scene.tweens.add({ targets: bg, alpha: 1, duration: 300 });
 
     scene.time.delayedCall(300, function () {
-        scene.playSound("voice_round" + String(Math.min(stageId, 3)), 0.7);
+        // Four round voices exist; past stage 4 they cycle with the rest of
+        // the per-stage assets rather than repeating stage 3's forever.
+        scene.playSound("voice_round" + String(Math.min(assetStageId(stageId), 3)), 0.7);
         scene.tweens.add({ targets: stageNumSprite, alpha: 1, duration: 300 });
     });
 

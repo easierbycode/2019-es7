@@ -247,6 +247,16 @@ Stage count is taken from this grid rather than the background map — the two
 disagree in 6 of 17 games (a cut-scene stage can carry objects with no painted
 background), while placement and the enemy blocks always agree.
 
+**Enemy identity is per stage, not global.** The 10 × `0x478` enemy block gives
+each stage its own 60 records, and they are genuinely different enemies: in
+DAIOH's second save, 56 of the 60 record slots hold a *different* 18-byte
+definition in every stage that places them (record 0 has nine distinct
+variants across its nine stages), and only 4 records are used by a single
+stage. The per-stage sprite composition bank agrees — 327 painted
+(stage, record) pairs resolve to 160 distinct compositions. So a roster keyed
+on the record number alone collapses unrelated enemies together; the importer
+keys on the **(stage, record) pair** (`lib/decode/decode-stage.js`).
+
 **Enemy record (18 B)** — not yet fully mapped, but strongly field-specialised:
 96.5% of its nibbles are ≤ 8 across 6799 populated records, and per-byte
 distinct-value counts are 200, 108, 138, 68, 94, 79, **16**, 65, **14**, 40,

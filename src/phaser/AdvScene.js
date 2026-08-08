@@ -1,6 +1,7 @@
 import { GAME_DIMENSIONS, LANG } from "../constants.js";
 import { gameState } from "../gameState.js";
 import { pollGamepads } from "./GamepadInput.js";
+import { lastStageId } from "./stages.js";
 
 var ADV_SCENARIO_JA = {
     stage0: {
@@ -115,18 +116,32 @@ export class PhaserAdvScene extends Phaser.Scene {
         }
         this.customImages = this.scenario.customImages || {};
         this.partNum = 0;
+        // The built-in scenario has six entries; a recipe with more stages than
+        // that reuses them rather than reading undefined off the end.
         this.stageKey = "stage" + String(gameState.stageId);
+        if (!this.scenario[this.stageKey]) {
+            var scenarioKeys = Object.keys(this.scenario).filter(function (k) { return /^stage\d+$/.test(k); });
+            this.stageKey = scenarioKeys.length
+                ? scenarioKeys[gameState.stageId % scenarioKeys.length]
+                : scenarioKeys[0];
+        }
         this.partText = this.scenario[this.stageKey].part[this.partNum].text;
         this.partTextCursor = 0;
         this.partTextComp = false;
         this.textTimer = 0;
 
+        // The game is over once the stage just cleared was the recipe's last —
+        // stage 4 for the shipped game, stage 8 for a nine-stage import.
+        var finalStage = recipe ? lastStageId(recipe) : 4;
         this.endingFlg = false;
-        if (gameState.stageId === 5) {
+        if (gameState.stageId > finalStage) {
             this.endingFlg = true;
-        } else if (gameState.stageId === 4) {
+        } else if (gameState.stageId === finalStage) {
             this.playSound("voice_thankyou", 0.7);
-            if (!(gameState.akebonoCnt >= 4 && gameState.continueCnt === 0)) {
+            // The shipped game hides its stage 4 behind the akebono condition.
+            // A level pack of a different length has no such secret — its last
+            // stage is simply its last stage.
+            if (finalStage === 4 && !(gameState.akebonoCnt >= 4 && gameState.continueCnt === 0)) {
                 this.endingFlg = true;
             }
         }

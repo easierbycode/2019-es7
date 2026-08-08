@@ -702,7 +702,7 @@
 
         function getFrameNameForCode(code) {
             if (code === "00") return null;
-            const letter = code[0];
+            const letter = code.length > 1 ? code.slice(0, -1) : code;
             // Look up enemy texture from enemyData
             for (const k of Object.keys(enemyData)) {
                 if (getEnemyLetter(k) === letter) {
@@ -917,28 +917,52 @@
         let storyCustomImages = {}; // { "stage0_part0": dataURL, ... }
 
         // ================== HELPERS ==================
-        function createEmptyWave() { return Array(8).fill("00"); }
+        // Grids are as wide as the level says. Eight columns is the historical
+        // width and stays the default; a Dezaemon 2 import is fourteen — the
+        // Saturn playfield's own columns, so its formations arrive intact.
+        const DEFAULT_GRID_COLS = 8;
+        const MAX_GRID_COLS = 20;
+        // BootScene plays stage0..stage9 (Dezaemon 2's own maximum).
+        const MAX_STAGE_ID = 9;
 
-        function normalizeWave(wave) {
-            const n = createEmptyWave();
+        function gridWidth(grid) {
+            if (Array.isArray(grid) && Array.isArray(grid[0]) && grid[0].length) {
+                return Math.min(MAX_GRID_COLS, grid[0].length);
+            }
+            return DEFAULT_GRID_COLS;
+        }
+
+        function createEmptyWave(cols) { return Array(cols || gridWidth(currentGrid)).fill("00"); }
+
+        function normalizeWave(wave, cols) {
+            const width = cols || DEFAULT_GRID_COLS;
+            const n = Array(width).fill("00");
             if (!Array.isArray(wave)) return n;
-            for (let i = 0; i < 8; i++) n[i] = typeof wave[i] === 'string' && wave[i] ? wave[i] : "00";
+            for (let i = 0; i < width; i++) n[i] = typeof wave[i] === 'string' && wave[i] ? wave[i] : "00";
             return n;
         }
 
         function normalizeGrid(grid) {
-            if (!Array.isArray(grid) || grid.length === 0) return Array(8).fill(null).map(() => createEmptyWave());
-            return grid.map(normalizeWave);
+            if (!Array.isArray(grid) || grid.length === 0) {
+                return Array(8).fill(null).map(() => Array(DEFAULT_GRID_COLS).fill("00"));
+            }
+            const cols = gridWidth(grid);
+            return grid.map(w => normalizeWave(w, cols));
         }
 
         function getCurrentStageId() {
             const m = String(currentStageKey).match(/^stage(\d+)$/);
             if (!m) return 0;
             const id = Number(m[1]);
-            return Number.isFinite(id) ? Math.max(0, Math.min(4, Math.floor(id))) : 0;
+            return Number.isFinite(id) ? Math.max(0, Math.min(MAX_STAGE_ID, Math.floor(id))) : 0;
         }
 
-        function getEnemyLetter(k) { return k.replace(/enemy/i, '').toUpperCase().slice(0, 1); }
+        // enemyA -> "A", enemyAB -> "AB". Grid cells are "<letters><drop digit>",
+        // so a roster past 26 spills into two-letter keys rather than losing
+        // everything after enemyZ.
+        function getEnemyLetter(k) { return String(k).replace(/^enemy/i, '').toUpperCase(); }
+        function cellEnemyLetter(code) { return code && code !== '00' ? code.slice(0, -1) : null; }
+        function cellDropId(code) { return code && code !== '00' ? code.slice(-1) : '0'; }
 
         function getEnemyDisplayName(k) {
             const d = enemyData[k];
@@ -981,7 +1005,7 @@
 
         function getEnemyBaseURL(code) {
             if (code === '00') return null;
-            const letter = code[0];
+            const letter = cellEnemyLetter(code);
             // Base enemy frame (no powerup variant)
             let url = getThumbURL(getFrameNameForCode(letter + '0'));
             if (url) return url;
@@ -1517,8 +1541,9 @@
             ap.onclick = () => {
                 const nums = keys.map(k => parseInt(k.replace('stage', '')));
                 const next = nums.length ? Math.max(...nums) + 1 : 0;
-                // BootScene clamps stages to 0..4 and only stage_loop0..4 backgrounds exist.
-                if (next > 4 && !confirm(`Phaser only plays stages 0-4 — stage${next} will be unreachable in-game. Add anyway?`)) return;
+                // BootScene plays stage0..stage9; there are only five sets of
+                // per-stage backgrounds and voices, so stage 5 and up reuse them.
+                if (next > MAX_STAGE_ID && !confirm(`Phaser only plays stages 0-${MAX_STAGE_ID} — stage${next} will be unreachable in-game. Add anyway?`)) return;
                 currentStageKey = `stage${next}`;
                 gameData[currentStageKey] = { enemylist: normalizeGrid([]) };
                 populateStagePills();
@@ -1700,7 +1725,7 @@
             const container = document.getElementById('grid-icon-view');
             container.innerHTML = '';
 
-            const COLS = 8;
+            const COLS = gridWidth(currentGrid);
             const grid = document.createElement('div');
             grid.className = `editor-grid ${
                 currentTool === 'delete' ? 'mode-delete' :
@@ -1752,7 +1777,7 @@
                 cell.appendChild(cl);
 
                 // Powerup bubble
-                const dropId = code[1];
+                const dropId = cellDropId(code);
                 if (dropId && dropId !== '0') {
                     const bubble = document.createElement('div');
                     bubble.className = 'powerup-bubble';
@@ -1793,7 +1818,7 @@
                 // Apply selected powerup to existing enemy
                 const cur = currentGrid[wi][si];
                 if (cur && cur !== '00' && selectedPowerup !== '0') {
-                    currentGrid[wi][si] = cur[0] + selectedPowerup;
+                    currentGrid[wi][si] = cellEnemyLetter(cur) + selectedPowerup;
                 } else {
                     return;
                 }
@@ -1808,7 +1833,7 @@
                 currentGrid[wi][si] = (data.letter || getEnemyLetter(data.key)) + selectedPowerup;
             } else if (data.type === 'powerup') {
                 const cur = currentGrid[wi][si];
-                if (cur && cur !== '00') currentGrid[wi][si] = cur[0] + data.id;
+                if (cur && cur !== '00') currentGrid[wi][si] = cellEnemyLetter(cur) + data.id;
             }
             renderGrid();
                    }
@@ -2544,6 +2569,21 @@
         });
 
         // ================== SAVE ==================
+        // Write the working grid back onto a stage record. A stage imported
+        // from a .sav carries `waveRows` — the scroll row each wave came from,
+        // which is what preserves its pacing — and that only stays meaningful
+        // while there is one entry per wave. Editing the wave count retires it
+        // rather than leaving the runtime with a mismatched pair.
+        function writeStageGrid(stage, grid) {
+            const list = normalizeGrid(grid);
+            stage.enemylist = list;
+            if (Array.isArray(stage.waveRows) && stage.waveRows.length !== list.length) {
+                delete stage.waveRows;
+                delete stage.waveInterval;
+            }
+            return stage;
+        }
+
         function quickSave() {
             if (dirHandle && gameData) {
                 saveAll();
@@ -2560,7 +2600,7 @@
             // Sync any pending editor form changes into gameData before saving
             syncEnemyEditorForm();
             gameData[currentStageKey] = gameData[currentStageKey] || {};
-            gameData[currentStageKey].enemylist = normalizeGrid(currentGrid);
+            writeStageGrid(gameData[currentStageKey], currentGrid);
             try {
                 let h;
                 try { h = await getFileHandle([GAME_JSON_NAME]); }
@@ -2579,7 +2619,7 @@
                 r.playerData = JSON.parse(JSON.stringify(playerData));
             }
             r[currentStageKey] = r[currentStageKey] || {};
-            r[currentStageKey].enemylist = normalizeGrid(currentGrid);
+            writeStageGrid(r[currentStageKey], currentGrid);
             return r;
         }
 
@@ -2601,7 +2641,7 @@
         }
 
         function exportCurrentLevelJSON() {
-            const d = { name: currentStageKey, enemylist: normalizeGrid(currentGrid), width: 8, exportedAt: new Date().toISOString() };
+            const d = { name: currentStageKey, enemylist: normalizeGrid(currentGrid), width: gridWidth(currentGrid), exportedAt: new Date().toISOString() };
             const a = document.createElement('a');
             a.href = URL.createObjectURL(new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' }));
             a.download = `${currentStageKey}-level.json`; a.click();
@@ -2841,7 +2881,7 @@
                 lines.push('Sprites: <span style="color:#84cc16">' + d.sprites.length +
                     '</span> enemy animation frames extracted from this save\'s CG pages');
             }
-            lines.push('<span style="color:#64748b">Enemy <em>attributes</em> (hp/speed/fire) are still being reverse-engineered, so imported enemies keep the default stats. Art, backgrounds, placement, palettes and music are decoded — see FORMAT.md.</span>');
+            lines.push('<span style="color:#64748b">Every stage, enemy type and spawn in this save is imported — enemies are kept apart per stage, and the grid is the Saturn playfield\'s own 14 columns. Enemy <em>attribute</em> field names are still being reverse-engineered, so imported enemies play with the default stats; their 18-byte definitions ride along verbatim so nothing is lost — see FORMAT.md.</span>');
             document.getElementById('deza-decoded-summary').innerHTML = lines.join('<br>');
             const spriteGrid = document.getElementById('deza-sprite-preview');
             spriteGrid.innerHTML = '';
@@ -2893,19 +2933,29 @@
             // loadFromFirebase) BEFORE adding this import's sprites.
             replacedFrames = {}; extraSprites = []; customFrameKeys = new Set();
             const existing = new Set(Object.keys((atlasData && atlasData.frames) || {}));
+            // Every texture array in the imported game, so a frame renamed to
+            // dodge a collision stays referenced. Enemies, bosses and the player
+            // all draw from the save's sprites now, and a record left pointing
+            // at the pre-rename key renders as nothing.
+            const retargetFrames = (from, to) => {
+                const fix = (o) => {
+                    if (!o || typeof o !== 'object') return;
+                    for (const v of Object.values(o)) {
+                        if (Array.isArray(v)) {
+                            for (let i = 0; i < v.length; i++) if (v[i] === from) v[i] = to;
+                        } else if (v && typeof v === 'object') fix(v);
+                    }
+                };
+                fix(gameJson.enemyData); fix(gameJson.bossData); fix(gameJson.playerData);
+            };
             for (const sp of sprites) {
                 let key = sp.key;
                 if (existing.has(key)) {
-                    const base = key.replace(/\.gif$/, '');
+                    const base = key.replace(/\.(gif|png)$/, '');
+                    const ext = (key.match(/\.(gif|png)$/) || ['.gif'])[0];
                     let n = 2;
-                    while (existing.has(key)) key = base + '_' + (n++) + '.gif';
-                    // Keep enemy texture references in sync with the renamed key.
-                    for (const rec of Object.values(gameJson.enemyData)) {
-                        if (Array.isArray(rec.texture)) rec.texture = rec.texture.map(t => t === sp.key ? key : t);
-                        if (rec.bulletData && Array.isArray(rec.bulletData.texture)) {
-                            rec.bulletData.texture = rec.bulletData.texture.map(t => t === sp.key ? key : t);
-                        }
-                    }
+                    while (existing.has(key)) key = base + '_' + (n++) + ext;
+                    retargetFrames(sp.key, key);
                 }
                 existing.add(key);
                 const c = document.createElement('canvas');
@@ -2933,8 +2983,17 @@
             document.getElementById('status').innerHTML = '<span style="color:#84cc16">Imported: ' + title + ' (Dezaemon 2)</span>';
             document.getElementById('dezaemon-import-modal').classList.add('hidden');
             const notes = warnings.slice();
-            notes.push('Player and bullets: the Evil Invaders character (' +
-                playerData.texture.length + ' idle frames + shot/big/3way), since Dezaemon saves carry no player.');
+            const stageKeys = Object.keys(gameData).filter(k => /^stage\d+$/.test(k));
+            const spawnCount = stageKeys.reduce((n, k) =>
+                n + gameData[k].enemylist.reduce((m, row) => m + row.filter(c => c !== '00').length, 0), 0);
+            const bossCount = Object.values(bossData).filter(b => b && b.dezaemon).length;
+            notes.unshift(stageKeys.length + ' stages, ' + Object.keys(enemyData).length +
+                ' enemy types and ' + spawnCount.toLocaleString() + ' spawns imported — nothing dropped.');
+            notes.push('Grid is ' + gridWidth(currentGrid) + ' columns wide (the Saturn playfield), and each wave keeps the scroll row it spawned on, so the stage keeps its pacing.');
+            if (bossCount) notes.push(bossCount + ' of ' + stageKeys.length + ' stages place a boss; those use the save\'s own boss art.');
+            notes.push('Player and bullets: the Mutoid character (' +
+                playerData.texture.length + ' idle frames + shot/big/3way + a ' +
+                playerData.barrier.texture.length + '-frame shield), since Dezaemon saves carry no player. Its art came in with the import.');
             if (sprites.length) notes.push(sprites.length + ' sprites from the save were packed into the atlas.');
             if (notes.length) alert('Import notes:\n- ' + notes.join('\n- '));
         }
@@ -2944,7 +3003,9 @@
             stageKeys: gameData ? Object.keys(gameData).filter(k => /^stage\d+$/.test(k)) : [],
             currentStageKey,
             waveCount: currentGrid.length,
+            gridCols: gridWidth(currentGrid),
             enemyKeys: Object.keys(enemyData || {}),
+            bossKeys: Object.keys(bossData || {}),
             extraSpriteCount: extraSprites.length,
             status: (document.getElementById('status') || {}).textContent || '',
         });
@@ -3577,20 +3638,25 @@ function GAME3D_RUNTIME(DATA) {
 
   // ================== SPAWNING ==================
   function spawnWaveRow(row) {
-    for (var i = 0; i < 8 && i < row.length; i++) {
+    // Lanes follow the level's own grid width — 8 historically, 14 for a
+    // Dezaemon import — so a wide row lands across the ground plane instead of
+    // being cut off after its first eight cells.
+    var cols = row.length || 8;
+    for (var i = 0; i < cols; i++) {
       var code = row[i];
       if (!code || code === '00' || typeof code !== 'string') continue;
-      var def = (R.enemyData || {})['enemy' + code[0]];
+      var key = 'enemy' + code.slice(0, -1);
+      var def = (R.enemyData || {})[key];
       if (!def || !def.texture || !def.texture.length) continue;
       var isAir = !!AIR_NAMES[def.name];
       enemies.push({
-        def: def, name: def.name || ('enemy' + code[0]),
-        wx: (i - 3.5) * LANE_W, alt: isAir ? AIR_ALT : 0, z: ZMAX,
+        def: def, name: def.name || key,
+        wx: (i - (cols - 1) / 2) * (LANE_W * 8 / cols), alt: isAir ? AIR_ALT : 0, z: ZMAX,
         vz: (def.speed || 0.7) * 3,
         hp: def.hp === 'infinity' ? Infinity : (def.hp || 1),
         score: def.score || 0, cagage: def.spgage != null ? def.spgage : (def.cagage || 0),
         interval: def.interval || -1, fireCnt: Math.random() * 40,
-        itemName: ITEM_BY_CODE[code[1]] || null,
+        itemName: ITEM_BY_CODE[code.slice(-1)] || null,
         animT: Math.random() * 100, posName: null, flash: 0, isAir: isAir,
         w: 32, h: 32, sized: false,
       });
@@ -4998,8 +5064,13 @@ function GAME3D_RUNTIME(DATA) {
                     enemyData: enemyData || {}, bossData: bossData || {},
                     playerData: playerData || {},
                     storyData: (gameData && gameData.storyData) || null,
-                    width: 8, savedAt: firebase.database.ServerValue.TIMESTAMP
+                    width: gridWidth(currentGrid), savedAt: firebase.database.ServerValue.TIMESTAMP
                 };
+                var stageRec = (gameData && gameData[currentStageKey]) || null;
+                if (stageRec && Array.isArray(stageRec.waveRows) && stageRec.waveRows.length === payload.enemylist.length) {
+                    payload.waveRows = stageRec.waveRows;
+                    payload.waveInterval = stageRec.waveInterval;
+                }
                 // Save audio URL overrides
                 var urlEntries = {};
                 for (var ak in audioURLs) { if (audioURLs[ak]) urlEntries[ak] = audioURLs[ak]; }

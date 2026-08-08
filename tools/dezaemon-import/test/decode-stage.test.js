@@ -16,6 +16,8 @@ import {
     BG_PARTS,
     describePlacementId,
     placementColumnToEditor,
+    placementColumn,
+    PLACEMENT_COLS,
 } from "../lib/decode/decode-stage.js";
 import { SECTION_SIZES } from "../lib/decompress.js";
 
@@ -118,34 +120,85 @@ test("ramsie stage 0: placed enemies plus exactly one boss", async () => {
 
 test("ramsie projects into an editor-ready roster and spawn rows", async () => {
     const decoded = await decodedFixture("ramsie.sav");
-    // roster is ordered by how often each enemy is placed, so the editor's
-    // 26-letter cap keeps the busiest enemies
-    assert.ok(decoded.enemies.length > 26, "ramsie uses more enemy types than the cap");
-    const counts = decoded.enemies.map((e) => e.placements);
-    assert.deepEqual(counts, [...counts].sort((a, b) => b - a));
+    // One roster entry per placed (stage, record) pair, in stage-then-record
+    // order, each carrying its own 18-byte definition.
+    assert.ok(decoded.enemies.length > 26, "ramsie uses more enemy types than one letter allows");
+    const order = decoded.enemies.map((e) => e.stage * 100 + e.record);
+    assert.deepEqual(order, [...order].sort((a, b) => a - b));
+    for (const e of decoded.enemies) {
+        assert.ok(e.stage >= 0 && e.stage < decoded.stageCount);
+        assert.ok(e.record >= 0 && e.record < 60);
+        assert.equal(e.key, `${e.stage}:${e.record}`);
+        assert.equal(e.bytes.length, 18);
+        assert.ok(e.placements > 0);
+    }
     assert.equal(decoded.stages.length, decoded.stageCount);
-    // stage 0 yields real spawn rows, earliest first, 8 columns wide
+    // stage 0 yields real spawn rows, earliest first, the save's own width
     const rows = decoded.stages[0].rows;
     assert.ok(rows.length > 50);
+    assert.equal(decoded.stages[0].cols, PLACEMENT_COLS);
     for (const row of rows) {
-        assert.equal(row.length, 8);
+        assert.equal(row.length, PLACEMENT_COLS);
         assert.ok(row.some((c) => c !== null), "a row is only emitted when it holds something");
         for (const cell of row) {
             if (!cell) continue;
             assert.ok(cell.enemy >= 0 && cell.enemy < decoded.enemies.length);
+            // every spawn resolves to an enemy defined by ITS OWN stage
+            assert.equal(decoded.enemies[cell.enemy].stage, 0);
         }
     }
 });
 
-test("placement columns fold the playfield onto the editor's 8 columns", () => {
-    // columns 3..16 are the 224px playfield; everything maps inside 0..7
+test("every placed enemy survives the projection — none collide, none vanish", async () => {
+    const decoded = await decodedFixture("ramsie.sav");
+    const { stages, stageCount } = decodeStages(decoded.sections[5].decompressed);
+    let placed = 0;
+    for (let s = 0; s < stageCount; s++) {
+        placed += stages[s].placement.objects.filter((o) => o.kind === "zako").length;
+    }
+    const projected = decoded.stages.reduce(
+        (n, st) => n + st.rows.reduce((m, row) => m + row.filter(Boolean).length, 0),
+        0,
+    );
+    assert.equal(projected, placed);
+});
+
+test("each wave records the scroll row it came from, so pacing survives", async () => {
+    const decoded = await decodedFixture("ramsie.sav");
+    for (const st of decoded.stages) {
+        assert.equal(st.waveRows.length, st.rows.length);
+        assert.deepEqual(st.waveRows, [...st.waveRows].sort((a, b) => a - b));
+        assert.equal(new Set(st.waveRows).size, st.waveRows.length);
+    }
+    // a stage's waves are genuinely unevenly spaced — the reason to keep them
+    const gaps = new Set();
+    const rows = decoded.stages[0].waveRows;
+    for (let i = 1; i < rows.length; i++) gaps.add(rows[i] - rows[i - 1]);
+    assert.ok(gaps.size > 1, "stage 0 does not deal its waves on a fixed beat");
+});
+
+test("a grid column IS the save's placement column", () => {
+    // Nothing is folded, so two enemies can never share a cell — which is
+    // exactly what the old 8-column binning could not promise.
+    const seen = new Set();
+    for (let col = 0; col < PLACEMENT_COLS; col++) {
+        const e = placementColumn(col);
+        assert.equal(e, col);
+        seen.add(e);
+    }
+    assert.equal(seen.size, PLACEMENT_COLS);
+    // and a byte outside the grid cannot index off the row
+    assert.equal(placementColumn(-1), 0);
+    assert.equal(placementColumn(99), PLACEMENT_COLS - 1);
+});
+
+test("the legacy 8-column binning is still available and unchanged", () => {
     for (let col = 0; col < 20; col++) {
         const e = placementColumnToEditor(col);
         assert.ok(e >= 0 && e <= 7, `column ${col} -> ${e}`);
     }
     assert.equal(placementColumnToEditor(3), 0);
     assert.equal(placementColumnToEditor(16), 7);
-    // the mapping is monotonic across the playfield
     let prev = -1;
     for (let col = 3; col <= 16; col++) {
         const e = placementColumnToEditor(col);

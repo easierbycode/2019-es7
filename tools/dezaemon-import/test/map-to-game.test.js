@@ -7,10 +7,15 @@ import {
     BUILTIN_DEFAULTS,
     EVIL_INVADERS_PLAYER,
     GRID_COLS,
-    MAX_ENEMIES,
     MAX_STAGES,
     BLANK_WAVES,
+    SINGLE_LETTER_ENEMIES,
+    FRAMES_PER_SOURCE_ROW,
+    enemyLetters,
+    MUTOID_PLAYER,
+    decodePlayerArt,
 } from "../lib/map-to-game.js";
+import { PLAYER_FRAMES } from "../lib/player-art.js";
 import { validateGameJson } from "../lib/game-schema.js";
 
 const emptyDecoded = () => ({ title: null, confidence: {}, sprites: [], enemies: [], stages: [] });
@@ -44,7 +49,8 @@ test("mapSaveToGame on an undecoded save yields a valid skeleton", () => {
     const { ok, errors } = validateGameJson(gameJson);
     assert.deepStrictEqual(errors, []);
     assert.ok(ok);
-    assert.strictEqual(sprites.length, 0);
+    // The save decoded to nothing, but the player still arrives with its art.
+    assert.strictEqual(sprites.length, PLAYER_FRAMES.length);
     assert.strictEqual(gameJson.meta.source, "dezaemon2");
     assert.strictEqual(gameJson.meta.sourceComment, "DEZA2 SGM");
     assert.strictEqual(gameJson.meta.sourceFilename, "DEZA2____01");
@@ -73,15 +79,47 @@ test("mapSaveToGame is deterministic", () => {
     assert.deepStrictEqual(a, b);
 });
 
-test("enemy overflow: only 26 letters exist, extras dropped with a warning", () => {
+test("enemy keys spill past enemyZ instead of the roster being cut at 26", () => {
     const decoded = emptyDecoded();
-    decoded.enemies = Array.from({ length: 30 }, (_, i) => ({ name: `zako${i}`, hp: i + 1 }));
+    decoded.enemies = Array.from({ length: 400 }, (_, i) => ({ name: `zako${i}`, hp: i + 1 }));
     const { gameJson, warnings } = mapSaveToGame(decoded);
-    assert.strictEqual(Object.keys(gameJson.enemyData).length, MAX_ENEMIES);
+    assert.strictEqual(Object.keys(gameJson.enemyData).length, 400);
     assert.strictEqual(gameJson.enemyData.enemyA.name, "zako0");
     assert.strictEqual(gameJson.enemyData.enemyZ.name, "zako25");
-    assert.ok(warnings.some((w) => w.includes("dropped 4")));
+    assert.strictEqual(gameJson.enemyData.enemyAA.name, "zako26");
+    assert.strictEqual(gameJson.enemyData.enemyOJ.name, "zako399");
+    assert.ok(!warnings.some((w) => w.includes("dropped")));
     assert.ok(validateGameJson(gameJson).ok);
+});
+
+test("enemyLetters is bijective base-26 — single letters first, then two", () => {
+    assert.strictEqual(enemyLetters(0), "A");
+    assert.strictEqual(enemyLetters(SINGLE_LETTER_ENEMIES - 1), "Z");
+    assert.strictEqual(enemyLetters(SINGLE_LETTER_ENEMIES), "AA");
+    assert.strictEqual(enemyLetters(SINGLE_LETTER_ENEMIES + 1), "AB");
+    assert.strictEqual(enemyLetters(701), "ZZ");
+    assert.strictEqual(enemyLetters(702), "AAA");
+    // no two indices ever collide, which is what keeps spawns unambiguous
+    const seen = new Set();
+    for (let i = 0; i < 1000; i++) seen.add(enemyLetters(i));
+    assert.strictEqual(seen.size, 1000);
+});
+
+test("the save's own definition bytes travel with each enemy", () => {
+    const decoded = emptyDecoded();
+    decoded.enemies = [
+        { name: "zako", stage: 2, record: 7, placements: 5, bytes: new Uint8Array([0x3c, 0xb7, 0x00, 0x01]) },
+    ];
+    const { gameJson } = mapSaveToGame(decoded);
+    assert.deepStrictEqual(gameJson.enemyData.enemyA.dezaemon, {
+        stage: 2,
+        record: 7,
+        placements: 5,
+        attributes: "3cb70001",
+    });
+    // ...and the attributes themselves still come from the defaults, because
+    // the record's field layout is not decoded yet
+    assert.strictEqual(gameJson.enemyData.enemyA.hp, BUILTIN_DEFAULTS.starterEnemy.hp);
 });
 
 test("stage rows are reversed into runtime order (last json row spawns first)", () => {
@@ -98,30 +136,66 @@ test("stage rows are reversed into runtime order (last json row spawns first)", 
     assert.deepStrictEqual(list[0], emptyWave());
 });
 
-test("stage overflow clamps to 5 with a warning; each stage gets a boss", () => {
+test("all nine stages of a nine-stage save come across, each with a boss", () => {
     const decoded = emptyDecoded();
-    decoded.stages = Array.from({ length: 7 }, () => ({ rows: [new Array(GRID_COLS).fill(null)] }));
+    decoded.stages = Array.from({ length: 9 }, () => ({ rows: [new Array(GRID_COLS).fill(null)] }));
     const { gameJson, warnings } = mapSaveToGame(decoded);
     const stageKeys = Object.keys(gameJson).filter((k) => k.startsWith("stage"));
-    assert.strictEqual(stageKeys.length, MAX_STAGES);
-    for (let s = 0; s < MAX_STAGES; s++) assert.ok(gameJson.bossData[`boss${s}`], `boss${s} missing`);
+    assert.strictEqual(stageKeys.length, 9);
+    for (let s = 0; s < 9; s++) assert.ok(gameJson.bossData[`boss${s}`], `boss${s} missing`);
+    assert.ok(!warnings.some((w) => w.includes("dropped")));
+    assert.ok(validateGameJson(gameJson).ok);
+});
+
+test("only stages past the runtime's tenth are dropped, and it says so", () => {
+    const decoded = emptyDecoded();
+    decoded.stages = Array.from({ length: 12 }, () => ({ rows: [new Array(GRID_COLS).fill(null)] }));
+    const { gameJson, warnings } = mapSaveToGame(decoded);
+    assert.strictEqual(Object.keys(gameJson).filter((k) => k.startsWith("stage")).length, MAX_STAGES);
     assert.ok(warnings.some((w) => w.includes("dropped 2")));
 });
 
-test("spawns referencing dropped enemies become empty cells with warnings", () => {
+test("a wide grid keeps its width, and every spawn resolves", () => {
+    const decoded = emptyDecoded();
+    decoded.enemies = Array.from({ length: 40 }, (_, i) => ({ name: `zako${i}` }));
+    const row = new Array(14).fill(null);
+    row[0] = { enemy: 39, drop: 0 };
+    row[13] = { enemy: 0, drop: 9 };
+    decoded.stages = [{ rows: [row], cols: 14, waveRows: [12] }];
+    const { gameJson } = mapSaveToGame(decoded);
+    const wave = gameJson.stage0.enemylist[0];
+    assert.strictEqual(wave.length, 14);
+    assert.strictEqual(wave[0], "AN0");   // index 39 -> AN
+    assert.strictEqual(wave[13], "A9");
+    assert.ok(validateGameJson(gameJson).ok);
+});
+
+test("wave pacing rides along, reversed in lockstep with the rows", () => {
     const decoded = emptyDecoded();
     decoded.enemies = [{ name: "only" }];
-    decoded.stages = [{ rows: [[{ enemy: 5, drop: 0 }, { enemy: 0, drop: 9 }, null, null, null, null, null, null]] }];
-    const { gameJson, warnings } = mapSaveToGame(decoded);
-    assert.strictEqual(gameJson.stage0.enemylist[0][0], "00");
-    assert.strictEqual(gameJson.stage0.enemylist[0][1], "A9");
-    // Dropped spawns are counted, not listed one per line — a real game drops
-    // hundreds and the per-spawn warnings buried every other note.
-    const dropped = warnings.find((w) => w.includes("spawns reference enemies beyond"));
-    assert.ok(dropped, "dropped spawns are reported");
-    assert.match(dropped, /^1 spawns reference enemies beyond the 26-letter limit/);
-    assert.match(dropped, /stage 0: 1/);
-    assert.equal(warnings.filter((w) => w.includes("beyond the")).length, 1);
+    const at = (row) => ({ rows: row.map(() => new Array(GRID_COLS).fill(null)), waveRows: row });
+    decoded.stages = [at([10, 40, 41])];
+    const { gameJson } = mapSaveToGame(decoded);
+    // enemylist is reversed for the runtime, so waveRows must be too
+    assert.deepStrictEqual(gameJson.stage0.waveRows, [41, 40, 10]);
+    assert.strictEqual(gameJson.stage0.waveInterval, FRAMES_PER_SOURCE_ROW);
+    assert.ok(validateGameJson(gameJson).ok);
+});
+
+test("a stage's own boss art and placement are carried over", () => {
+    const decoded = emptyDecoded();
+    decoded.sprites = [
+        { key: "dezaBoss0_0", w: 8, h: 8, rgba: new Uint8ClampedArray(256) },
+        { key: "dezaBoss0_1", w: 8, h: 8, rgba: new Uint8ClampedArray(256) },
+    ];
+    decoded.stages = [{ rows: [new Array(GRID_COLS).fill(null)] }, { rows: [new Array(GRID_COLS).fill(null)] }];
+    decoded.bosses = [{ stage: 0, sizeClass: 2, row: 479, col: 8, spriteKeys: [0, 1] }];
+    const { gameJson } = mapSaveToGame(decoded);
+    assert.deepStrictEqual(gameJson.bossData.boss0.anim.idle, ["dezaBoss0_0.gif", "dezaBoss0_1.gif"]);
+    assert.deepStrictEqual(gameJson.bossData.boss0.dezaemon, { sizeClass: 2, row: 479, col: 8 });
+    // a stage the save gave no boss still ends, on the default one
+    assert.strictEqual(gameJson.bossData.boss1.name, BUILTIN_DEFAULTS.starterBoss.name);
+    assert.ok(validateGameJson(gameJson).ok);
 });
 
 test("sprite keys are sanitized, .gif-suffixed, and deduped", () => {
@@ -132,13 +206,19 @@ test("sprite keys are sanitized, .gif-suffixed, and deduped", () => {
         { key: null, w: 4, h: 4, rgba: new Uint8ClampedArray(4 * 4 * 4) },
     ];
     const { sprites } = mapSaveToGame(decoded);
+    // The save's sprites come first, so decoded indices keep addressing them;
+    // the player's own frames are appended after.
     assert.deepStrictEqual(
-        sprites.map((s) => s.key),
+        sprites.slice(0, 3).map((s) => s.key),
         ["ship_a.gif", "ship_a_2.gif", "deza_cg2.gif"]
+    );
+    assert.deepStrictEqual(
+        sprites.slice(3).map((s) => s.key),
+        PLAYER_FRAMES.map((f) => f.key)
     );
 });
 
-test("an import always flies the Evil Invaders character, whatever the defaults say", () => {
+test("an import always flies the Mutoid character, whatever the defaults say", () => {
     // The editor derives `defaults` from the game that happens to be open, and
     // its player can reference frames that live only in that level's atlas —
     // which the import drops. Taking the player from there would ship an
@@ -157,34 +237,67 @@ test("an import always flies the Evil Invaders character, whatever the defaults 
         barrier: { time: 1, texture: ["someLevelOnlyBarrier0.gif"] },
     };
     const defaults = { ...BUILTIN_DEFAULTS, playerData: customPlayer };
-    const { gameJson } = mapSaveToGame(emptyDecoded(), { defaults });
+    const { gameJson, sprites } = mapSaveToGame(emptyDecoded(), { defaults });
 
-    assert.deepStrictEqual(gameJson.playerData, EVIL_INVADERS_PLAYER);
-    assert.deepStrictEqual(gameJson.playerData.texture, [
-        "player00.gif", "player01.gif", "player02.gif",
-        "player03.gif", "player04.gif", "player05.gif",
-    ]);
+    assert.deepStrictEqual(gameJson.playerData, MUTOID_PLAYER);
+    assert.deepStrictEqual(gameJson.playerData.texture,
+        ["cyberLiberty0.png", "cyberLiberty1.png"]);
     assert.deepStrictEqual(gameJson.playerData.shootNormal.texture,
-        ["shot00.gif", "shot01.gif", "shot02.gif", "shot03.gif"]);
+        ["hadoken0.png", "hadoken1.png"]);
     assert.deepStrictEqual(gameJson.playerData.shootBig.texture,
-        ["shotBig00.gif", "shotBig01.gif", "shotBig02.gif", "shotBig03.gif"]);
+        ["bigProjectile0.png", "bigProjectile1.png", "bigProjectile2.png"]);
     assert.deepStrictEqual(gameJson.playerData.shoot3way.texture,
-        ["shot00.gif", "shot01.gif", "shot02.gif", "shot03.gif"]);
-    assert.deepStrictEqual(gameJson.playerData.barrier.texture,
-        ["barrier0.gif", "barrier1.gif", "barrier2.gif", "barrier3.gif"]);
+        ["hadoken0.png", "hadoken1.png"]);
+    assert.strictEqual(gameJson.playerData.barrier.texture.length, 10);
+
+    // Every frame it references travels with the import, or the ship, its
+    // shots and its shield would all draw as nothing.
+    const packed = new Set(sprites.map((s) => s.key));
+    const referenced = [
+        ...gameJson.playerData.texture,
+        ...gameJson.playerData.shootNormal.texture,
+        ...gameJson.playerData.shootBig.texture,
+        ...gameJson.playerData.shoot3way.texture,
+        ...gameJson.playerData.barrier.texture,
+    ];
+    assert.deepStrictEqual(referenced.filter((f) => !packed.has(f)), []);
+
     // ...and it is a copy, so editing the imported game cannot mutate the
     // character every later import is seeded from.
     gameJson.playerData.texture.push("mutated.gif");
-    assert.strictEqual(EVIL_INVADERS_PLAYER.texture.length, 6);
+    assert.strictEqual(MUTOID_PLAYER.texture.length, 2);
     // The enemy/boss halves of `defaults` are still honoured.
     assert.strictEqual(gameJson.enemyData.enemyA.name, BUILTIN_DEFAULTS.starterEnemy.name);
 });
 
-test("the Evil Invaders player matches what the Phaser runtime ships", () => {
+test("the player's baked frames decode to real pixels at their atlas size", () => {
+    const art = decodePlayerArt();
+    assert.strictEqual(art.length, PLAYER_FRAMES.length);
+    for (const f of art) {
+        assert.ok(f.w > 0 && f.h > 0, `${f.key} has a size`);
+        assert.strictEqual(f.rgba.length, f.w * f.h * 4);
+        let opaque = 0;
+        for (let p = 3; p < f.rgba.length; p += 4) if (f.rgba[p]) opaque++;
+        assert.ok(opaque > 0, `${f.key} is not blank`);
+    }
+    // the ship and its shield, at the sizes evil-invaders-phaser4 draws them
+    const byKey = new Map(art.map((f) => [f.key, f]));
+    assert.deepStrictEqual(
+        [byKey.get("cyberLiberty0.png").w, byKey.get("cyberLiberty0.png").h], [32, 32]);
+    assert.deepStrictEqual(
+        [byKey.get("shield0.png").w, byKey.get("shield0.png").h], [96, 96]);
+});
+
+test("New Game still flies the Evil Invaders character the runtime ships", () => {
     // src/phaser/game-objects/Player.js and Bullet.js hardcode these same keys
-    // as their fallbacks, and every one is a frame in assets/game_asset.
+    // as their fallbacks, and every one is a frame in assets/game_asset — so a
+    // blank game needs no extra art, unlike an import.
     assert.strictEqual(BUILTIN_DEFAULTS.playerData, EVIL_INVADERS_PLAYER);
     assert.deepStrictEqual(buildBlankGame().playerData, EVIL_INVADERS_PLAYER);
+    assert.deepStrictEqual(buildBlankGame().playerData.texture, [
+        "player00.gif", "player01.gif", "player02.gif",
+        "player03.gif", "player04.gif", "player05.gif",
+    ]);
 });
 
 test("enemies with decoded sprites get their texture repointed by sprite index", () => {

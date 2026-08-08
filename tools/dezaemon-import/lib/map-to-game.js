@@ -7,16 +7,41 @@
 // in Phaser immediately.
 //
 // Schema facts this module enforces (see src/phaser/ for the runtime side):
-//   - grid cells are "<UppercaseLetter><digit>" ("00" = empty), so at most 26
-//     enemy types (enemyA..enemyZ) and drop digits 0-9
+//   - grid cells are "<UppercaseLetters><digit>" ("00" = empty). One letter is
+//     the historical form (enemyA..enemyZ); keys spill into two letters
+//     (enemyAA, enemyAB, ...) past 26, which is what lets a save keep all of
+//     its enemy types instead of the first 26
+//   - a stage's rows all have the same width; 8 is the historical width and
+//     an import uses the Saturn playfield's own 14 columns
 //   - the runtime reverses stage rows at load (the LAST json row spawns
-//     first), so decoded spawn-order rows are written reversed
-//   - BootScene clamps stages to stage0..stage4
+//     first), so decoded spawn-order rows are written reversed — `waveRows`
+//     is reversed in lockstep so a wave keeps the scroll row it came from
+//   - BootScene plays stage0..stage9
 
-export const GRID_COLS = 8;
-export const MAX_STAGES = 5;
-export const MAX_ENEMIES = 26;
+import { MUTOID_PLAYER, decodePlayerArt } from "./player-art.js";
+
+export { MUTOID_PLAYER, decodePlayerArt };
+
+export const GRID_COLS = 8;          // blank-game / legacy grid width
+export const MAX_STAGES = 10;        // Dezaemon's own maximum, and the runtime's
+export const SINGLE_LETTER_ENEMIES = 26; // enemyA..enemyZ before keys go two-wide
 export const BLANK_WAVES = 8;
+// Frames of play per Dezaemon scroll row. The Saturn stage is 768 rows of
+// 16px scrolled at ~2px/frame, so a row is ~8 frames; at that rate an imported
+// stage runs about as long as it did on hardware.
+export const FRAMES_PER_SOURCE_ROW = 8;
+
+// Bijective base-26: 0 -> A, 25 -> Z, 26 -> AA, 27 -> AB, 701 -> ZZ, 702 -> AAA.
+// Single letters first, so a small roster is byte-for-byte what it always was.
+export function enemyLetters(index) {
+    let n = index;
+    let out = "";
+    do {
+        out = String.fromCharCode(65 + (n % 26)) + out;
+        n = Math.floor(n / 26) - 1;
+    } while (n >= 0);
+    return out;
+}
 
 // The Evil Invaders player character, exactly as the Phaser 4 runtime draws
 // it: player00..player05 are the idle animation Player.js builds, shot*/shotBig*
@@ -24,9 +49,8 @@ export const BLANK_WAVES = 8;
 // the shield. Every one of these frames ships in assets/game_asset — the atlas
 // BootScene loads — so a game seeded with this record plays with no extra art.
 //
-// Kept as its own export because a Dezaemon 2 save carries no player: the
-// format's own ship art and stats live in sections we do not decode, so an
-// import has to supply one, and this is the character it supplies.
+// This is the "New Game" character. A .sav IMPORT flies MUTOID_PLAYER instead
+// (lib/player-art.js) — see the playerData assignment in mapSaveToGame.
 export const EVIL_INVADERS_PLAYER = {
     name: "G",
     maxHp: 3,
@@ -89,8 +113,8 @@ export const BUILTIN_DEFAULTS = {
 
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
-export function emptyWave() {
-    return new Array(GRID_COLS).fill("00");
+export function emptyWave(cols = GRID_COLS) {
+    return new Array(cols).fill("00");
 }
 
 // Minimal valid game: one stage of empty waves, the starter player/enemy/boss.
@@ -117,6 +141,9 @@ function sanitizeSpriteKey(raw, used) {
 
 const NUMERIC_ENEMY_FIELDS = ["score", "spgage", "hp", "speed", "interval", "shadowOffsetY"];
 
+const toHex = (bytes) =>
+    bytes ? Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("") : null;
+
 // Map a decodeSave() result onto the editor's game.json shape.
 // Returns { gameJson, sprites, warnings }; sprites is the (key-sanitized)
 // list of {key, w, h, rgba} to add to the atlas.
@@ -136,18 +163,24 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
         return { key, w: s.w, h: s.h, rgba: s.rgba };
     });
 
-    // Enemies: assign enemyA..enemyZ in order.
-    const decodedEnemies = decoded.enemies || [];
-    if (decodedEnemies.length > MAX_ENEMIES) {
-        warnings.push(
-            `save has ${decodedEnemies.length} enemy types; grid codes only support ${MAX_ENEMIES} — dropped ${decodedEnemies.length - MAX_ENEMIES}`
-        );
+    // The player's own frames, appended so the save's sprite indices above stay
+    // valid. They keep their real names (cyberLiberty0.png, hadoken0.png, ...):
+    // the record below references them by name, and none of them collide with a
+    // frame in the stock game_asset atlas.
+    const playerArt = decodePlayerArt();
+    for (const frame of playerArt) {
+        usedKeys.add(frame.key);
+        sprites.push(frame);
     }
+
+    // Enemies: one key per decoded type, enemyA..enemyZ then enemyAA onwards.
+    // Nothing is rationed — a save's whole roster comes across.
+    const decodedEnemies = decoded.enemies || [];
     const enemyData = {};
     const enemyLetterByIndex = [];
-    decodedEnemies.slice(0, MAX_ENEMIES).forEach((e, i) => {
-        const letter = String.fromCharCode(65 + i);
-        enemyLetterByIndex[i] = letter;
+    decodedEnemies.forEach((e, i) => {
+        const letters = enemyLetters(i);
+        enemyLetterByIndex[i] = letters;
         const rec = clone(defaults.starterEnemy);
         if (e.name != null) rec.name = String(e.name);
         for (const f of NUMERIC_ENEMY_FIELDS) {
@@ -158,72 +191,98 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
                 typeof idx === "number" ? (spriteKeyByIndex[idx] || rec.texture[0]) : String(idx)
             );
         }
-        enemyData[`enemy${letter}`] = rec;
+        // The save's own definition, verbatim. hp/speed/interval above still
+        // come from the defaults because the 18-byte record's fields are not
+        // named yet (FORMAT.md) — but the bytes are here rather than gone, so
+        // the attributes can be filled in later without re-importing, and two
+        // enemies that differ only in their attributes stay distinguishable.
+        if (e.bytes || e.stage !== undefined) {
+            rec.dezaemon = {
+                stage: e.stage,
+                record: e.record,
+                placements: e.placements,
+                attributes: toHex(e.bytes),
+            };
+        }
+        enemyData[`enemy${letters}`] = rec;
     });
     if (Object.keys(enemyData).length === 0) {
         enemyData.enemyA = clone(defaults.starterEnemy);
     }
 
-    // Stages: decoded spawn-order rows → reversed json rows, clamped to 5.
+    // Stages: decoded spawn-order rows -> reversed json rows. Every stage the
+    // save defines is emitted; the runtime plays stage0..stage9.
     const decodedStages = decoded.stages || [];
     if (decodedStages.length > MAX_STAGES) {
         warnings.push(
-            `save has ${decodedStages.length} stages; the runtime supports ${MAX_STAGES} (stage0..stage4) — dropped ${decodedStages.length - MAX_STAGES}`
+            `save has ${decodedStages.length} stages; the runtime plays ${MAX_STAGES} (stage0..stage${MAX_STAGES - 1}) — dropped ${decodedStages.length - MAX_STAGES}`
         );
     }
     const gameJson = {};
-    // A real game drops hundreds of spawns when its roster overflows the 26
-    // letters; one warning each buries every other note, so count them per
-    // stage and report a single line.
-    const droppedSpawns = new Map();
     const stageCount = Math.max(1, Math.min(decodedStages.length, MAX_STAGES));
     for (let s = 0; s < stageCount; s++) {
-        const rows = decodedStages[s] ? decodedStages[s].rows || [] : [];
+        const decodedStage = decodedStages[s] || {};
+        const rows = decodedStage.rows || [];
+        const cols = decodedStage.cols || (rows[0] ? rows[0].length : GRID_COLS);
         const enemylist = rows.map((row) => {
-            const out = emptyWave();
-            for (let c = 0; c < Math.min(GRID_COLS, row.length); c++) {
+            const out = emptyWave(cols);
+            for (let c = 0; c < Math.min(cols, row.length); c++) {
                 const cell = row[c];
                 if (!cell) continue;
-                const letter = enemyLetterByIndex[cell.enemy];
-                if (letter === undefined) {
-                    droppedSpawns.set(s, (droppedSpawns.get(s) || 0) + 1);
-                    continue;
-                }
+                const letters = enemyLetterByIndex[cell.enemy];
+                if (letters === undefined) continue;
                 const drop = Number.isInteger(cell.drop) && cell.drop >= 0 && cell.drop <= 9 ? cell.drop : 0;
-                out[c] = `${letter}${drop}`;
+                out[c] = `${letters}${drop}`;
             }
             return out;
         });
         // Runtime spawns the LAST json row first — decoders emit spawn order.
         enemylist.reverse();
-        gameJson[`stage${s}`] = {
-            enemylist: enemylist.length ? enemylist : Array.from({ length: BLANK_WAVES }, emptyWave),
+        const stage = {
+            enemylist: enemylist.length ? enemylist : Array.from({ length: BLANK_WAVES }, () => emptyWave(cols)),
         };
+        // Pacing: the scroll row each wave came from, reversed in lockstep with
+        // enemylist. Without it every wave is evenly spaced and a stage's
+        // rhythm — gaps of anywhere from 1 to 177 rows — is lost.
+        if (Array.isArray(decodedStage.waveRows) && decodedStage.waveRows.length === rows.length && rows.length) {
+            stage.waveRows = decodedStage.waveRows.slice().reverse();
+            stage.waveInterval = FRAMES_PER_SOURCE_ROW;
+        }
+        if (decodedStage.items && decodedStage.items.length) stage.items = decodedStage.items;
+        gameJson[`stage${s}`] = stage;
     }
 
-    if (droppedSpawns.size) {
-        const total = [...droppedSpawns.values()].reduce((a, b) => a + b, 0);
-        const perStage = [...droppedSpawns.entries()]
-            .sort((a, b) => a[0] - b[0])
-            .map(([s, n]) => `stage ${s}: ${n}`)
-            .join(", ");
-        warnings.push(
-            `${total} spawns reference enemies beyond the ${MAX_ENEMIES}-letter limit and were left empty (${perStage})`
-        );
-    }
-
-    // One boss per stage (runtime spawns bossData["boss" + stageId]).
+    // One boss per stage (runtime spawns bossData["boss" + stageId]). Stages
+    // whose save places a boss get its own art; the rest keep the default so
+    // the stage still ends.
     const bossData = {};
-    for (let s = 0; s < stageCount; s++) bossData[`boss${s}`] = clone(defaults.starterBoss);
+    const bossByStage = new Map((decoded.bosses || []).map((b) => [b.stage, b]));
+    for (let s = 0; s < stageCount; s++) {
+        const rec = clone(defaults.starterBoss);
+        const decodedBoss = bossByStage.get(s);
+        if (decodedBoss) {
+            rec.dezaemon = { sizeClass: decodedBoss.sizeClass, row: decodedBoss.row, col: decodedBoss.col };
+            if (Array.isArray(decodedBoss.spriteKeys) && decodedBoss.spriteKeys.length) {
+                const frames = decodedBoss.spriteKeys
+                    .map((idx) => spriteKeyByIndex[idx])
+                    .filter(Boolean);
+                if (frames.length) {
+                    rec.name = `dezaBoss${s}`;
+                    rec.anim = { idle: frames, attack: frames.slice(0, Math.max(1, frames.length - 1)) };
+                }
+            }
+        }
+        bossData[`boss${s}`] = rec;
+    }
 
-    // Player + bullets always come from the Evil Invaders character, never from
+    // Player + bullets always come from the Mutoid character, never from
     // `defaults`. The editor derives `defaults` from whatever game is currently
     // open, and its player may be a custom one whose frames live only in that
     // level's atlas — which the import drops when it resets the atlas to make
     // room for the save's sprites. Seeding from it would leave the imported
     // game pointing at frames that no longer exist: an invisible ship firing
-    // invisible shots. The stock character's frames are always in game_asset.
-    gameJson.playerData = clone(EVIL_INVADERS_PLAYER);
+    // invisible shots. This character's frames travel with it, in `sprites`.
+    gameJson.playerData = clone(MUTOID_PLAYER);
     gameJson.enemyData = enemyData;
     gameJson.bossData = bossData;
     gameJson.meta = { version: "1.0", source: "dezaemon2" };
@@ -242,7 +301,10 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
     // "sec5 region map"). Falling back to engine defaults without saying so
     // looks like a successful import right up until you press play, so name
     // each gap.
-    if (!sprites.length) {
+    // Counted from the save, not from `sprites` — that list always carries the
+    // player's own frames, so it is never empty.
+    const savedSprites = (decoded.sprites || []).length;
+    if (!savedSprites) {
         warnings.push(
             decodedEnemies.length
                 ? "no CG/sprite data decoded for these enemies — using the default art " +
@@ -251,9 +313,13 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
         );
     }
     if (decodedEnemies.length && !decodedEnemies.some((e) => NUMERIC_ENEMY_FIELDS.some((f) => Number.isFinite(e[f])))) {
+        const carried = decodedEnemies.filter((e) => e.bytes).length;
         warnings.push(
-            "enemy attributes (hp/speed/interval) are not decoded yet — every imported " +
-            "enemy uses the default stats"
+            "enemy attributes (hp/speed/interval) have no field names yet, so every enemy " +
+            "plays with the default stats — but " +
+            (carried
+                ? `each one's 18-byte definition is stored verbatim on enemyData.*.dezaemon.attributes (${carried} records), so nothing is lost`
+                : "no definition bytes came through for them")
         );
     }
     if (!decodedEnemies.length) {
@@ -264,7 +330,7 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
             "no stage layout decoded from this save — every wave is empty, so nothing will spawn"
         );
     }
-    if (!sprites.length && !decodedEnemies.length && !decodedStages.length) {
+    if (!savedSprites && !decodedEnemies.length && !decodedStages.length) {
         warnings.push(
             "this import carries the save's identity but none of its content yet; " +
             "decoding the section contents is still open work (see FORMAT.md)"

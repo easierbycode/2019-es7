@@ -135,27 +135,52 @@ function isUnpainted(art, placeholder) {
     return art.frames.every((f) => f.cells.every((c) => c.empty || c.cell === placeholder));
 }
 
+// A composition's identity: the cell refs (with flips) of every frame. Two
+// (stage, record) pairs that share one render to the same pixels, so they can
+// share atlas frames instead of packing the same art twice — DAIOH's 327
+// painted pairs collapse onto 160 distinct compositions this way.
+function artSignature(art) {
+    return art.frames
+        .map((f) => f.cells.map((c) => (c.empty ? "-" : `${c.cell}${c.hflip ? "h" : ""}${c.vflip ? "v" : ""}`)).join(","))
+        .join("|");
+}
+
 // Build the sprite list + per-enemy frame keys for the editor.
 //
-// `enemies` is the roster from projectForEditor(); `stagesPlacing` maps a
-// record to every stage that places it, so an enemy whose first stage left the
-// slot unpainted still picks up art from a stage that drew it.
-// Returns {sprites, spriteKeysByRecord}.
+// `enemies` is the roster from projectForEditor() — one entry per placed
+// (stage, record) pair, each carrying its own stage, so each enemy is drawn
+// with the art ITS stage defines rather than whichever stage happened to come
+// first. `stagesPlacing` maps a record to every stage that places it, so a
+// pair whose own stage left the sprite slot unpainted still falls back to a
+// stage that drew it.
+//
+// Returns {sprites, spriteKeysByEnemy} keyed by enemy.key ("stage:record").
 export function extractEnemySprites(sec5, sections, palettes, enemies, stagesPlacing) {
     const sprites = [];
-    const spriteKeysByRecord = new Map();
+    const spriteKeysByEnemy = new Map();
+    const bySignature = new Map(); // composition -> sprite indices already packed
     const placeholder = findPlaceholderCell(sec5).cell;
     for (const enemy of enemies) {
-        const candidates = stagesPlacing.get(enemy.record);
-        if (!candidates || !candidates.length) continue;
+        // The enemy's own stage first; only then any other stage that places
+        // the same record (art is per stage, and slots can be left unpainted).
+        const fallbacks = stagesPlacing.get(enemy.record) || [];
+        const candidates = [enemy.stage, ...fallbacks.filter((s) => s !== enemy.stage)];
         let art = null;
         for (const stage of candidates) {
+            if (stage === undefined) continue;
             const a = readEnemyFrames(sec5, stage, enemy.record);
             if (!a) continue;
             if (!isUnpainted(a, placeholder)) { art = a; break; }
             if (!art) art = a; // remember the placeholder art as a last resort
         }
         if (!art || isUnpainted(art, placeholder)) continue;
+
+        const sig = artSignature(art);
+        const shared = bySignature.get(sig);
+        if (shared) {
+            spriteKeysByEnemy.set(enemy.key, shared);
+            continue;
+        }
         const keys = [];
         art.frames.forEach((frame, i) => {
             const { w, h, rgba } = renderFrame(sections, palettes, frame);
@@ -166,7 +191,69 @@ export function extractEnemySprites(sec5, sections, palettes, enemies, stagesPla
             keys.push(sprites.length);
             sprites.push({ key: `${enemy.name}_${i}`, w, h, rgba });
         });
-        if (keys.length) spriteKeysByRecord.set(enemy.record, keys);
+        if (!keys.length) continue;
+        bySignature.set(sig, keys);
+        spriteKeysByEnemy.set(enemy.key, keys);
     }
-    return { sprites, spriteKeysByRecord };
+    return { sprites, spriteKeysByEnemy };
+}
+
+// --- Bosses -----------------------------------------------------------
+//
+// The composition bank's last four slots are the four boss size classes. Each
+// gets the full 64 refs, so a boss frame is 16 cells — a 4x4 rectangle of
+// 16x16 cells, 64x64 px — and there are four of them, same as a zako.
+
+export const BOSS_CLASS_BASE = 7;
+export const BOSS_CELLS_PER_FRAME = REFS_PER_CLASS / FRAMES_PER_ENEMY; // 16
+export const BOSS_FRAME_CELLS = 4; // 4x4
+
+// Read one stage's boss art for a given size class, or null when unpainted.
+export function readBossFrames(sec5, stage, sizeClass) {
+    const { offset, stride } = SEC5_REGIONS.spriteStages;
+    const base = offset + stage * stride;
+    const start = (BOSS_CLASS_BASE + sizeClass) * REFS_PER_CLASS;
+    const words = [];
+    for (let k = 0; k < REFS_PER_CLASS; k++) {
+        const at = base + (start + k) * 2;
+        words.push((sec5[at] << 8) | sec5[at + 1]);
+    }
+    if (words.every((w) => w === EMPTY_REF)) return null;
+    const frames = [];
+    for (let f = 0; f < FRAMES_PER_ENEMY; f++) {
+        const cells = words
+            .slice(f * BOSS_CELLS_PER_FRAME, (f + 1) * BOSS_CELLS_PER_FRAME)
+            .map((word) => ({
+                empty: word === EMPTY_REF,
+                cell: word & 0x3ff,
+                hflip: (word & 0x8000) !== 0,
+                vflip: (word & 0x4000) !== 0,
+            }));
+        if (cells.every((c) => c.empty)) continue;
+        frames.push({ w: BOSS_FRAME_CELLS, h: BOSS_FRAME_CELLS, cells });
+    }
+    return frames.length ? { stage, sizeClass, w: BOSS_FRAME_CELLS, h: BOSS_FRAME_CELLS, frames } : null;
+}
+
+// Sprites for every stage that places a boss.
+// `bosses` is [{stage, sizeClass}]; returns {sprites, spriteKeysByStage}.
+export function extractBossSprites(sec5, sections, palettes, bosses) {
+    const sprites = [];
+    const spriteKeysByStage = new Map();
+    const placeholder = findPlaceholderCell(sec5).cell;
+    for (const { stage, sizeClass } of bosses) {
+        const art = readBossFrames(sec5, stage, sizeClass);
+        if (!art || isUnpainted(art, placeholder)) continue;
+        const keys = [];
+        art.frames.forEach((frame, i) => {
+            const { w, h, rgba } = renderFrame(sections, palettes, frame);
+            let opaque = false;
+            for (let p = 3; p < rgba.length; p += 4) if (rgba[p]) { opaque = true; break; }
+            if (!opaque) return;
+            keys.push(sprites.length);
+            sprites.push({ key: `dezaBoss${stage}_${i}`, w, h, rgba });
+        });
+        if (keys.length) spriteKeysByStage.set(stage, keys);
+    }
+    return { sprites, spriteKeysByStage };
 }

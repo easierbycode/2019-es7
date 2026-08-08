@@ -5,6 +5,7 @@ import { BGM_INFO, GAME_DIMENSIONS, RESOURCE_PATHS } from "../constants.js";
 import { gameState, saveHighScore } from "../gameState.js";
 import { PLAYER_STATES } from "../enums/player-boss-states.js";
 import { triggerHaptic } from "../haptics.js";
+import { assetStageId, lastStageId } from "./stages.js";
 import {
     getDisplayedHighScore,
     getWorldBestLabel,
@@ -149,19 +150,33 @@ export class PhaserGameScene extends Phaser.Scene {
         var stageId = gameState.stageId || 0;
         this.stageKey = "stage" + String(stageId);
 
-        var enemyList = this.recipe[this.stageKey] ? this.recipe[this.stageKey].enemylist : [];
+        var stageData = this.recipe[this.stageKey] || {};
+        var enemyList = stageData.enemylist;
         this.stageEnemyPositionList = (enemyList || []).slice().reverse();
+        // Pacing: a level can say which scroll row each wave came from, so an
+        // imported stage keeps its rhythm instead of dealing every wave out on
+        // the same fixed beat. Reversed alongside enemylist.
+        this.stageWaveRows = Array.isArray(stageData.waveRows) &&
+            stageData.waveRows.length === (enemyList || []).length
+            ? stageData.waveRows.slice().reverse()
+            : null;
+        if (this.stageWaveRows && Number.isFinite(stageData.waveInterval) && stageData.waveInterval > 0) {
+            this.waveInterval = stageData.waveInterval;
+        }
 
         if (gameState.shortFlg) {
             this.stageEnemyPositionList = [];
+            this.stageWaveRows = null;
         }
 
+        // Per-stage art only exists for five stages; stage 5 and up borrow it.
+        var assetStage = assetStageId(stageId);
         var bgSuffix = gameState.hasCustomEnemies ? "stage_loop_c" : "stage_loop";
         var bgEndSuffix = gameState.hasCustomEnemies ? "stage_end_c" : "stage_end";
-        this.stageBg = this.add.tileSprite(0, 0, GW, GH, bgSuffix + stageId);
+        this.stageBg = this.add.tileSprite(0, 0, GW, GH, bgSuffix + assetStage);
         this.stageBg.setOrigin(0, 0);
 
-        this.stageEndBg = this.add.image(0, 0, bgEndSuffix + stageId);
+        this.stageEndBg = this.add.image(0, 0, bgEndSuffix + assetStage);
         this.stageEndBg.setOrigin(0, 0);
         this.stageEndBg.y = -this.stageEndBg.height;
         this.stageEndBg.setVisible(false);
@@ -233,7 +248,7 @@ export class PhaserGameScene extends Phaser.Scene {
 
         var self = this;
         this.time.delayedCall(2600, function () {
-            self.playSound("g_stage_voice_" + String(stageId), 0.7);
+            self.playSound("g_stage_voice_" + String(assetStage), 0.7);
         });
     }
 
@@ -368,7 +383,7 @@ export class PhaserGameScene extends Phaser.Scene {
         // voice before the normal stage title sequence
         var preDelay = 0;
         var preOverlay = null;
-        if (stageId === 4) {
+        if (stageId === lastStageId(this.recipe) && stageId > 0) {
             preOverlay = this.add.rectangle(GCX, GCY, GW, GH, 0x000000);
             preOverlay.setDepth(202);
             preOverlay.setAlpha(1);
@@ -393,7 +408,7 @@ export class PhaserGameScene extends Phaser.Scene {
             bg.setDepth(200);
             bg.setAlpha(0);
 
-            var stageNumIdx = Math.min(stageId + 1, 4);
+            var stageNumIdx = Math.min(assetStageId(stageId) + 1, 4);
             var stageNumSprite = self.add.image(0, GCY - 20, "game_ui", "stageNum" + String(stageNumIdx) + ".gif");
             stageNumSprite.setOrigin(0, 0);
             stageNumSprite.setDepth(201);
@@ -408,7 +423,7 @@ export class PhaserGameScene extends Phaser.Scene {
             self.tweens.add({ targets: bg, alpha: 1, duration: 300 });
 
             self.time.delayedCall(300, function () {
-                self.playSound("voice_round" + String(Math.min(stageId, 3)), 0.7);
+                self.playSound("voice_round" + String(Math.min(assetStageId(stageId), 3)), 0.7);
                 self.tweens.add({ targets: stageNumSprite, alpha: 1, duration: 300 });
             });
 
@@ -812,7 +827,7 @@ export class PhaserGameScene extends Phaser.Scene {
     // =================================================================
     playBossBgm(stageId) {
         var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
-        var name = bossNames[stageId] || "bison";
+        var name = bossNames[assetStageId(stageId)] || "bison";
         var key = "boss_" + name + "_bgm";
         this.stageBgmName = key;
 
@@ -1215,7 +1230,27 @@ export class PhaserGameScene extends Phaser.Scene {
         // --- Wave spawning ---
         if (this.enemyWaveFlg) {
             this.enemyWaveFrameCounter += 1;
-            if (this.enemyWaveFrameCounter >= this.waveInterval) {
+            if (this.stageWaveRows) {
+                // The level carries the scroll row of every wave, so waves are
+                // due when the stage has scrolled that far — the gaps between
+                // them are part of the level, not an artefact of a fixed beat.
+                var first = this.stageWaveRows[0];
+                while (
+                    this.waveCount < this.stageEnemyPositionList.length &&
+                    this.enemyWaveFrameCounter >=
+                        (this.stageWaveRows[this.waveCount] - first) * this.waveInterval
+                ) {
+                    _enemyWave(this);
+                }
+                // Past the last wave the boss is due after one more beat.
+                if (
+                    this.waveCount >= this.stageEnemyPositionList.length &&
+                    this.enemyWaveFrameCounter >=
+                        (this.stageWaveRows[this.stageWaveRows.length - 1] - first + 1) * this.waveInterval
+                ) {
+                    _enemyWave(this);
+                }
+            } else if (this.enemyWaveFrameCounter >= this.waveInterval) {
                 this.enemyWaveFrameCounter -= this.waveInterval;
                 _enemyWave(this);
             }
