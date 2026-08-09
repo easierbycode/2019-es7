@@ -2679,21 +2679,30 @@
             return base;
         }
 
-        // Queue the default player's baked frames (duke_0.., the sparkler shot,
-        // the big shot, the 3-way and the shield) for the atlas. None of them
-        // ship in game_asset, so without this the new player draws as nothing.
-        // Marked custom so Save Game writes them into the level's own atlas.
+        // Make sure the default player's frames (duke_0.., the sparkler shot,
+        // the big shot, the 3-way and the shield) are in the atlas. They ship in
+        // game_asset, so normally this finds them all and does nothing; it earns
+        // its keep on an atlas that lacks them — a game loaded from another
+        // project, or one repacked before the player changed — where the ship
+        // would otherwise draw as nothing.
+        //
+        // Only genuinely missing frames are marked custom: a frame that is
+        // already in the atlas at the right size needs no per-level copy, and
+        // adding one would write the ten 96x96 shields into every saved game.
         function seedPlayerArt() {
             if (!window.Dezaemon || !window.Dezaemon.decodePlayerArt) return 0;
             const existing = (atlasData && atlasData.frames) || {};
             let n = 0;
             for (const sp of window.Dezaemon.decodePlayerArt()) {
+                const cur = existing[sp.key] && existing[sp.key].frame;
+                if (cur && cur.w === sp.w && cur.h === sp.h) continue;
                 const c = document.createElement('canvas');
                 c.width = sp.w; c.height = sp.h;
                 c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(sp.rgba), sp.w, sp.h), 0, 0);
                 const entry = { key: sp.key, canvas: c, w: sp.w, h: sp.h };
-                // A key the atlas already has is a REPLACEMENT — pushing it into
-                // extraSprites would lay two frames on one slot in the repack.
+                // A key the atlas already has (at a different size) is a
+                // REPLACEMENT — pushing it into extraSprites would lay two
+                // frames on one slot in the repack.
                 if (existing[sp.key]) replacedFrames[sp.key] = entry;
                 else extraSprites.push(entry);
                 customFrameKeys.add(sp.key);
@@ -2949,7 +2958,7 @@
             // mapSaveToGame supplies the Evil Invaders player and its bullets
             // regardless of `defaults` — a Dezaemon save has no player of its
             // own, and the atlas reset below would strip a custom one's frames.
-            const { gameJson, sprites, warnings } = window.Dezaemon.mapSaveToGame(st.decoded, {
+            let { gameJson, sprites, warnings } = window.Dezaemon.mapSaveToGame(st.decoded, {
                 defaults: getDezaemonDefaults(),
                 sourceEntry: save,
                 importedAt: new Date().toISOString(),
@@ -2973,6 +2982,20 @@
                 };
                 fix(gameJson.enemyData); fix(gameJson.bossData); fix(gameJson.playerData);
             };
+            // The default player's frames ship in game_asset, and mapSaveToGame
+            // appends them to `sprites` for atlases that lack them. Here they
+            // are already present and identical, so re-adding them would rename
+            // every one as a "collision" (duke_0 -> duke_0_2.gif) and bloat the
+            // level's own atlas with a second copy of the ten 96x96 shields.
+            const atlasFramesNow = (atlasData && atlasData.frames) || {};
+            const sameSizeInAtlas = (sp) => {
+                const f = atlasFramesNow[sp.key] && atlasFramesNow[sp.key].frame;
+                return !!(f && f.w === sp.w && f.h === sp.h);
+            };
+            const playerArtKeys = new Set(
+                (window.Dezaemon.decodePlayerArt ? window.Dezaemon.decodePlayerArt() : []).map((f) => f.key)
+            );
+            sprites = sprites.filter((sp) => !(playerArtKeys.has(sp.key) && sameSizeInAtlas(sp)));
             for (const sp of sprites) {
                 let key = sp.key;
                 if (existing.has(key)) {
@@ -5263,7 +5286,13 @@ function GAME3D_RUNTIME(DATA) {
                                 nextCustom.add(key);
                             }
                             customFrameKeys = nextCustom;
-                            renderAtlas();
+                            // Fold them into the atlas rather than leaving them
+                            // in replacedFrames/extraSprites. Only atlasData is
+                            // published to the viewers and to Play, so a level
+                            // loaded from the cloud used to play with none of
+                            // its own art — its enemies and its ship resolved to
+                            // whatever the local atlas happened to have.
+                            mergeExtraSpritesIntoAtlas().then(renderAtlas);
                         };
                         fbImg.onerror = () => {
                             customFrameKeys = new Set();

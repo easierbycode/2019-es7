@@ -3799,6 +3799,466 @@
 				"w": 256,
 				"h": 256
 			}
+		},
+		"shield0.png": {
+			"frame": {
+				"x": 4,
+				"y": 1988,
+				"w": 96,
+				"h": 96
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 96,
+				"h": 96
+			},
+			"sourceSize": {
+				"w": 96,
+				"h": 96
+			}
+		},
+		"shield1.png": {
+			"frame": {
+				"x": 104,
+				"y": 1988,
+				"w": 96,
+				"h": 96
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 96,
+				"h": 96
+			},
+			"sourceSize": {
+				"w": 96,
+				"h": 96
+			}
+		},
+		"shield2.png": {
+			"frame": {
+				"x": 204,
+				"y": 1988,
+				"w": 96,
+				"h": 96
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 96,
+				"h": 96
+			},
+			"sourceSize": {
+				"w": 96,
+				"h": 96
+			}
+		},
+		"shield3.png": {
+			"frame": {
+				"x": 304,
+				"y": 1988,
+				"w": 96,
+				"h": 96
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 96,
+				"h": 96
+			},
+			"sourceSize": {
+				"w": 96,
+				"h": 96
+			}
+		},
+		"shield4.png": {
+			"frame": {
+				"x": 404,
+				"y": 1988,
+				"w": 96,
+				"h": 96
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 96,
+				"h": 96
+			},
+			"sourceSize": {
+				"w": 96,
+				"h": 96
+			}
+		},
+		"shield5.png": {
+			"frame": {
+				"x": 504,
+				"y": 1988,
+				"w": 96,
+				"h": 96
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 96,
+				"h": 96
+			},
+			"sourceSize": {
+				"w": 96,
+				"h": 96
+			}
+		},
+		"shield6.png": {
+			"frame": {
+				"x": 604,
+				"y": 1988,
+				"w": 96,
+				"h": 96
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 96,
+				"h": 96
+			},
+			"sourceSize": {
+				"w": 96,
+				"h": 96
+			}
+		},
+		"shield7.png": {
+			"frame": {
+				"x": 704,
+				"y": 1988,
+				"w": 96,
+				"h": 96
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 96,
+				"h": 96
+			},
+			"sourceSize": {
+				"w": 96,
+				"h": 96
+			}
+		},
+		"shield8.png": {
+			"frame": {
+				"x": 804,
+				"y": 1988,
+				"w": 96,
+				"h": 96
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 96,
+				"h": 96
+			},
+			"sourceSize": {
+				"w": 96,
+				"h": 96
+			}
+		},
+		"shield9.png": {
+			"frame": {
+				"x": 904,
+				"y": 1988,
+				"w": 96,
+				"h": 96
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 96,
+				"h": 96
+			},
+			"sourceSize": {
+				"w": 96,
+				"h": 96
+			}
+		},
+		"duke_1": {
+			"frame": {
+				"x": 1004,
+				"y": 1988,
+				"w": 31,
+				"h": 48
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 31,
+				"h": 48
+			},
+			"sourceSize": {
+				"w": 31,
+				"h": 48
+			}
+		},
+		"duke_3": {
+			"frame": {
+				"x": 1039,
+				"y": 1988,
+				"w": 31,
+				"h": 44
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 31,
+				"h": 44
+			},
+			"sourceSize": {
+				"w": 31,
+				"h": 44
+			}
+		},
+		"duke_2": {
+			"frame": {
+				"x": 1074,
+				"y": 1988,
+				"w": 31,
+				"h": 39
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 31,
+				"h": 39
+			},
+			"sourceSize": {
+				"w": 31,
+				"h": 39
+			}
+		},
+		"duke_0": {
+			"frame": {
+				"x": 1109,
+				"y": 1988,
+				"w": 31,
+				"h": 38
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 31,
+				"h": 38
+			},
+			"sourceSize": {
+				"w": 31,
+				"h": 38
+			}
+		},
+		"bigProjectile_2.png": {
+			"frame": {
+				"x": 1144,
+				"y": 1988,
+				"w": 29,
+				"h": 18
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 29,
+				"h": 18
+			},
+			"sourceSize": {
+				"w": 29,
+				"h": 18
+			}
+		},
+		"bigProjectile_3.png": {
+			"frame": {
+				"x": 1177,
+				"y": 1988,
+				"w": 30,
+				"h": 18
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 30,
+				"h": 18
+			},
+			"sourceSize": {
+				"w": 30,
+				"h": 18
+			}
+		},
+		"bigProjectile_1.png": {
+			"frame": {
+				"x": 1211,
+				"y": 1988,
+				"w": 24,
+				"h": 12
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 24,
+				"h": 12
+			},
+			"sourceSize": {
+				"w": 24,
+				"h": 12
+			}
+		},
+		"bigProjectile0.png": {
+			"frame": {
+				"x": 1239,
+				"y": 1988,
+				"w": 14,
+				"h": 12
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 14,
+				"h": 12
+			},
+			"sourceSize": {
+				"w": 14,
+				"h": 12
+			}
+		},
+		"bigProjectile1.png": {
+			"frame": {
+				"x": 1257,
+				"y": 1988,
+				"w": 14,
+				"h": 12
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 14,
+				"h": 12
+			},
+			"sourceSize": {
+				"w": 14,
+				"h": 12
+			}
+		},
+		"bigProjectile2.png": {
+			"frame": {
+				"x": 1275,
+				"y": 1988,
+				"w": 14,
+				"h": 12
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 14,
+				"h": 12
+			},
+			"sourceSize": {
+				"w": 14,
+				"h": 12
+			}
+		},
+		"hadoken0.png": {
+			"frame": {
+				"x": 1293,
+				"y": 1988,
+				"w": 15,
+				"h": 9
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 15,
+				"h": 9
+			},
+			"sourceSize": {
+				"w": 15,
+				"h": 9
+			}
+		},
+		"hadoken1.png": {
+			"frame": {
+				"x": 1312,
+				"y": 1988,
+				"w": 15,
+				"h": 9
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 15,
+				"h": 9
+			},
+			"sourceSize": {
+				"w": 15,
+				"h": 9
+			}
+		},
+		"bigProjectile_0.png": {
+			"frame": {
+				"x": 1331,
+				"y": 1988,
+				"w": 23,
+				"h": 8
+			},
+			"rotated": false,
+			"trimmed": false,
+			"spriteSourceSize": {
+				"x": 0,
+				"y": 0,
+				"w": 23,
+				"h": 8
+			},
+			"sourceSize": {
+				"w": 23,
+				"h": 8
+			}
 		}
 	},
 	"meta": {
@@ -3808,9 +4268,8 @@
 		"format": "RGBA8888",
 		"size": {
 			"w": 2048,
-			"h": 2048
+			"h": 2088
 		},
-		"scale": "1",
-		"smartupdate": "$TexturePacker:SmartUpdate:2f213a6b451f9f5719773418dfe80ae8$"
+		"scale": "1"
 	}
 }

@@ -218,36 +218,37 @@
 	
 
 	"playerData": {
-		"name"			: "G",
+		"name"			: "duke",
 		"maxHp"			: 3,
 		"spDamage"		: 50,
+		"speed"			: 150,
 		"defaultShootName"  : "normal",
 		"defaultShootSpeed" : "speed_normal",
-		"texture"		: ["player00.gif", "player01.gif", "player02.gif", "player03.gif", "player04.gif", "player05.gif"],
+		"texture"		: ["duke_0", "duke_1", "duke_2", "duke_3"],
 		"shootNormal"	: {
 			"name"			: "normal",
 			"damage"			: 1,
 			"hp"				: 1,
 			"interval"		: 23,
-			"texture"		: ["shot00.gif","shot01.gif","shot02.gif","shot03.gif"]
+			"texture"		: ["bigProjectile_0.png","bigProjectile_1.png","bigProjectile_2.png","bigProjectile_3.png"]
 		},
 		"shootBig"		: {
 			"name"			: "big",
 			"damage"			: 2,
 			"hp"				: 100,
 			"interval"		: 39,
-			"texture"		: ["shotBig00.gif","shotBig01.gif","shotBig02.gif","shotBig03.gif"]
+			"texture"		: ["bigProjectile0.png","bigProjectile1.png","bigProjectile2.png"]
 		},
 		"shoot3way"		: {
 			"name"			: "3way",
 			"damage"			: 1,
 			"hp"				: 1,
 			"interval"		: 31,
-			"texture"		: ["shot00.gif","shot01.gif","shot02.gif","shot03.gif"]
+			"texture"		: ["hadoken0.png","hadoken1.png"]
 		},
 		"barrier"		: {
 			"time"			: 4,
-			"texture"		: ["barrier0.gif","barrier1.gif","barrier2.gif","barrier3.gif"]
+			"texture"		: ["shield0.png","shield1.png","shield2.png","shield3.png","shield4.png","shield5.png","shield6.png","shield7.png","shield8.png","shield9.png"]
 		}
 	},
 
