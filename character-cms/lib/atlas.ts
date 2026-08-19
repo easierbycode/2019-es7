@@ -166,7 +166,12 @@ export function loadAtlas(
   return promise;
 }
 
-/** Draw a frame centered at (dx, dy), pixelated, optionally scaled. */
+/**
+ * Draw a frame centered at (dx, dy), pixelated, optionally scaled and rotated.
+ * `rotation` is radians clockwise about the centre, matching Phaser's
+ * `setRotation` — bullet art is drawn facing right and rotated into its
+ * direction of travel.
+ */
 export function drawFrame(
   ctx: CanvasRenderingContext2D,
   atlas: Atlas,
@@ -174,16 +179,27 @@ export function drawFrame(
   dx: number,
   dy: number,
   scale = 1,
+  rotation = 0,
 ): boolean {
   const f = resolveFrame(atlas, name);
   if (!f) return false;
+  const w = f.w * scale;
+  const h = f.h * scale;
+  if (rotation) {
+    ctx.save();
+    ctx.translate(dx, dy);
+    ctx.rotate(rotation);
+    ctx.drawImage(atlas.image, f.x, f.y, f.w, f.h, -w / 2, -h / 2, w, h);
+    ctx.restore();
+    return true;
+  }
   ctx.drawImage(
     atlas.image,
     f.x, f.y, f.w, f.h,
-    Math.round(dx - (f.w * scale) / 2),
-    Math.round(dy - (f.h * scale) / 2),
-    f.w * scale,
-    f.h * scale,
+    Math.round(dx - w / 2),
+    Math.round(dy - h / 2),
+    w,
+    h,
   );
   return true;
 }
