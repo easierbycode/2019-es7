@@ -46,6 +46,10 @@
   let editorEl: HTMLDivElement | null = $state(null);
   // deno-lint-ignore no-explicit-any
   let cmView: any = null;
+  // Wired up once CodeMirror has loaded; null until then so the buttons
+  // disable themselves rather than throwing.
+  let cmFoldAll: (() => void) | null = $state(null);
+  let cmUnfoldAll: (() => void) | null = $state(null);
   // Used to suppress reflowing the editor with our own outgoing change.
   let suppressRemoteApply = false;
   let unsubFB: (() => void) | null = null;
@@ -70,7 +74,16 @@
       { defaultKeymap, history, historyKeymap },
       { json },
       { oneDark },
-      { syntaxHighlighting, defaultHighlightStyle, bracketMatching, indentOnInput },
+      {
+        syntaxHighlighting,
+        defaultHighlightStyle,
+        bracketMatching,
+        indentOnInput,
+        foldGutter,
+        foldKeymap,
+        foldAll,
+        unfoldAll,
+      },
     ] = await Promise.all([
       import("@codemirror/state"),
       import("@codemirror/view"),
@@ -93,13 +106,16 @@
         doc: textValue,
         extensions: [
           lineNumbers(),
+          // Arrows in the gutter collapse each object/array; the json()
+          // language provides the fold ranges.
+          foldGutter(),
           highlightActiveLine(),
           history(),
           json(),
           bracketMatching(),
           indentOnInput(),
           syntaxHighlighting(defaultHighlightStyle),
-          keymap.of([...defaultKeymap, ...historyKeymap]),
+          keymap.of([...defaultKeymap, ...historyKeymap, ...foldKeymap]),
           oneDark,
           updateListener,
           EditorView.theme({
@@ -109,6 +125,13 @@
         ],
       }),
     });
+
+    // Fold/unfold every object and array in the document. Held on the component
+    // so the toolbar buttons can reach them without re-importing the module;
+    // they stay disabled until CodeMirror is up.
+    const view = cmView;
+    cmFoldAll = () => { foldAll(view); view.focus(); };
+    cmUnfoldAll = () => { unfoldAll(view); view.focus(); };
   }
 
   function applyRemoteToEditor(text: string) {
@@ -209,6 +232,12 @@
     </div>
     <div class="toolbar">
       <button class="btn" onclick={formatJson}>Format</button>
+      <button class="btn" onclick={() => cmFoldAll?.()} disabled={!cmFoldAll}>
+        Collapse all
+      </button>
+      <button class="btn" onclick={() => cmUnfoldAll?.()} disabled={!cmUnfoldAll}>
+        Expand all
+      </button>
       <button class="btn" onclick={reloadFromRemote}>Revert</button>
       <button class="btn primary" onclick={saveNow} disabled={!!parseError}>Save now</button>
     </div>
@@ -230,6 +259,7 @@
       <CharacterPreview
         kind={kind}
         gameKey={gameKey}
+        entryKey={entryKey}
         data={parsedValue}
       />
     </div>
