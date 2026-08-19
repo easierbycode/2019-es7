@@ -12,7 +12,7 @@
 
   import { onMount } from "svelte";
   import { loadSpriteX, SPRITEX_BASE } from "../lib/spritex.ts";
-  import { getDB, ref as fbRef, get as fbGet, update as fbUpdate } from "../lib/firebase.ts";
+  import { getDB, ref as fbRef, get as fbGet } from "../lib/firebase.ts";
 
   // deno-lint-ignore no-explicit-any
   let mod: any = $state(null);
@@ -58,9 +58,10 @@
     const ctx = c.getContext("2d");
     if (!ctx) return;
     ctx.drawImage(imageBitmap, 0, 0);
-    const id = ctx.getImageData(0, 0, c.width, c.height);
     try {
-      const result = mod.smartDetectSprites(id);
+      // smartDetectSprites reads the pixels itself — it wants the context and
+      // its dimensions, not an ImageData.
+      const result = mod.smartDetectSprites(ctx, c.width, c.height);
       // deno-lint-ignore no-explicit-any
       detected = (result.sprites ?? []).map((s: any, i: number) => ({
         x: s.x, y: s.y, w: s.w, h: s.h,
@@ -104,47 +105,65 @@
     if (f) handleFile(f);
   }
 
+  /** Frame count of an atlas json, in any of the shapes RTDB holds. */
+  // deno-lint-ignore no-explicit-any
+  function frameCount(raw: any): number {
+    let json = raw;
+    for (let i = 0; i < 2 && typeof json === "string"; i++) {
+      try { json = JSON.parse(json); } catch { return 0; }
+    }
+    const frames = json?.frames ?? json?.textures?.[0]?.frames;
+    if (Array.isArray(frames)) return frames.length;
+    if (frames && typeof frames === "object") return Object.keys(frames).length;
+    return 0;
+  }
+
   async function pushToAtlas() {
     if (!mod || !imageBitmap || !detected.length) return;
     saveError = null; savingMsg = "Packing…";
     try {
-      // Build per-sprite ImageData objects from the source.
-      const c = document.createElement("canvas");
-      c.width = imageBitmap.width; c.height = imageBitmap.height;
-      const ctx = c.getContext("2d");
-      if (!ctx) throw new Error("no 2d context");
-      ctx.drawImage(imageBitmap, 0, 0);
+      // buildAtlas packs a { name -> PNG dataURL } map, so cut each detected
+      // rect out of the source into its own canvas first.
+      const named: Record<string, string> = {};
+      for (const d of detected) {
+        const cell = document.createElement("canvas");
+        cell.width = d.w; cell.height = d.h;
+        const cctx = cell.getContext("2d");
+        if (!cctx) throw new Error("no 2d context");
+        cctx.imageSmoothingEnabled = false;
+        cctx.drawImage(imageBitmap, d.x, d.y, d.w, d.h, 0, 0, d.w, d.h);
+        named[d.name] = cell.toDataURL("image/png");
+      }
 
-      const sprites = detected.map((d) => ({
-        name: d.name,
-        rect: { x: d.x, y: d.y, w: d.w, h: d.h },
-        image: ctx.getImageData(d.x, d.y, d.w, d.h),
-      }));
+      const built = await mod.buildAtlas(named);
 
-      const built = await mod.buildAtlas(sprites, { padding: 2 });
-
-      savingMsg = `Merging into atlas "${atlasKey}"…`;
-      // Merge with existing atlas if present (so we don't clobber).
+      savingMsg = `Saving atlas "${atlasKey}"…`;
+      // saveAtlas *replaces* atlases/<key> — it does a set, not an update. That
+      // namespace is shared with spriteX and other games, so an existing atlas
+      // has to be confirmed before these frames wipe it.
       const db = getDB();
       const snap = await fbGet(fbRef(db, `atlases/${atlasKey}`));
-      // deno-lint-ignore no-explicit-any
-      let mergedJson: any = built.json;
       if (snap.exists()) {
         const existing = snap.val() as { json?: unknown };
-        if (existing?.json) {
-          // For merge, we let spriteX's saveAtlas handle it if available.
-          // Otherwise just overwrite — user is warned via savingMsg.
+        const count = frameCount(existing?.json);
+        const ok = confirm(
+          `atlases/${atlasKey} already exists` +
+            (count ? ` with ${count} frame(s)` : "") +
+            `.
+
+Saving replaces it outright with the ${detected.length} ` +
+            `frame(s) detected here. The existing frames will be lost.
+
+` +
+            `Replace it?`,
+        );
+        if (!ok) {
+          savingMsg = null;
+          return;
         }
       }
 
-      if (typeof mod.saveAtlas === "function") {
-        await mod.saveAtlas(atlasKey, { json: mergedJson, png: built.png });
-      } else {
-        await fbUpdate(fbRef(db, `atlases/${atlasKey}`), {
-          json: mergedJson,
-          png: built.png,
-        });
-      }
+      await mod.saveAtlas(atlasKey, { json: built.json, png: built.dataURL });
 
       savingMsg = `Saved ${detected.length} frame(s) to atlases/${atlasKey}.`;
     } catch (e) {
