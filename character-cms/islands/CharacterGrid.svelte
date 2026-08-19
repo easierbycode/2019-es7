@@ -9,6 +9,7 @@
   import { onDestroy, onMount } from "svelte";
   import { getDB, onValue, ref as fbRef } from "../lib/firebase.ts";
   import { type Atlas, loadAtlas } from "../lib/atlas.ts";
+  import { spriteFrames } from "../lib/character.ts";
   import FrameLoop from "./FrameLoop.svelte";
 
   interface Props {
@@ -37,10 +38,8 @@
 
   let unsubs: Array<() => void> = [];
 
-  // deno-lint-ignore no-explicit-any
-  function frameList(d: any): string[] {
-    return Array.isArray(d?.texture) ? d.texture : [];
-  }
+  // Bosses keep their frames under anim.idle, not texture — see lib/character.ts.
+  const frameList = spriteFrames;
 
   function rebuild(
     // deno-lint-ignore no-explicit-any
