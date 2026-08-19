@@ -21,10 +21,6 @@ export default function App({ Component, url }: PageProps) {
       </head>
       <body>
         <header class="topbar">
-          <div class="brand">
-            <span class="brand-mark">EI</span>
-            <span class="brand-name">Character CMS</span>
-          </div>
           <nav class="nav">
             {navItem("/", "Overview")}
             {navItem("/players", "Players")}
