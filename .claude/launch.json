@@ -9,6 +9,12 @@
       "autoPort": true
     },
     {
+      "name": "character-cms",
+      "runtimeExecutable": "cmd.exe",
+      "runtimeArgs": ["/c", "cd", "character-cms", "&&", "deno", "task", "dev", "--port", "5175", "--strictPort"],
+      "port": 5175
+    },
+    {
       "name": "ps2-sp-demo",
       "runtimeExecutable": "cmd.exe",
       "runtimeArgs": ["/c", "npx", "vite", "--config", "ps2-sp-demo/vite.config.ts", "--port", "5180", "--strictPort"],

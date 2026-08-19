@@ -49,6 +49,54 @@ function stripDenoDepQuery(): Plugin {
   };
 }
 
+// Keep Vite's dependency optimizer switched OFF.
+//
+// @fresh/plugin-vite sets `optimizeDeps.noDiscovery: true` on purpose ("Optimize
+// deps somehow leads to duplicate modules"). Vite only *really* disables the
+// optimizer when noDiscovery is set AND `optimizeDeps.include` is empty; a
+// non-empty include list brings it back to life. @sveltejs/vite-plugin-svelte
+// contributes an include list (svelte + its dependency reinclusions), and Vite
+// merges plugin arrays by concatenation — so adding Svelte silently re-enabled
+// the optimizer.
+//
+// With the optimizer live, `vite:resolve` appends `?v=<browserHash>` to every
+// node_modules resolution it handles (ensureVersionQuery). Fresh's Deno plugin
+// resolves bare specifiers itself at `enforce: "pre"`, so imports coming from
+// Deno-resolved modules never get that query. The result was two URLs for one
+// file, i.e. two live copies of Preact:
+//
+//   preact/dist/preact.module.js?v=3589703d   <- islands, fresh:client-entry
+//   preact/dist/preact.module.js              <- fresh's preact_hooks_client.ts
+//
+// Two copies means two `options` objects. Fresh hydrated with one of them while
+// islands pulled hooks bound to the other, so `currentComponent` was never set
+// for the island's hooks module and preact/debug threw
+// "Hook can only be invoked from render methods." on the first useRef.
+//
+// Nothing here needs pre-bundling — every dep is ESM resolved through Deno's
+// node_modules — so emptying the include list is the whole fix.
+function disableDepOptimizer(): Plugin {
+  return {
+    name: "disable-dep-optimizer",
+    enforce: "post",
+    config(config) {
+      config.optimizeDeps = {
+        ...config.optimizeDeps,
+        noDiscovery: true,
+        include: [],
+      };
+      const client = config.environments?.client;
+      if (client?.optimizeDeps) {
+        client.optimizeDeps = {
+          ...client.optimizeDeps,
+          noDiscovery: true,
+          include: [],
+        };
+      }
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [
     stripDenoDepQuery(),
@@ -60,6 +108,7 @@ export default defineConfig({
       preprocess: [vitePreprocess()],
       compilerOptions: { runes: true },
     }),
+    disableDepOptimizer(),
   ],
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".jsx", ".svelte"],
