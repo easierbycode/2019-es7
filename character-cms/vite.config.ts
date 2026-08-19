@@ -11,6 +11,9 @@ import { defineConfig, type Plugin } from "vite";
 import { fresh } from "@fresh/plugin-vite";
 import { svelte, vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { env } from "node:process";
 
 // Workaround for @fresh/plugin-vite's Deno loader (src/plugins/deno.ts).
 // Its `load` hook does `path.toFileUrl(id)` and hands the result to Deno's
@@ -45,6 +48,65 @@ function stripDenoDepQuery(): Plugin {
         return { code: readFileSync(clean, "utf8"), map: null };
       }
       return null;
+    },
+  };
+}
+
+// Expose the game's own texture atlases to the CMS at /game-assets/<key>.{json,png}.
+//
+// The Phaser runtime loads `assets/game_asset.json` + `assets/img/game_asset.png`
+// straight off disk (see src/phaser/BootScene.js), so those files — not RTDB —
+// are what the game actually renders. RTDB's shared spriteX namespace happens to
+// contain an unrelated atlas ALSO called "game_asset" (monkeyBrain/flirty_girl
+// frames from another game), which is what the previews used to bind to: every
+// lookup missed and the canvases came up empty.
+//
+// character-cms is a Vite root of its own, so ../assets is outside it. Serve the
+// two files by hand in dev and copy them into the client bundle on build.
+const GAME_ASSETS_ROUTE = "/game-assets/";
+const GAME_ASSETS_DIR = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "assets",
+);
+
+/** /game-assets/foo.json -> ../assets/foo.json; /game-assets/foo.png -> ../assets/img/foo.png */
+function gameAssetPath(name: string): string | null {
+  if (!/^[\w.-]+\.(json|png)$/.test(name)) return null; // no traversal, no surprises
+  const file = name.endsWith(".png")
+    ? join(GAME_ASSETS_DIR, "img", name)
+    : join(GAME_ASSETS_DIR, name);
+  return existsSync(file) ? file : null;
+}
+
+function gameAssets(): Plugin {
+  return {
+    name: "game-assets",
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const url = (req.url ?? "").split("?")[0];
+        if (!url.startsWith(GAME_ASSETS_ROUTE)) return next();
+        const file = gameAssetPath(url.slice(GAME_ASSETS_ROUTE.length));
+        if (!file) return next();
+        res.setHeader(
+          "content-type",
+          file.endsWith(".png") ? "image/png" : "application/json",
+        );
+        res.end(readFileSync(file));
+      });
+    },
+    // Client build only — the SSR bundle has no use for them.
+    generateBundle(_options, _bundle) {
+      if (this.environment?.name !== "client") return;
+      for (const name of ["game_asset.json", "game_asset.png"]) {
+        const file = gameAssetPath(name);
+        if (!file) continue;
+        this.emitFile({
+          type: "asset",
+          fileName: `game-assets/${name}`,
+          source: readFileSync(file),
+        });
+      }
     },
   };
 }
@@ -100,6 +162,7 @@ function disableDepOptimizer(): Plugin {
 export default defineConfig({
   plugins: [
     stripDenoDepQuery(),
+    gameAssets(),
     fresh(),
     svelte({
       // vitePreprocess strips TS from <script lang="ts"> via esbuild before
@@ -110,6 +173,9 @@ export default defineConfig({
     }),
     disableDepOptimizer(),
   ],
+  // Vite does not read PORT on its own; honouring it lets a launcher place the
+  // dev server on a free port. Unset leaves Vite's own default (5173) alone.
+  server: env.PORT ? { port: Number(env.PORT) } : {},
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".jsx", ".svelte"],
   },

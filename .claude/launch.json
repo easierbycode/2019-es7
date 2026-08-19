@@ -11,8 +11,9 @@
     {
       "name": "character-cms",
       "runtimeExecutable": "cmd.exe",
-      "runtimeArgs": ["/c", "cd", "character-cms", "&&", "deno", "task", "dev", "--port", "5175", "--strictPort"],
-      "port": 5175
+      "runtimeArgs": ["/c", "cd", "character-cms", "&&", "deno", "task", "dev"],
+      "port": 5175,
+      "autoPort": true
     },
     {
       "name": "ps2-sp-demo",

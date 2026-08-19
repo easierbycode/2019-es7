@@ -8,12 +8,17 @@
   //   3. Projectile preview        — emits projectiles using bulletData /
   //                                 shootNormal config.
   //
-  // Frames are loaded from the atlas at /atlases/<atlasKey>/{json,png} or
-  // /games/<gameKey>/atlases/<atlasKey>/{json,png}. Sprite sheets in the
-  // game use the "game_asset" atlas by default.
+  // Frames come from lib/atlas.ts, which prefers the game's own on-disk
+  // atlas (/game-assets/<atlasKey>.{json,png}) over RTDB's shared spriteX
+  // namespace. Sprite sheets in the game use the "game_asset" atlas.
 
   import { onDestroy } from "svelte";
-  import { getDB, ref as fbRef, get as fbGet } from "../lib/firebase.ts";
+  import {
+    type Atlas,
+    drawFrame as drawAtlasFrame,
+    loadAtlas,
+    missingFrames,
+  } from "../lib/atlas.ts";
 
   interface Props {
     kind: "player" | "enemy" | "boss";
@@ -25,85 +30,45 @@
 
   let { kind, gameKey, data, atlasKey = "game_asset" }: Props = $props();
 
-  // -- Atlas loader (caches PNG + JSON, parses frames) ---------------------
-  type Frame = { x: number; y: number; w: number; h: number };
-  type Atlas = { image: HTMLImageElement; frames: Record<string, Frame> };
-
-  // deno-lint-ignore no-explicit-any
-  function decodeAtlasJson(raw: any): any {
-    if (raw == null) return null;
-    if (typeof raw === "object") return raw;
-    if (typeof raw === "string") {
-      try {
-        const once = JSON.parse(raw);
-        if (typeof once === "string") return JSON.parse(once);
-        return once;
-      } catch { return null; }
-    }
-    return null;
-  }
-
-  function decodeKey(k: string): string {
-    if (!k.startsWith("k_")) return k;
-    const hex = k.slice(2);
-    let out = "";
-    for (let i = 0; i < hex.length; i += 4) {
-      out += String.fromCodePoint(parseInt(hex.slice(i, i + 4), 16));
-    }
-    return out;
-  }
-
-  async function loadAtlas(key: string): Promise<Atlas | null> {
-    const db = getDB();
-    const candidates = [
-      `games/${gameKey}/atlases/${key}`,
-      `atlases/${key}`,
-    ];
-    for (const path of candidates) {
-      try {
-        const snap = await fbGet(fbRef(db, path));
-        if (!snap.exists()) continue;
-        const v = snap.val() as { json?: unknown; png?: string };
-        const json = decodeAtlasJson(v.json);
-        if (!json || !json.frames) continue;
-        const frames: Record<string, Frame> = {};
-        for (const [name, entry] of Object.entries(json.frames as Record<string, unknown>)) {
-          const f = (entry as { frame?: Frame })?.frame;
-          if (f) frames[decodeKey(name)] = f;
-        }
-        const png = String(v.png ?? "");
-        const src = png.startsWith("data:") ? png : `data:image/png;base64,${png}`;
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const i = new Image();
-          i.onload = () => resolve(i);
-          i.onerror = (e) => reject(e);
-          i.src = src;
-        });
-        return { image: img, frames };
-      } catch {
-        // try next candidate
-      }
-    }
-    return null;
-  }
-
   // -- Reactive: load atlas once, then re-render whenever data changes -----
   let atlas: Atlas | null = $state(null);
   let atlasError: string | null = $state(null);
 
   $effect(() => {
-    void atlasKey;
+    void atlasKey; void gameKey;
     atlas = null;
     atlasError = null;
-    loadAtlas(atlasKey)
+    loadAtlas(atlasKey, gameKey)
       .then((a) => {
         if (a) atlas = a;
-        else atlasError = `Atlas "${atlasKey}" not found in RTDB.`;
+        else atlasError = `Atlas "${atlasKey}" not found (checked ` +
+          `games/${gameKey}/atlases/${atlasKey}, /game-assets/${atlasKey}.json ` +
+          `and atlases/${atlasKey}).`;
       })
       .catch((e) => atlasError = String((e as Error).message ?? e));
   });
 
+  // Frame names the JSON asks for that this atlas cannot draw. Surfacing these
+  // is the whole point: an unresolved name used to render as an empty cell,
+  // which looks identical to "still loading".
+  let unresolved: string[] = $derived.by(() => {
+    if (!atlas || !data) return [];
+    // Every texture[] in the entry: the sprite itself plus each shoot/bullet
+    // sub-config (shootNormal, shootBig, shoot3way, bulletData, barrier, …).
+    const wanted: string[] = [];
+    const collect = (v: unknown) => {
+      if (!v || typeof v !== "object") return;
+      const t = (v as { texture?: unknown }).texture;
+      if (Array.isArray(t)) wanted.push(...t.filter((n) => typeof n === "string"));
+    };
+    collect(data);
+    for (const v of Object.values(data)) collect(v);
+    return missingFrames(atlas, [...new Set(wanted)]);
+  });
+
   // -- Frame drawing helper -----------------------------------------------
+  // A frame the atlas cannot resolve draws a red cross rather than nothing, so
+  // a bad frame name shows up in the preview instead of leaving a blank cell.
   function drawFrame(
     ctx: CanvasRenderingContext2D,
     a: Atlas,
@@ -111,15 +76,19 @@
     dx: number, dy: number,
     scale = 1,
   ) {
-    const f = a.frames[name] ?? a.frames[name.replace(/\.png$/, ".gif")] ?? a.frames[name.replace(/\.gif$/, ".png")];
-    if (!f) return false;
-    ctx.drawImage(
-      a.image,
-      f.x, f.y, f.w, f.h,
-      Math.round(dx - (f.w * scale) / 2), Math.round(dy - (f.h * scale) / 2),
-      f.w * scale, f.h * scale,
-    );
-    return true;
+    if (drawAtlasFrame(ctx, a, name, dx, dy, scale)) return true;
+    const s = 16 * scale;
+    ctx.save();
+    ctx.strokeStyle = "#ff6b6b";
+    ctx.setLineDash([3, 3]);
+    ctx.strokeRect(Math.round(dx - s / 2) + 0.5, Math.round(dy - s / 2) + 0.5, s, s);
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(dx - s / 2, dy - s / 2); ctx.lineTo(dx + s / 2, dy + s / 2);
+    ctx.moveTo(dx + s / 2, dy - s / 2); ctx.lineTo(dx - s / 2, dy + s / 2);
+    ctx.stroke();
+    ctx.restore();
+    return false;
   }
 
   // -- 1. Frame strip ------------------------------------------------------
@@ -351,6 +320,14 @@
 <div class="preview-stack">
   {#if atlasError}
     <div class="error-box">{atlasError}</div>
+  {:else if unresolved.length}
+    <div class="error-box">
+      {unresolved.length} frame name{unresolved.length === 1 ? "" : "s"} not in
+      atlas <code>{atlasKey}</code> ({atlas?.source}):
+      <code>{unresolved.slice(0, 12).join(", ")}</code>{unresolved.length > 12
+        ? ` +${unresolved.length - 12} more`
+        : ""}
+    </div>
   {/if}
 
   <div>

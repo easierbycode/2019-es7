@@ -1,7 +1,15 @@
-// Shared atlas loader. Fetches /atlases/<key>/{json,png} (with fallbacks)
-// from RTDB once, decodes the json, builds a frame map, and caches the
-// resulting Image so multiple consumers (preview, grid, etc.) share one
-// network round-trip per atlas.
+// Shared atlas loader. Resolves an atlas key to a decoded frame map plus one
+// cached Image, so multiple consumers (preview, grid, etc.) share a single
+// round-trip per atlas.
+//
+// Sources are tried in order:
+//   1. games/<gameKey>/atlases/<key>  — per-game override in RTDB
+//   2. /game-assets/<key>.{json,png}  — the game's own on-disk atlas, served by
+//                                       the game-assets Vite plugin
+//   3. atlases/<key>                  — the shared spriteX namespace in RTDB
+//
+// (3) is last on purpose: it is a global namespace shared with other games, so
+// a key like "game_asset" there is not necessarily *this* game's atlas.
 
 import { get as fbGet, getDB, ref as fbRef } from "./firebase.ts";
 
@@ -9,6 +17,8 @@ export interface Frame { x: number; y: number; w: number; h: number }
 export interface Atlas {
   image: HTMLImageElement;
   frames: Record<string, Frame>;
+  /** Where the atlas came from, for diagnostics. */
+  source: string;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -36,6 +46,46 @@ export function decodeFrameKey(k: string): string {
   return out;
 }
 
+/**
+ * Build a name -> Frame map from any of the atlas shapes we see in the wild:
+ *
+ *   { frames: { "a.gif": { frame: {...} } } }   TexturePacker hash (assets/*.json)
+ *   { frames: [ { filename: "a.png", frame: {...} } ] }        TexturePacker array
+ *   { textures: [ { frames: [ { filename, frame } ] } ] }      TexturePacker v3
+ *
+ * Only the hash form used to be handled, so array-form atlases produced a map
+ * keyed "0", "1", "2"… and every frame lookup silently missed.
+ */
+// deno-lint-ignore no-explicit-any
+export function normalizeFrames(json: any): Record<string, Frame> | null {
+  const out: Record<string, Frame> = {};
+
+  // deno-lint-ignore no-explicit-any
+  const add = (name: unknown, entry: any) => {
+    if (typeof name !== "string" || !name) return;
+    const f = entry?.frame ?? entry;
+    if (!f) return;
+    for (const k of ["x", "y", "w", "h"]) {
+      if (typeof f[k] !== "number") return;
+    }
+    out[decodeFrameKey(name)] = { x: f.x, y: f.y, w: f.w, h: f.h };
+  };
+
+  // deno-lint-ignore no-explicit-any
+  const eat = (frames: any) => {
+    if (Array.isArray(frames)) {
+      for (const e of frames) add(e?.filename ?? e?.name, e);
+    } else if (frames && typeof frames === "object") {
+      for (const [k, e] of Object.entries(frames)) add(k, e);
+    }
+  };
+
+  eat(json?.frames);
+  if (Array.isArray(json?.textures)) for (const t of json.textures) eat(t?.frames);
+
+  return Object.keys(out).length ? out : null;
+}
+
 const _cache = new Map<string, Promise<Atlas | null>>();
 
 /**
@@ -49,6 +99,42 @@ export function resolveFrame(atlas: Atlas, name: string): Frame | null {
     ?? null;
 }
 
+/** Names in `wanted` that this atlas cannot draw. */
+export function missingFrames(atlas: Atlas, wanted: string[]): string[] {
+  return wanted.filter((n) => !resolveFrame(atlas, n));
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = () => reject(new Error(`image failed to load: ${src.slice(0, 64)}`));
+    i.src = src;
+  });
+}
+
+/** The game's on-disk atlas, served by the game-assets Vite plugin. */
+async function loadLocalAtlas(atlasKey: string): Promise<Atlas | null> {
+  const base = `/game-assets/${atlasKey}`;
+  const res = await fetch(`${base}.json`);
+  if (!res.ok) return null;
+  const frames = normalizeFrames(await res.json());
+  if (!frames) return null;
+  return { image: await loadImage(`${base}.png`), frames, source: base };
+}
+
+async function loadRtdbAtlas(path: string): Promise<Atlas | null> {
+  const snap = await fbGet(fbRef(getDB(), path));
+  if (!snap.exists()) return null;
+  const v = snap.val() as { json?: unknown; png?: string };
+  const frames = normalizeFrames(decodeAtlasJson(v.json));
+  if (!frames) return null;
+  const png = String(v.png ?? "");
+  if (!png) return null;
+  const src = png.startsWith("data:") ? png : `data:image/png;base64,${png}`;
+  return { image: await loadImage(src), frames, source: path };
+}
+
 export function loadAtlas(
   atlasKey: string,
   gameKey?: string,
@@ -58,39 +144,19 @@ export function loadAtlas(
   if (cached) return cached;
 
   const promise = (async (): Promise<Atlas | null> => {
-    const db = getDB();
-    const candidates = [
-      gameKey ? `games/${gameKey}/atlases/${atlasKey}` : null,
-      `atlases/${atlasKey}`,
-    ].filter((p): p is string => !!p);
+    const sources: Array<() => Promise<Atlas | null>> = [];
+    if (gameKey) {
+      sources.push(() => loadRtdbAtlas(`games/${gameKey}/atlases/${atlasKey}`));
+    }
+    sources.push(() => loadLocalAtlas(atlasKey));
+    sources.push(() => loadRtdbAtlas(`atlases/${atlasKey}`));
 
-    for (const path of candidates) {
+    for (const load of sources) {
       try {
-        const snap = await fbGet(fbRef(db, path));
-        if (!snap.exists()) continue;
-        const v = snap.val() as { json?: unknown; png?: string };
-        const json = decodeAtlasJson(v.json);
-        if (!json || !json.frames) continue;
-        const frames: Record<string, Frame> = {};
-        for (
-          const [name, entry] of Object.entries(
-            json.frames as Record<string, unknown>,
-          )
-        ) {
-          const f = (entry as { frame?: Frame })?.frame;
-          if (f) frames[decodeFrameKey(name)] = f;
-        }
-        const png = String(v.png ?? "");
-        const src = png.startsWith("data:") ? png : `data:image/png;base64,${png}`;
-        const img = await new Promise<HTMLImageElement>((resolve, reject) => {
-          const i = new Image();
-          i.onload = () => resolve(i);
-          i.onerror = (e) => reject(e);
-          i.src = src;
-        });
-        return { image: img, frames };
+        const atlas = await load();
+        if (atlas) return atlas;
       } catch {
-        // try next candidate
+        // try next source
       }
     }
     return null;
