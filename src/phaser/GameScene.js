@@ -6,7 +6,20 @@ import { gameState, saveHighScore } from "../gameState.js";
 import { PLAYER_STATES } from "../enums/player-boss-states.js";
 import { triggerHaptic } from "../haptics.js";
 import { assetStageId, lastStageId } from "./stages.js";
-import { buildStageBackground, SCROLL_PX_PER_FRAME } from "./dezaemon-runtime.js";
+import { buildStageBackground, SCROLL_PX_PER_FRAME, startDezaemonBgm, stopDezaemonBgm, playDezaemonSfx } from "./dezaemon-runtime.js";
+
+// Stock sound keys that an imported save's SFX bank replaces.
+var DEZA_SFX_MAP = {
+    se_explosion: "explosion",
+    se_bomb: "explosion",
+    boss_explosion: "bossExplosion",
+    se_finish_akebono: "bossExplosion",
+    se_sp_explosion: "bossExplosion",
+    se_shoot: "shot",
+    se_enemy_shoot: "shot",
+    se_damage: "hit",
+    se_hit: "hit",
+};
 import {
     getDisplayedHighScore,
     getWorldBestLabel,
@@ -99,7 +112,13 @@ export class PhaserGameScene extends Phaser.Scene {
     bossShootRadial(projData, count) { _bossShootRadial(this, projData, count); }
     checkBossDanger() { _checkBossDanger(this); }
     bossDie(boss) { _bossDie(this, boss); }
-    bossAdd() { _bossAdd(this); }
+    bossAdd() {
+        // the save's own boss track takes over when its boss appears
+        if (this.recipe && this.recipe.dezaemonBgm && !this.bossActive) {
+            startDezaemonBgm(this, "boss");
+        }
+        _bossAdd(this);
+    }
     enemyDie(enemy, isSp) { _enemyDie(this, enemy, isSp); }
     showExplosion(x, y) { _showExplosion(this, x, y); }
     showHitImpact(x, y, isGuard) { _showHitImpact(this, x, y, isGuard); }
@@ -512,6 +531,7 @@ export class PhaserGameScene extends Phaser.Scene {
     stageClear() {
         if (this.stageCleared) return;
         this.stageCleared = true;
+        stopDezaemonBgm(this);
         this.gameStarted = false;
 
         gameState.score = this.scoreCount;
@@ -867,6 +887,16 @@ export class PhaserGameScene extends Phaser.Scene {
     // Sound
     // =================================================================
     playBossBgm(stageId) {
+        // An imported Dezaemon save carries its own soundtrack: the settings
+        // BGM table assigns a main song per stage, sequenced from the save's
+        // sec6 slots. When that starts, the stock boss BGM stays silent.
+        if (this.recipe && this.recipe.dezaemonBgm) {
+            this.bossStageId = stageId;
+            if (startDezaemonBgm(this, "main")) {
+                this.stageBgmName = "__dezaemon__";
+                return;
+            }
+        }
         var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
         var name = bossNames[assetStageId(stageId)] || "bison";
         var key = "boss_" + name + "_bgm";
@@ -893,6 +923,13 @@ export class PhaserGameScene extends Phaser.Scene {
 
     playSound(key, volume) {
         if (gameState.lowModeFlg) return;
+        // An imported Dezaemon save chose an SFX bank (REAL/COMIC/SF); the
+        // core game noises come from its synthesized flavor instead of the
+        // stock samples. Voices and UI cues fall through to the stock path.
+        if (this.recipe && this.recipe.dezaemonBgm) {
+            var deza = DEZA_SFX_MAP[key];
+            if (deza && playDezaemonSfx(this, deza)) return;
+        }
         try {
             var vol = typeof volume === "number" ? volume : 0.7;
             if (this.cache.audio.exists(key)) {
@@ -922,6 +959,7 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     stopAllSounds() {
+        stopDezaemonBgm(this);
         try { this.sound.stopAll(); } catch (e) {}
     }
 

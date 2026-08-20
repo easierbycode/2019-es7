@@ -55,12 +55,23 @@ test("shot damage lookup: traced weapons and the safe fallback", () => {
     // weapon 5's normal shot is the fully traced table; every other id falls
     // back to the traced minimum so an untraced weapon can only make enemies
     // slightly tankier, never unkillable.
-    assert.equal(WEAPON_SHOT_DAMAGE[5].traced, true);
+    assert.equal(WEAPON_SHOT_DAMAGE[5].basis, "traced");
     for (let w = 0; w < 8; w++) {
         const dmg = weaponShotDamage(w);
         assert.ok(dmg >= DEFAULT_SHOT_DAMAGE, `weapon ${w} -> ${dmg}`);
     }
     assert.equal(weaponShotDamage(99), DEFAULT_SHOT_DAMAGE);
+});
+
+test("every weapon id has an engine-grounded damage entry", () => {
+    for (let w = 0; w < 8; w++) {
+        const e = WEAPON_SHOT_DAMAGE[w];
+        assert.ok(e && e.damage >= DEFAULT_SHOT_DAMAGE, `weapon ${w}`);
+        assert.ok(e.basis, `weapon ${w} carries its basis`);
+    }
+    // the two constants that were traced outright
+    assert.equal(WEAPON_SHOT_DAMAGE[4].damage, 27);
+    assert.equal(WEAPON_SHOT_DAMAGE[7].chargeDamage, 192);
 });
 
 test("decodeSettings reads the block at sec5 +0x5A780", () => {

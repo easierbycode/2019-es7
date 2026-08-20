@@ -382,6 +382,38 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
     if (backgroundCells.length) gameJson.backgroundCells = backgroundCells;
     gameJson.enemyData = enemyData;
     gameJson.bossData = bossData;
+    // The save's own soundtrack. The settings BGM table is three special
+    // tracks then (main, boss) pairs per stage, every entry indexing sec6's
+    // 24 song slots; only the songs the table references (and that hold any
+    // notes) ship, as base64 of their raw 4228-byte slot. The runtime
+    // (dezaemon-runtime.js) sequences them through WebAudio, and sfxSet picks
+    // the synthesized effect bank (1 REAL / 2 COMIC / 3 SF).
+    const sec6 = decoded.sections && decoded.sections[6] && decoded.sections[6].decompressed;
+    if (decoded.settings && sec6 && decoded.songs) {
+        const table = decoded.settings.bgmTable;
+        const special = table.slice(0, 3);
+        const stagePairs = [];
+        for (let s2 = 0; s2 * 2 + 4 < table.length && s2 < stageCount; s2++) {
+            stagePairs.push([table[3 + s2 * 2], table[4 + s2 * 2]]);
+        }
+        const used = new Set([...special, ...stagePairs.flat()]);
+        const songs = {};
+        for (const idx of used) {
+            if (idx == null || idx < 0 || idx >= 24) continue;
+            const song = decoded.songs[idx];
+            if (!song || !song.noteCount) continue;
+            songs[idx] = bytesToBase64(sec6.subarray(idx * 4228, (idx + 1) * 4228));
+        }
+        if (Object.keys(songs).length) {
+            gameJson.dezaemonBgm = {
+                sfxSet: decoded.settings.sfxSet,
+                special,
+                stages: stagePairs,
+                songs,
+            };
+        }
+    }
+
     gameJson.meta = { version: "1.0", source: "dezaemon2" };
     if (decoded.settings) {
         gameJson.meta.dezaemonSettings = {

@@ -361,6 +361,37 @@ test("decoded behavior lands on the runtime fields and rides along whole", () =>
     assert.ok(validateGameJson(gameJson).ok);
 });
 
+test("an import ships the save's own soundtrack, only the songs it uses", async () => {
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const url = await import("node:url");
+    const here = path.dirname(url.fileURLToPath(import.meta.url));
+    const { normalize } = await import("../lib/bup-source.js");
+    const bup = await import("../lib/bup-parse.js");
+    const { decodeSave } = await import("../lib/decode/index.js");
+    const { data } = await normalize(fs.readFileSync(path.join(here, "..", "fixtures", "ramsie.sav")));
+    const d = decodeSave(bup.parse(data).find((s) => s.payload).payload.buffer);
+    const { gameJson } = mapSaveToGame(d, {});
+    const bgm = gameJson.dezaemonBgm;
+    assert.ok(bgm, "dezaemonBgm present");
+    assert.strictEqual(bgm.sfxSet, d.settings.sfxSet);
+    assert.strictEqual(bgm.stages.length, d.stageCount);
+    // every referenced, non-empty song ships as a full raw slot
+    for (const [idx, b64] of Object.entries(bgm.songs)) {
+        assert.ok(d.songs[idx].noteCount > 0, `song ${idx} has notes`);
+        const rawLen = Math.floor(b64.replace(/=+$/, "").length * 3 / 4);
+        assert.strictEqual(rawLen, 4228);
+    }
+    // and every table entry that points at a non-empty song is shipped
+    for (const pair of bgm.stages) {
+        for (const idx of pair) {
+            if (d.songs[idx] && d.songs[idx].noteCount) {
+                assert.ok(bgm.songs[idx] !== undefined, `stage song ${idx} shipped`);
+            }
+        }
+    }
+});
+
 test("LIFE units convert through the engine's traced shot damage", () => {
     // The normal shot's power-level table, read from GAME.CMP +0x6085e14 by
     // the spawn at +0x10bbe. Full power = 21 units per shot.

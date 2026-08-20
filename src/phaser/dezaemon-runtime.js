@@ -279,3 +279,273 @@ export function updateEnemyFire(scene, enemy, shootFn) {
     }
     return true;
 }
+
+// =====================================================================
+// Audio — the save's own soundtrack and effect bank.
+//
+// gameJson.dezaemonBgm (map-to-game.js) carries the settings BGM table and
+// the raw 4228-byte song slots it references, base64-packed. A song is a
+// 4-byte header + 32 measures of (4 control bytes + 4 parts x 32 steps);
+// step 0x00 is empty, 0x01-0x3B a note over ~5 octaves, 0x80-0x88 a tie.
+// The Saturn plays these through sampled instruments we do not have, so the
+// sequencer voices them as chiptune through WebAudio: two pulse parts, a
+// triangle bass and a noise part, which keeps the save's composition —
+// melody, harmony and rhythm — even though the timbres are approximations.
+//
+// SFX: the settings SFX set (1 REAL / 2 COMIC / 3 SF) picks between three
+// synthesized effect flavors for shot / hit / explosion / boss events.
+// =====================================================================
+
+var BGM_STEP_SECONDS = 1 / 15;   // 32 steps/measure ~ 128 BPM in 8ths
+var BGM_LOOKAHEAD = 0.35;        // seconds scheduled ahead of the clock
+var BGM_TICK_MS = 90;
+var BGM_GAIN = 0.10;
+
+function b64ToBytes(s) {
+    var ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    var clean = String(s).replace(/=+$/, "");
+    var out = new Uint8Array((clean.length * 3) >> 2);
+    var acc = 0, bits = 0, o = 0;
+    for (var i = 0; i < clean.length; i++) {
+        var v = ALPHA.indexOf(clean.charAt(i));
+        if (v < 0) continue;
+        acc = (acc << 6) | v;
+        bits += 6;
+        if (bits >= 8) {
+            bits -= 8;
+            out[o++] = (acc >> bits) & 0xff;
+        }
+    }
+    return out;
+}
+
+// One song slot -> per-part event lists [{step, note, len}] in step units.
+export function parseBgmSong(b64) {
+    var raw = b64ToBytes(b64);
+    var parts = [[], [], [], []];
+    for (var p = 0; p < 4; p++) {
+        var current = null;
+        for (var m = 0; m < 32; m++) {
+            var base = 4 + m * 132 + 4 + p * 32;
+            for (var st = 0; st < 32; st++) {
+                var v = raw[base + st];
+                var abs = m * 32 + st;
+                if (v >= 0x01 && v <= 0x3b) {
+                    current = { step: abs, note: v, len: 1 };
+                    parts[p].push(current);
+                } else if (v >= 0x80 && v <= 0x88 && current) {
+                    current.len = abs - current.step + 1;
+                } else if (v === 0) {
+                    current = null;
+                }
+            }
+        }
+    }
+    var last = 0;
+    for (p = 0; p < 4; p++) {
+        for (var i = 0; i < parts[p].length; i++) {
+            var e = parts[p][i];
+            if (e.step + e.len > last) last = e.step + e.len;
+        }
+    }
+    // loop at the end of the last measure that holds anything
+    var loopSteps = Math.max(32, Math.ceil(last / 32) * 32);
+    return { parts: parts, loopSteps: loopSteps };
+}
+
+function audioCtx(scene) {
+    var snd = scene.sound;
+    return (snd && snd.context && typeof snd.context.createOscillator === "function")
+        ? snd.context
+        : null;
+}
+
+function noteFreq(note) {
+    // note 1..0x3B across ~5 octaves; anchor so mid-range lands around A4
+    return 440 * Math.pow(2, (note - 34) / 12);
+}
+
+var PART_VOICES = [
+    { type: "square", gain: 1.0 },
+    { type: "square", gain: 0.8 },
+    { type: "triangle", gain: 1.2 },
+    { type: "noise", gain: 0.5 },
+];
+
+function makeNoiseBuffer(ctx) {
+    var len = (ctx.sampleRate * 0.25) | 0;
+    var buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    var d = buf.getChannelData(0);
+    for (var i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    return buf;
+}
+
+// Start (or switch) the imported soundtrack for a scene. `which` is "main"
+// or "boss"; the assignment comes from the save's own BGM table.
+export function startDezaemonBgm(scene, which) {
+    var bgm = scene.recipe && scene.recipe.dezaemonBgm;
+    if (!bgm) return false;
+    var ctx = audioCtx(scene);
+    if (!ctx) return false;
+    var stageId = typeof scene.bossStageId === "number" ? scene.bossStageId : 0;
+    var pair = (bgm.stages && bgm.stages[stageId]) || null;
+    var idx = pair ? (which === "boss" ? pair[1] : pair[0]) : null;
+    if (idx == null || !bgm.songs || bgm.songs[idx] == null) return false;
+
+    stopDezaemonBgm(scene);
+    var st = scene._dezaBgm = {
+        ctx: ctx,
+        song: parseBgmSong(bgm.songs[idx]),
+        songIndex: idx,
+        which: which,
+        cursor: [0, 0, 0, 0],
+        startTime: ctx.currentTime + 0.05,
+        loop: 0,
+        master: ctx.createGain(),
+        noise: makeNoiseBuffer(ctx),
+        timer: null,
+        scheduled: 0,
+    };
+    st.master.gain.value = BGM_GAIN;
+    st.master.connect(ctx.destination);
+    var pump = function () { scheduleBgm(scene, st); };
+    st.timer = scene.time.addEvent({ delay: BGM_TICK_MS, loop: true, callback: pump });
+    pump();
+    return true;
+}
+
+function scheduleBgm(scene, st) {
+    var ctx = st.ctx;
+    var horizon = ctx.currentTime + BGM_LOOKAHEAD;
+    for (var p = 0; p < 4; p++) {
+        var events = st.song.parts[p];
+        if (!events.length) continue;
+        var voice = PART_VOICES[p];
+        for (;;) {
+            var i = st.cursor[p];
+            var loopBase = st.loop * st.song.loopSteps;
+            if (i >= events.length) {
+                // wrapped: advance the shared loop counter once all parts pass
+                var allDone = true;
+                for (var q = 0; q < 4; q++) {
+                    if (st.cursor[q] < st.song.parts[q].length) { allDone = false; break; }
+                }
+                if (allDone) {
+                    st.loop += 1;
+                    for (var r = 0; r < 4; r++) st.cursor[r] = 0;
+                    continue;
+                }
+                break;
+            }
+            var e = events[i];
+            var t = st.startTime + (loopBase + e.step) * BGM_STEP_SECONDS;
+            if (t > horizon) break;
+            st.cursor[p] = i + 1;
+            if (t < ctx.currentTime - 0.02) continue;
+            playBgmNote(st, voice, e, t);
+            st.scheduled += 1;
+        }
+    }
+}
+
+function playBgmNote(st, voice, e, t) {
+    var ctx = st.ctx;
+    var dur = Math.max(0.05, e.len * BGM_STEP_SECONDS * 0.95);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(voice.gain * 0.5, t + 0.01);
+    g.gain.setTargetAtTime(0.0001, t + dur, 0.03);
+    g.connect(st.master);
+    if (voice.type === "noise") {
+        var src = ctx.createBufferSource();
+        src.buffer = st.noise;
+        src.playbackRate.value = 0.5 + (e.note / 0x3b);
+        src.connect(g);
+        src.start(t);
+        src.stop(t + Math.min(dur, 0.2));
+    } else {
+        var osc = ctx.createOscillator();
+        osc.type = voice.type;
+        osc.frequency.value = noteFreq(e.note);
+        osc.connect(g);
+        osc.start(t);
+        osc.stop(t + dur + 0.1);
+    }
+}
+
+export function stopDezaemonBgm(scene) {
+    var st = scene._dezaBgm;
+    if (!st) return;
+    if (st.timer) st.timer.remove();
+    try { st.master.disconnect(); } catch (e) { /* context may be gone */ }
+    scene._dezaBgm = null;
+}
+
+// ---------------------------------------------------------------------
+// SFX — three synthesized banks keyed by the save's SFX set.
+// ---------------------------------------------------------------------
+
+var SFX_GAIN = 0.14;
+
+export function playDezaemonSfx(scene, name) {
+    var bgm = scene.recipe && scene.recipe.dezaemonBgm;
+    if (!bgm) return false;
+    var ctx = audioCtx(scene);
+    if (!ctx) return false;
+    var bank = bgm.sfxSet === 2 ? "comic" : bgm.sfxSet === 3 ? "sf" : "real";
+    var t = ctx.currentTime;
+    var g = ctx.createGain();
+    g.gain.value = SFX_GAIN;
+    g.connect(ctx.destination);
+    if (name === "explosion" || name === "bossExplosion") {
+        var big = name === "bossExplosion";
+        if (bank === "comic") {
+            sfxSweep(ctx, g, t, "square", big ? 300 : 500, big ? 40 : 90, big ? 0.5 : 0.22);
+        } else {
+            sfxNoise(scene, ctx, g, t, big ? 0.6 : 0.25, bank === "sf" ? 1400 : 700);
+        }
+    } else if (name === "shot") {
+        if (bank === "sf") sfxSweep(ctx, g, t, "sawtooth", 1400, 300, 0.08);
+        else if (bank === "comic") sfxSweep(ctx, g, t, "square", 900, 500, 0.06);
+        else sfxNoise(scene, ctx, g, t, 0.05, 3000);
+    } else { // hit
+        if (bank === "comic") sfxSweep(ctx, g, t, "square", 700, 250, 0.07);
+        else if (bank === "sf") sfxSweep(ctx, g, t, "sawtooth", 900, 200, 0.09);
+        else sfxNoise(scene, ctx, g, t, 0.08, 1200);
+    }
+    return true;
+}
+
+function sfxSweep(ctx, out, t, type, f0, f1, dur) {
+    var osc = ctx.createOscillator();
+    var g = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(f0, t);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
+    g.gain.setValueAtTime(1, t);
+    g.gain.setTargetAtTime(0.0001, t + dur * 0.7, dur * 0.2);
+    osc.connect(g);
+    g.connect(out);
+    osc.start(t);
+    osc.stop(t + dur + 0.1);
+}
+
+function sfxNoise(scene, ctx, out, t, dur, cutoff) {
+    var st = scene._dezaBgm;
+    var buf = (st && st.noise) || makeNoiseBuffer(ctx);
+    var src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = dur > 0.25;
+    var f = ctx.createBiquadFilter();
+    f.type = "lowpass";
+    f.frequency.setValueAtTime(cutoff, t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(60, cutoff / 8), t + dur);
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(1, t);
+    g.gain.setTargetAtTime(0.0001, t + dur * 0.7, dur * 0.25);
+    src.connect(f);
+    f.connect(g);
+    g.connect(out);
+    src.start(t);
+    src.stop(t + dur + 0.2);
+}

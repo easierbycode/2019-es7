@@ -3061,6 +3061,12 @@
                 playerData.texture.length + ' idle frames + the sparkler shot/big/3way + a ' +
                 playerData.barrier.texture.length + '-frame shield), since Dezaemon saves carry no player. Its art came in with the import.');
             if (sprites.length) notes.push(sprites.length + ' sprites from the save were packed into the atlas.');
+            if (gameData.dezaemonBgm) {
+                const bankNames = { 1: 'REAL', 2: 'COMIC', 3: 'SF' };
+                notes.push(Object.keys(gameData.dezaemonBgm.songs).length +
+                    ' songs from the save play as its soundtrack (chiptune-voiced), with the ' +
+                    (bankNames[gameData.dezaemonBgm.sfxSet] || 'REAL') + ' effect bank.');
+            }
             if (notes.length) alert('Import notes:\n- ' + notes.join('\n- '));
         }
 

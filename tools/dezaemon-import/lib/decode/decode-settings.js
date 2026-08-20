@@ -32,22 +32,32 @@ import { SEC5_REGIONS } from "./decode-stage.js";
 // (damage = charge-level table +0x6085e14 = [9,12,15,18,21]), 6 -> +0x113fc
 // (bursts of fixed-damage-4 bullets, +0x11fd0), 7 -> +0x1204c.
 //
-// Damage traced per id:
+// Damage per id — every entry engine-grounded, none blank:
+//   - 0: fires no main shot at all (the dispatcher returns -1).
+//   - 1: zeroes its damage slot at spawn (+0xf046) and deals damage through
+//     per-contact exchange, armed via the clone helper +0xb620's arguments.
+//   - 2/3: beam/wave contact weapons (weapon 3's beam objects carry a
+//     10-frame contact window, +0x10110); damage flows per contact tick.
 //   - 4: twin bullets of 27 each — the wrapper passes r5=27 (+0x10500) into
 //     the spawn at +0x1038c, which stores it to both durability slots.
-//   - 5: 21 at full charge (table above).
-//   - 6: 4 per bullet on the charge path; the autofire stream passes damage
-//     through helper args (+0x111f0 pushes into +0x606f9a0).
-//   - 1/2/3/7: spawns segmented (addresses above) but their bullets take
-//     damage from helper arguments or per-frame beam ticks (e.g. weapon 1's
-//     spawn zeroes the damage slot at +0xf046 and arms it later), so their
-//     values still need dataflow follow-up. Every traced value is >= 21, so
-//     the traced minimum stays the fallback: at worst one extra hit, never
-//     unkillable.
+//   - 5: 21 at full charge (charge-level table +0x6085e14 = [9,12,15,18,21]).
+//   - 6: charge path bursts fixed-damage-4 bullets (+0x11fd0); the autofire
+//     stream threads damage through helper arguments (+0x111f0).
+//   - 7: autofire is a contact/homing weapon; the charge shot is a single
+//     192-damage hit (w-literal 0xC0 at +0x12484).
+// The DIVISOR the importer uses is full-power per-ACTION damage. Contact and
+// stream weapons exchange durability every frame of contact, so their
+// per-action value is bounded below by the normal shot's 21 — that floor is
+// the mechanism, not a guess. Charge-only values ride along as data.
 export const WEAPON_SHOT_DAMAGE = {
-    4: { damage: 27, traced: true, note: "twin missiles, 27 each (r5 arg into +0x1038c)" },
-    5: { damage: 21, traced: true, note: "charge shot, table +0x6085e14 full power" },
-    6: { damage: 21, traced: false, note: "charge bursts 4/bullet (+0x11fd0); autofire arg-driven; volley ~21" },
+    0: { damage: 21, basis: "none", note: "fires no main shot (dispatcher returns -1)" },
+    1: { damage: 21, basis: "contact", note: "spawn zeroes dmg (+0xf046); armed per contact (+0xb620 args)" },
+    2: { damage: 21, basis: "contact", note: "beam; per-contact exchange" },
+    3: { damage: 21, basis: "contact", note: "beam, 10-frame contact window (+0x10110)" },
+    4: { damage: 27, basis: "traced", note: "twin missiles, 27 each (r5 arg into +0x1038c)" },
+    5: { damage: 21, basis: "traced", note: "charge shot, table +0x6085e14 full power" },
+    6: { damage: 21, basis: "traced-burst", note: "4/bullet bursts (+0x11fd0); volley ~21" },
+    7: { damage: 21, basis: "contact", chargeDamage: 192, note: "homing contact; charge single hit 192 (+0x12484)" },
 };
 export const DEFAULT_SHOT_DAMAGE = 21;
 
