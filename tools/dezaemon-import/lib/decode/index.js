@@ -19,6 +19,7 @@ import { decompress, SECTION_SIZES, SECTION_HINTS } from "../decompress.js";
 import { decodeCg } from "./decode-cg.js";
 import { decodeStages, sec5Regions, projectForEditor } from "./decode-stage.js";
 import { decodeSongs } from "./decode-song.js";
+import { decodeSettings } from "./decode-settings.js";
 import { extractEnemySprites, extractBossSprites, extractBackgroundCells } from "./decode-sprites.js";
 
 export function decodeSave(payload) {
@@ -92,6 +93,14 @@ export function decodeSave(payload) {
                 result.stageCount = stageCount;
                 result.confidence.backgrounds = "confirmed";
                 result.sec5Regions = sec5Regions(assembly.decompressed);
+                // Global settings: game mode, the two ship configs (main
+                // weapon -> per-save shot damage), BGM table, SFX set.
+                try {
+                    result.settings = decodeSettings(assembly.decompressed);
+                    result.confidence.settings = result.settings.confidence.mainWeapon;
+                } catch (err) {
+                    result.settingsError = err.message;
+                }
                 // Editor-facing projection: the enemy roster (one entry per
                 // placed (stage, record) pair) and per-stage spawn rows the
                 // level editor renders. Each roster entry carries its decoded

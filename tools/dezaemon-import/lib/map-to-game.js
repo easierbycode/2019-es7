@@ -46,6 +46,9 @@ export const PLAYER_SHOT_DAMAGE_BY_LEVEL = [9, 12, 15, 18, 21];
 // scale slot instead — see FORMAT.md "Player weapons".)
 export const ENGINE_SHOT_DAMAGE =
     PLAYER_SHOT_DAMAGE_BY_LEVEL[PLAYER_SHOT_DAMAGE_BY_LEVEL.length - 1];
+// A save picks its own weapon (settings +0x0F low nibble, decode-settings.js);
+// decoded.settings.shotDamage carries that weapon's traced full-power value,
+// falling back to ENGINE_SHOT_DAMAGE for weapons whose spawns are untraced.
 
 // Saturn zako bullets cross the playfield in a couple of seconds; the
 // runtime default of 1 px/frame takes eight, and slow bullets accumulate
@@ -227,6 +230,8 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
 
     // Enemies: one key per decoded type, enemyA..enemyZ then enemyAA onwards.
     // Nothing is rationed — a save's whole roster comes across.
+    // Per-save shot damage: the save's own main weapon where decoded.
+    const shotDamage = (decoded.settings && decoded.settings.shotDamage) || ENGINE_SHOT_DAMAGE;
     const decodedEnemies = decoded.enemies || [];
     const enemyData = {};
     const enemyLetterByIndex = [];
@@ -247,7 +252,7 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
             // LIFE decodes in engine damage units; the runtime's shots do 1
             // damage, so convert to full-power-shot hits
             // ([60,30,15,10,5,3,2,1] -> [3,2,1,1,1,1,1,1]).
-            rec.hp = Math.max(1, Math.ceil(e.behavior.hp / ENGINE_SHOT_DAMAGE));
+            rec.hp = Math.max(1, Math.ceil(e.behavior.hp / shotDamage));
             rec.score = e.behavior.score;
             // px/frame relative to the scrolling map; near-zero means the
             // enemy rides the scroll, which the runtime adds on top.
@@ -378,6 +383,15 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
     gameJson.enemyData = enemyData;
     gameJson.bossData = bossData;
     gameJson.meta = { version: "1.0", source: "dezaemon2" };
+    if (decoded.settings) {
+        gameJson.meta.dezaemonSettings = {
+            gameMode: decoded.settings.gameMode,
+            mainWeapon: decoded.settings.ships[0].mainWeapon,
+            mainWeapon2P: decoded.settings.ships[1].mainWeapon,
+            shotDamage,
+            sfxSet: decoded.settings.sfxSet,
+        };
+    }
     if (decoded.title) gameJson.meta.sourceTitle = decoded.title;
     if (sourceEntry) {
         gameJson.meta.sourceComment = sourceEntry.comment;

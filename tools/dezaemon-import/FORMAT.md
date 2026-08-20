@@ -331,7 +331,7 @@ are the channel A/C bytes.
 | Offset | Content |
 |--------|---------|
 | `+0x00` | game mode, values 0–3 (2 bits; scroll orientation + player count candidates) |
-| `+0x0C`, `+0x10` | always `0x10` or `0x11` — the two player-ship config blocks start here (`+0x0C`–`+0x0F` and `+0x10`–`+0x13` mirror each other's value sets) |
+| `+0x0C`–`+0x0F`, `+0x10`–`+0x13` | the two player-ship config blocks (P1/P2). Byte +0: always `0x10`/`0x11` (two-value item, open). Byte +1: two packed enums (open). Byte +2: KUMITATE-edited pair (`0x40/0x41/0x44` observed, open). Byte +3 low nibble = **MAIN WEAPON 0-7**, high nibble a 0-3 select. Weapon evidence: KUMITATE's menu handler pairs `+0x0F`/`+0x13` with its own UI data; the nibble spans 6 of 8 values across the corpus (an 8-option menu; every other ship byte holds 2-4 values); the factory default (SGM_INIT = Gust) stores 6. GAME.CMP's fire dispatcher (`+0x1cebc`, weapon variable via pointer global `0x6084110`) routes id 5 → the normal-shot spawn (damage table `+0x6085e14`), 6 → a burst spawn writing fixed damage 4/bullet (`+0x11fd0`), 7 → a third spawn; ids 0-4's spawns are reached by fall-through and not yet segmented. The settings→engine copy is pointer-indirected and untraced, so the weapon byte is `heuristic` (congruence), not `confirmed`. |
 | `+0x1C`–`+0x23` | 8-entry table, all values ≤ 38 — the 8 item slots |
 | `+0x2D`–`+0x40` | 20 **always-even** bytes (10 pairs, max 48 = 2×24) |
 | `+0x41`–`+0x58` | **BGM assignment table**: 24 entries, every value ≤ 23 in every game, indexing sec6's 24 song slots. Three special tracks first, then (main, boss) pairs per stage — DAIOH reads `12,11,13, 1,6, 2,7, 3,8, 4,9, 5,10`. No entry ever points at an empty song slot. |
