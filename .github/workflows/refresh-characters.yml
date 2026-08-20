@@ -1,0 +1,56 @@
+# Keeps the static characters module's named exports in sync with the live
+# library without anyone running characters/build.mjs by hand: on a schedule
+# (or on demand), rebuild the module and, if the library changed, commit the
+# result and dispatch the Pages deploy.
+#
+# Note the explicit dispatch: pushes made with the default GITHUB_TOKEN never
+# trigger other workflows, so without it the auto-commit would sit undeployed.
+#
+# This is the fallback freshness path for consumers of the static files
+# (bundlers, import-map pages, Deno). Pages served by the cmg app don't need
+# it — its /characters route generates named exports from the database per
+# request (see cmg routes/characters/index.ts).
+name: Refresh characters module
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+
+concurrency:
+  group: refresh-characters
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Rebuild the characters module from the live library
+        run: |
+          npm ci --ignore-scripts
+          node characters/build.mjs
+
+      - name: Commit, push, and dispatch the deploy if the library changed
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if git diff --quiet -- characters; then
+            echo "Library unchanged since the last build — nothing to do."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add characters
+          git commit -m "Refresh characters module from the live library"
+          git push
+          gh workflow run deploy.yml --ref main

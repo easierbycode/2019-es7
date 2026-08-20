@@ -328,6 +328,17 @@ jobs:
       - name: Download custom BGM from Firebase
         run: node scripts/download-custom-bgm.js
 
+      # Regenerate the characters module's named exports from the live
+      # library so every deploy ships current ones, even when the committed
+      # generated.js is stale. Fail-soft: the committed artifacts always
+      # exist, so a hiccup here must not block the site deploy.
+      # --ignore-scripts skips the Electron binary download; esbuild works
+      # without scripts via its @esbuild/* platform packages.
+      - name: Refresh the characters module from the live library
+        run: |
+          (npm ci --ignore-scripts && node characters/build.mjs) || \
+            echo "::warning::characters rebuild failed — deploying the committed artifacts"
+
       - name: Build for GitHub Pages
         run: |
           mkdir dist

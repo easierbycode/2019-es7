@@ -39,12 +39,34 @@ evil-invaders RTDB) as a Svelte 5 component for
 `import ... from "https://easierbycode.com/2019-es7/characters"` (no file) is
 resolved for you in:
 
-- **cmg scene scripts** — `scene-script.js` rewrites the bare URL to
-  `characters/browser.js` when compiling.
+- **cmg scene scripts** — `scene-script.js` rewrites the bare URL when
+  compiling: on cmg-served pages to the cmg app's live `/characters` route
+  (below), elsewhere to `characters/browser.js`.
 - **Deno / import-map pages** — map the bare URL to `.../characters/index.js`.
 
 Everywhere else, import `.../characters/browser.js` directly (GitHub Pages
-cannot serve an extensionless path as JavaScript).
+cannot serve an extensionless path as JavaScript) — or use the live endpoint.
+
+## Named-export freshness (no rebuilds needed)
+
+The named exports in these static files are regenerated automatically, but the
+live endpoint never goes stale at all:
+
+- **Live endpoint** — `https://cmg.easierbycode.deno.net/characters` (cmg's
+  `routes/characters/index.ts`) generates the export list from the database on
+  every request (60s cache) and re-exports the component code from
+  `browser.js`. A character created seconds ago imports by name. Extensionless,
+  correct MIME type, open CORS — importable from anywhere. cmg game pages
+  point scene-script imports here via `__CHARACTERS_MODULE__`.
+- **CI regeneration** — every Pages deploy reruns `characters/build.mjs`, so
+  the deployed static files carry current exports even when the committed
+  `generated.js` is stale.
+- **Scheduled refresh** — `.github/workflows/refresh-characters.yml` rebuilds
+  every 30 minutes (or on manual dispatch), commits only when the library
+  changed, and dispatches the Pages deploy.
+
+`node characters/build.mjs` by hand is now only needed when the component
+*code* in `src/` changes. `character("name")` works regardless of all of this.
 
 ## Using `character(name)`
 
