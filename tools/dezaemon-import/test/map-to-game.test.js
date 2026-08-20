@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert";
 import {
     buildBlankGame,
+    PLAYER_SHOT_DAMAGE_BY_LEVEL,
+    ENGINE_SHOT_DAMAGE,
     mapSaveToGame,
     emptyWave,
     BUILTIN_DEFAULTS,
@@ -357,6 +359,19 @@ test("decoded behavior lands on the runtime fields and rides along whole", () =>
     assert.strictEqual(rec.dezaemon.behavior.scale.axes, "xy");
     assert.strictEqual(rec.dezaemon.behavior.ground, true);
     assert.ok(validateGameJson(gameJson).ok);
+});
+
+test("LIFE units convert through the engine's traced shot damage", () => {
+    // The normal shot's power-level table, read from GAME.CMP +0x6085e14 by
+    // the spawn at +0x10bbe. Full power = 21 units per shot.
+    assert.deepStrictEqual(PLAYER_SHOT_DAMAGE_BY_LEVEL, [9, 12, 15, 18, 21]);
+    assert.strictEqual(ENGINE_SHOT_DAMAGE, 21);
+    // The whole LIFE table lands on hardware-pace hits of a 1-damage shot.
+    const HP_UNITS = [60, 30, 15, 10, 5, 3, 2, 1];
+    assert.deepStrictEqual(
+        HP_UNITS.map((u) => Math.max(1, Math.ceil(u / ENGINE_SHOT_DAMAGE))),
+        [3, 2, 1, 1, 1, 1, 1, 1],
+    );
 });
 
 test("an appearance that cannot fire maps to interval -1", () => {

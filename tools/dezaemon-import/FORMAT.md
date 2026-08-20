@@ -293,13 +293,28 @@ picks its handler from `b5 & 0xF` (values 10/11/12 special) and every one
 fires; "fire type 0 = silent" was an early misread. Reload = interval +
 rand(window), decremented once per frame while the enemy is active.
 
-**Durability shares one unit space with damage.** Objects live in one pool:
-a bullet's damage is its own hp, and a collision subtracts the two from each
-other (e.g. `+0x1457e`). Enemy LIFE therefore decodes in damage units
-([60,30,15,10,5,3,2,1]); a standard player shot is worth roughly 20 of them,
-so max-LIFE zako die in ~3 hits on hardware. The per-weapon damage table is
-not yet traced — the importer's `STANDARD_SHOT_DAMAGE = 20` is calibrated
-against how the sample games play, not read from the engine.
+**Durability shares one unit space with damage — and the player-weapon
+damage tables are traced.** Objects live in one pool; enemy LIFE decodes in
+damage units ([60,30,15,10,5,3,2,1]). The player's normal shot carries its
+damage in the same slot zako keep hp in (0x6090630): the spawn at GAME.CMP
+`+0x10bbe` writes it from the five-entry power-level table at `+0x6085e14` =
+**[9, 12, 15, 18, 21]** (its bullets score nothing — 0x6093e50/0x6095040 are
+set to 0x7FFFFFFF at the same spawn). A full-power main shot is therefore 21
+units, and max-LIFE zako die in ceil(60/21) = 3 hits, which is what the
+importer's `ENGINE_SHOT_DAMAGE` now uses.
+
+Big/pierce shots use a different channel: their power rides in the SCALE
+slot (0x6095930/0x6091a30 — a big shot is literally as strong as it is
+large), drained by each enemy's hp as it pierces (`+0xb8ec`:
+`scale -= enemyHp`). Their per-level tables sit alongside the normal shot's:
+`+0x6085e6c` = [16,18,20,22,24] (spawn `+0x14692`), `+0x6085ebc` =
+[8,14,20,26,32] (spawn `+0x14a50`), `+0x6085edc` = [48,60,72,84,96] (spawn
+`+0x14dce`), and `+0x6085ea8` holds the player-bullet speeds
+[0x600,0x800,0xa00,0xc00] = 6/8/10/12 px/frame by level. Which of the
+editor's seven main-weapon choices maps to which table is still open — the
+weapon-select byte in the settings block is not yet decoded — but every
+candidate lands in the 8-32 range, so the hits conversion is stable across
+them.
 The engine negates a channel's step when start > end, and rotation mode 2
 negates it again (counter-clockwise). Cross-checks: the factory-default game
 (SGM_INIT = Gust) decodes to hp 1 / score 50 everywhere — the editor's

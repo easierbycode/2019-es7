@@ -33,14 +33,19 @@ export const BLANK_WAVES = 8;
 // stage runs about as long as it did on hardware.
 export const FRAMES_PER_SOURCE_ROW = 8;
 
-// The engine keeps every object's durability in one shared unit: a bullet
-// carries its damage in its own hp slot and collisions subtract the two
-// (GAME.CMP, see FORMAT.md). Enemy LIFE therefore decodes in DAMAGE UNITS
-// ([60,30,15,10,5,3,2,1]), and a standard player shot is worth roughly 20 of
-// them — Lemureal Nova's max-LIFE zako die in ~3 hits on hardware, not 60.
-// The Phaser runtime's shots do 1 damage each, so LIFE maps to hits here.
-// Calibrated, not traced: the per-weapon damage table is still undecoded.
-export const STANDARD_SHOT_DAMAGE = 20;
+// The engine keeps every object's durability in one shared unit space, and
+// the player's main shot carries its damage in the same per-object slot the
+// zako keep their hp in (0x6090630). The shot's value is TRACED, not
+// calibrated: the spawn at GAME.CMP +0x10bbe writes it from the five-entry
+// power-level table at +0x6085e14 —
+export const PLAYER_SHOT_DAMAGE_BY_LEVEL = [9, 12, 15, 18, 21];
+// — so a full-power main shot is worth 21 units. Enemy LIFE decodes in the
+// same units ([60,30,15,10,5,3,2,1]); the Phaser runtime's shots do 1 damage
+// each, so LIFE maps to ceil(units / 21) hits: max-LIFE zako die in 3, like
+// on hardware. (Big/pierce shots use other tables and carry power in the
+// scale slot instead — see FORMAT.md "Player weapons".)
+export const ENGINE_SHOT_DAMAGE =
+    PLAYER_SHOT_DAMAGE_BY_LEVEL[PLAYER_SHOT_DAMAGE_BY_LEVEL.length - 1];
 
 // Saturn zako bullets cross the playfield in a couple of seconds; the
 // runtime default of 1 px/frame takes eight, and slow bullets accumulate
@@ -240,8 +245,9 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
         // dezaemon.behavior for the runtime's behavior driver.
         if (e.behavior) {
             // LIFE decodes in engine damage units; the runtime's shots do 1
-            // damage, so convert to hits ([60,30,15,10,5,3,2,1] -> [3,2,1...]).
-            rec.hp = Math.max(1, Math.round(e.behavior.hp / STANDARD_SHOT_DAMAGE));
+            // damage, so convert to full-power-shot hits
+            // ([60,30,15,10,5,3,2,1] -> [3,2,1,1,1,1,1,1]).
+            rec.hp = Math.max(1, Math.ceil(e.behavior.hp / ENGINE_SHOT_DAMAGE));
             rec.score = e.behavior.score;
             // px/frame relative to the scrolling map; near-zero means the
             // enemy rides the scroll, which the runtime adds on top.
