@@ -306,15 +306,12 @@ importer's `ENGINE_SHOT_DAMAGE` now uses.
 Big/pierce shots use a different channel: their power rides in the SCALE
 slot (0x6095930/0x6091a30 — a big shot is literally as strong as it is
 large), drained by each enemy's hp as it pierces (`+0xb8ec`:
-`scale -= enemyHp`). Their per-level tables sit alongside the normal shot's:
-`+0x6085e6c` = [16,18,20,22,24] (spawn `+0x14692`), `+0x6085ebc` =
-[8,14,20,26,32] (spawn `+0x14a50`), `+0x6085edc` = [48,60,72,84,96] (spawn
-`+0x14dce`), and `+0x6085ea8` holds the player-bullet speeds
-[0x600,0x800,0xa00,0xc00] = 6/8/10/12 px/frame by level. Which of the
-editor's seven main-weapon choices maps to which table is still open — the
-weapon-select byte in the settings block is not yet decoded — but every
-candidate lands in the 8-32 range, so the hits conversion is stable across
-them.
+`scale -= enemyHp`). The three per-level tables alongside the normal shot's
+belong to the SUB-weapons (see the sub-weapon dispatcher under "Settings
+byte map"): `+0x6085e6c` = [16,18,20,22,24] (read `+0x14692`), `+0x6085ebc`
+= [8,14,20,26,32] (read `+0x14a50`), `+0x6085edc` = [48,60,72,84,96] (read
+`+0x14dce`); `+0x6085ea8` holds player-bullet speeds [0x600..0xc00] =
+6/8/10/12 px/frame by level.
 The engine negates a channel's step when start > end, and rotation mode 2
 negates it again (counter-clockwise). Cross-checks: the factory-default game
 (SGM_INIT = Gust) decodes to hp 1 / score 50 everywhere — the editor's
@@ -331,7 +328,7 @@ are the channel A/C bytes.
 | Offset | Content |
 |--------|---------|
 | `+0x00` | game mode, values 0–3 (2 bits; scroll orientation + player count candidates) |
-| `+0x0C`–`+0x0F`, `+0x10`–`+0x13` | the two player-ship config blocks (P1/P2). Byte +0: always `0x10`/`0x11` (two-value item, open). Byte +1: two packed enums (open). Byte +2: KUMITATE-edited pair (`0x40/0x41/0x44` observed, open). Byte +3 low nibble = **MAIN WEAPON 0-7**, high nibble a 0-3 select. Weapon evidence: KUMITATE's menu handler pairs `+0x0F`/`+0x13` with its own UI data; the nibble spans 6 of 8 values across the corpus (an 8-option menu; every other ship byte holds 2-4 values); the factory default (SGM_INIT = Gust) stores 6. GAME.CMP's fire dispatcher (`+0x1cebc`, weapon variable via pointer global `0x6084110`) routes id 5 → the normal-shot spawn (damage table `+0x6085e14`), 6 → a burst spawn writing fixed damage 4/bullet (`+0x11fd0`), 7 → a third spawn; ids 0-4's spawns are reached by fall-through and not yet segmented. The settings→engine copy is pointer-indirected and untraced, so the weapon byte is `heuristic` (congruence), not `confirmed`. |
+| `+0x0C`–`+0x0F`, `+0x10`–`+0x13` | the two player-ship config blocks (P1/P2). Byte +0: always `0x10`/`0x11` (two-value item, open). Byte +1: two packed enums (open). Byte +2: KUMITATE-edited pair (`0x40/0x41/0x44` observed, open). Byte +3 low nibble = **MAIN WEAPON 0-7**, high nibble a 0-3 select. Weapon evidence: KUMITATE's menu handler pairs `+0x0F`/`+0x13` with its own UI data; the nibble spans 6 of 8 values across the corpus (an 8-option menu; every other ship byte holds 2-4 values); the factory default (SGM_INIT = Gust) stores 6. GAME.CMP has TWO fire dispatchers, both segmented: the autofire jump table `+0x15144` (mova `+0x15150`) routes 0→none (returns -1), 1→`+0xf498`, 2→`+0xfcac`, 3→`+0xfe08`, 4→`+0x104cc`, 5→exit (charge-type), 6→`+0x1110c`, 7→`+0x11ea8`; the charge/release dispatcher `+0x1cebc` routes 5→`+0x10a6c` (charge-level damage table `+0x6085e14`), 6→`+0x113fc` (4/bullet bursts, `+0x11fd0`), 7→`+0x1204c`. Weapon 4's damage is traced: twin bullets of 27 (r5 arg at `+0x10500` into the spawn `+0x1038c`). Weapons 1/2/3/7 pass damage through helper args or per-frame beam ticks (weapon 1 zeroes the damage slot at spawn, `+0xf046`) — dataflow follow-up still open. The sub-weapon has its own dispatcher `+0x1528c` (config via pointer global `0x6084118`, & 3): 0→none, 1→`+0x1471c` (calls `+0x145e8`, table `+0x6085e6c` [16..24]), 2→`+0x14988` (table `+0x6085ebc` [8..32]), 3→`+0x14d04` (table `+0x6085edc` [48..96]) — so those three tables are SUB-weapon damage-by-level, and the ship block's `+3` high nibble (0-3) is the sub-weapon select. The settings→engine copy is pointer-indirected and untraced, so the weapon byte is `heuristic` (congruence), not `confirmed`. |
 | `+0x1C`–`+0x23` | 8-entry table, all values ≤ 38 — the 8 item slots |
 | `+0x2D`–`+0x40` | 20 **always-even** bytes (10 pairs, max 48 = 2×24) |
 | `+0x41`–`+0x58` | **BGM assignment table**: 24 entries, every value ≤ 23 in every game, indexing sec6's 24 song slots. Three special tracks first, then (main, boss) pairs per stage — DAIOH reads `12,11,13, 1,6, 2,7, 3,8, 4,9, 5,10`. No entry ever points at an empty song slot. |

@@ -22,20 +22,32 @@
 import { SEC5_REGIONS } from "./decode-stage.js";
 
 // Full-power damage of the player's shot, per main-weapon id, in the shared
-// hp/damage units enemies decode in. Traced so far (GAME.CMP):
-//   - weapon 5: the normal-shot spawn (+0x10bbe via the ==5 dispatch at
-//     +0x1cf08) fires the power-level table +0x6085e14 = [9,12,15,18,21].
-//   - weapon 6 (the factory default): its spawn sprays fixed-damage-4
-//     bullets (+0x11fd0 writes 4 into both durability slots), several per
-//     volley — per-action damage lands in the same 16-28 band.
-//   - weapons 0-4 and 7: spawn routines not yet segmented (no literal-pool
-//     or branch references; reached by fall-through). The remaining traced
-//     player tables ([16..24], [8..32], [48..96]) all end at >= 24, so the
-//     traced minimum (21) is the safe divisor for every untraced id: at
-//     worst an enemy takes one extra hit, never becomes unkillable.
+// hp/damage units enemies decode in. Both fire dispatchers are segmented
+// (GAME.CMP): the autofire jump table at +0x15144 (mova +0x15150) routes
+//   0 -> none (returns -1: a weapon-0 save fires no main shot at all)
+//   1 -> +0xf498   2 -> +0xfcac   3 -> +0xfe08   4 -> +0x104cc
+//   5 -> exit (charge-type: fires only through the release dispatcher)
+//   6 -> +0x1110c  7 -> +0x11ea8
+// and the charge/release dispatcher at +0x1cebc routes 5 -> +0x10a6c
+// (damage = charge-level table +0x6085e14 = [9,12,15,18,21]), 6 -> +0x113fc
+// (bursts of fixed-damage-4 bullets, +0x11fd0), 7 -> +0x1204c.
+//
+// Damage traced per id:
+//   - 4: twin bullets of 27 each — the wrapper passes r5=27 (+0x10500) into
+//     the spawn at +0x1038c, which stores it to both durability slots.
+//   - 5: 21 at full charge (table above).
+//   - 6: 4 per bullet on the charge path; the autofire stream passes damage
+//     through helper args (+0x111f0 pushes into +0x606f9a0).
+//   - 1/2/3/7: spawns segmented (addresses above) but their bullets take
+//     damage from helper arguments or per-frame beam ticks (e.g. weapon 1's
+//     spawn zeroes the damage slot at +0xf046 and arms it later), so their
+//     values still need dataflow follow-up. Every traced value is >= 21, so
+//     the traced minimum stays the fallback: at worst one extra hit, never
+//     unkillable.
 export const WEAPON_SHOT_DAMAGE = {
-    5: { damage: 21, traced: true, note: "normal shot, table +0x6085e14 full power" },
-    6: { damage: 21, traced: false, note: "4/bullet traced (+0x11fd0); volley of 4-7 approximated at 21" },
+    4: { damage: 27, traced: true, note: "twin missiles, 27 each (r5 arg into +0x1038c)" },
+    5: { damage: 21, traced: true, note: "charge shot, table +0x6085e14 full power" },
+    6: { damage: 21, traced: false, note: "charge bursts 4/bullet (+0x11fd0); autofire arg-driven; volley ~21" },
 };
 export const DEFAULT_SHOT_DAMAGE = 21;
 
@@ -52,9 +64,11 @@ function shipBlock(sec5, base) {
         b: sec5[base + 1],
         // +2: KUMITATE-edited (paired P1/P2); values 0x40/0x41/0x44 (open)
         c: sec5[base + 2],
-        // +3: low nibble = MAIN WEAPON 0-7; high nibble = a 0-3 select
+        // +3: low nibble = MAIN WEAPON 0-7; high nibble = SUB-WEAPON 0-3
+        // (its own dispatcher at GAME.CMP +0x1528c serves the three
+        // sub-weapon damage tables [16..24]/[8..32]/[48..96])
         mainWeapon: sec5[base + 3] & 0x0f,
-        altSelect: (sec5[base + 3] >> 4) & 0x0f,
+        subWeapon: (sec5[base + 3] >> 4) & 0x03,
         raw: [...sec5.subarray(base, base + 4)],
     };
 }

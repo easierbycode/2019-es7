@@ -40,6 +40,15 @@ test("mucha-kucha's two ships carry different weapons", async () => {
     assert.equal(d.settings.ships[0].mainWeapon, 4);
     assert.equal(d.settings.ships[1].mainWeapon, 6);
     assert.equal(d.settings.sfxSet, 1); // REAL bank
+    // weapon 4's traced twin-missile damage drives its divisor
+    assert.equal(d.settings.shotDamage, 27);
+});
+
+test("ramsie's sub-weapons decode alongside the mains", async () => {
+    const d = await decodedFixture("ramsie.sav");
+    // ramsie ships: +0x0F = 0x07 both -> main 7, sub 0
+    assert.equal(d.settings.ships[0].subWeapon, 0);
+    assert.equal(d.settings.ships[1].subWeapon, 0);
 });
 
 test("shot damage lookup: traced weapons and the safe fallback", () => {
@@ -64,7 +73,7 @@ test("decodeSettings reads the block at sec5 +0x5A780", () => {
     const st = decodeSettings(sec5);
     assert.equal(st.gameMode, 2);
     assert.equal(st.ships[0].mainWeapon, 5);
-    assert.equal(st.ships[0].altSelect, 3);
+    assert.equal(st.ships[0].subWeapon, 3);
     assert.equal(st.ships[1].mainWeapon, 6);
     assert.equal(st.shotDamage, 21);
     assert.equal(st.sfxSet, 2);
