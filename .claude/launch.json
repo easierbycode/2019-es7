@@ -9,6 +9,19 @@
       "autoPort": true
     },
     {
+      "name": "dev-mac",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "--no-clipboard", "--cors", "-l", "3000", "."],
+      "port": 3000,
+      "autoPort": true
+    },
+    {
+      "name": "cmg-dev",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-lc", "cd /Users/danieljohnson/CODE/cmg0819 && deno task dev"],
+      "port": 5173
+    },
+    {
       "name": "character-cms",
       "runtimeExecutable": "cmd.exe",
       "runtimeArgs": ["/c", "cd", "character-cms", "&&", "deno", "task", "dev"],

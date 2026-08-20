@@ -335,6 +335,9 @@ jobs:
           cp -r src dist/
           cp -r lib dist/
           cp -r icons dist/ || true
+          # The importable characters module (see characters/README.md):
+          # committed build artifacts, served at /2019-es7/characters/.
+          cp -r characters dist/
           cp index.html dist/
           cp phaser-game.html dist/
           cp level-editor.html dist/
