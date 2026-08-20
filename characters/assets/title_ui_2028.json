@@ -1,0 +1,195 @@
+{
+ "frames": {
+  "titleG": {
+   "frame": {
+    "x": 2,
+    "y": 2,
+    "w": 256,
+    "h": 364
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 256,
+    "h": 364
+   },
+   "sourceSize": {
+    "w": 256,
+    "h": 364
+   }
+  },
+  "logo": {
+   "frame": {
+    "x": 2,
+    "y": 368,
+    "w": 256,
+    "h": 91
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 256,
+    "h": 91
+   },
+   "sourceSize": {
+    "w": 256,
+    "h": 91
+   }
+  },
+  "titleCopyright": {
+   "frame": {
+    "x": 2,
+    "y": 461,
+    "w": 256,
+    "h": 34
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 256,
+    "h": 34
+   },
+   "sourceSize": {
+    "w": 256,
+    "h": 34
+   }
+  },
+  "twitterBtn0": {
+   "frame": {
+    "x": 260,
+    "y": 461,
+    "w": 114,
+    "h": 34
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 114,
+    "h": 34
+   },
+   "sourceSize": {
+    "w": 114,
+    "h": 34
+   }
+  },
+  "subTitleEn": {
+   "frame": {
+    "x": 2,
+    "y": 497,
+    "w": 256,
+    "h": 20
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 256,
+    "h": 20
+   },
+   "sourceSize": {
+    "w": 256,
+    "h": 20
+   }
+  },
+  "howtoBtn0": {
+   "frame": {
+    "x": 260,
+    "y": 497,
+    "w": 63,
+    "h": 17
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 63,
+    "h": 17
+   },
+   "sourceSize": {
+    "w": 63,
+    "h": 17
+   }
+  },
+  "staffrollBtn0": {
+   "frame": {
+    "x": 325,
+    "y": 497,
+    "w": 61,
+    "h": 17
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 61,
+    "h": 17
+   },
+   "sourceSize": {
+    "w": 61,
+    "h": 17
+   }
+  },
+  "hiScoreTxt": {
+   "frame": {
+    "x": 388,
+    "y": 497,
+    "w": 75,
+    "h": 15
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 75,
+    "h": 15
+   },
+   "sourceSize": {
+    "w": 75,
+    "h": 15
+   }
+  },
+  "titleStartText": {
+   "frame": {
+    "x": 2,
+    "y": 519,
+    "w": 160,
+    "h": 12
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 12
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 12
+   }
+  }
+ },
+ "meta": {
+  "app": "characters demo-title (packed from cmg foo.json + /atlases/2028_game_ui)",
+  "version": "1.0",
+  "image": "title_ui_2028.png",
+  "format": "RGBA8888",
+  "scale": "1",
+  "size": {
+   "w": 465,
+   "h": 533
+  }
+ }
+}

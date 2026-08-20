@@ -158,3 +158,10 @@ const demo = banner + pinSvelteToCdn(await bundle("demo-entry.js", {
 }));
 writeFileSync(out("demo.js"), demo);
 console.log("✓ demo.js");
+
+const demoTitle = banner + pinSvelteToCdn(await bundle("demo-title-entry.js", {
+  external: ["svelte", "svelte/*", "./browser.js"],
+  plugins: [svelte()],
+}));
+writeFileSync(out("demo-title.js"), demoTitle);
+console.log("✓ demo-title.js");
