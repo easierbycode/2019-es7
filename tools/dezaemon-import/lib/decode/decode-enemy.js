@@ -60,6 +60,21 @@ export const FACTOR_TABLE = [0, 4, 8, 12, 16, 24, 32, 48, 64];
 export const ROTATION_TABLE = [0, 32, 64, 96, 128, 160, 192, 224];
 export const DIRECTION_TABLE = [0, 16, 32, 48, 64, 80, 96, 112, 128];
 
+// Whether an appearance (byte 0) can fire at all. The engine's fire
+// dispatcher (+0x19882) tests bit 4 of the appearance definition word — the
+// u16 at +8 of the 256-entry pointer table at 0x6088e5c — and skips firing
+// when it is set. Extracted verbatim from GAME.bin: bit i of byte i>>3, LSB
+// first, set = that appearance never fires (48 of 256).
+const APPEARANCE_NOFIRE_HEX =
+    "0000000000ffff00000000ff000000ffff000000ff0000000000000000000000";
+export function appearanceFires(appearance) {
+    const byte = parseInt(
+        APPEARANCE_NOFIRE_HEX.slice((appearance >> 3) * 2, (appearance >> 3) * 2 + 2),
+        16,
+    );
+    return (byte & (1 << (appearance & 7))) === 0;
+}
+
 // Per-channel step tables, 8.8 fixed point value-units per frame.
 export const FACTOR_STEP_TABLE = [16, 32, 64, 128, 256, 384, 512, 1024];
 export const ROTATION_STEP_TABLE = [16, 32, 64, 128, 256, 512, 1024, 2048];
@@ -102,7 +117,12 @@ export function decodeEnemyRecord(bytes) {
         speed: SPEED_TABLE[b[2] & 7] / 65536,
         movePattern: ((b[2] >> 4) & 3) | ((b[2] & 8) >> 1),
         fire: {
-            type: (b[2] >> 6) & 3,          // 0 none, 1 spread, 2/3 engine variants
+            // The gate is the appearance, not the record: the engine's
+            // dispatcher fires any enemy whose appearance allows it, on the
+            // reload countdown below. b2 bits 6-7 select the volley/bullet
+            // pattern (all four values fire).
+            enabled: appearanceFires(b[0]),
+            type: (b[2] >> 6) & 3,          // volley pattern (0 straight)
             count: (b[3] & 7) + 1,           // shots per volley (type 1)
             wide: (b[3] & 8) !== 0,          // wider spread (type 1)
             param: b[3],                     // raw, for types 2/3

@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 import {
     decodeEnemyRecord,
     hasTransforms,
+    appearanceFires,
     HP_TABLE,
     SCORE_TABLE,
     SPEED_TABLE,
@@ -116,6 +117,22 @@ test("every populated corpus record decodes without throwing, in range", async (
             assert.ok(ch.to >= 0 && ch.to < 360);
         }
     }
+});
+
+test("the fire gate is the appearance, straight from the engine's table", () => {
+    // 48 of 256 appearance ids carry the no-fire bit (dispatcher +0x19882).
+    let silent = 0;
+    for (let a = 0; a < 256; a++) if (!appearanceFires(a)) silent++;
+    assert.equal(silent, 48);
+    // Lemureal's turrets (0x21, 0xc6) fire; its 0x85 props do not.
+    assert.equal(appearanceFires(0x21), true);
+    assert.equal(appearanceFires(0xc6), true);
+    assert.equal(appearanceFires(0x85), false);
+    // the decoded record carries it as fire.enabled
+    const firing = decodeEnemyRecord(rec("210081310000000000000000000000000000"));
+    assert.equal(firing.fire.enabled, true);
+    const silentRec = decodeEnemyRecord(rec("850081310000000000000000000000000000"));
+    assert.equal(silentRec.fire.enabled, false);
 });
 
 test("the editor-default record (Gust) decodes to the weakest enemy", () => {

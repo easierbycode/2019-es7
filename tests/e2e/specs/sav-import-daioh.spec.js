@@ -110,15 +110,18 @@ test("a nine-stage DAIOH save imports whole — every stage, type and spawn", as
     // the transform channels on dezaemon.behavior. Values must come from the
     // engine's own tables, not defaults.
     const attrs = await page.evaluate(() => {
-        const HP = [60, 30, 15, 10, 5, 3, 2, 1];
         const SCORE = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
         const recs = Object.values(gameData.enemyData);
         return {
             total: recs.length,
             withBehavior: recs.filter((e) => e.dezaemon && e.dezaemon.behavior).length,
-            hpFromTable: recs.filter((e) => HP.includes(e.hp)).length,
+            // LIFE decodes in engine damage units and maps to 1-3 hits of the
+            // runtime's shot — max-LIFE zako die in 3, like on hardware
+            hpAsHits: recs.filter((e) => e.hp >= 1 && e.hp <= 3).length,
             scoreFromTable: recs.filter((e) => SCORE.includes(e.score)).length,
             silenced: recs.filter((e) => e.interval === -1).length,
+            fastBullets: recs.filter((e) => e.interval > 0 &&
+                e.bulletData && e.bulletData.speed === 2.5).length,
             withTransforms: recs.filter((e) => {
                 const b = e.dezaemon && e.dezaemon.behavior;
                 return b && (b.rotation.enabled || b.scale.enabled ||
@@ -127,10 +130,13 @@ test("a nine-stage DAIOH save imports whole — every stage, type and spawn", as
         };
     });
     expect(attrs.withBehavior).toBe(ENEMY_TYPES);
-    expect(attrs.hpFromTable).toBe(ENEMY_TYPES);
+    expect(attrs.hpAsHits).toBe(ENEMY_TYPES);
     expect(attrs.scoreFromTable).toBe(ENEMY_TYPES);
-    // DAIOH's measured shape: 249 silent enemies, 149 with visual transforms
-    expect(attrs.silenced).toBeGreaterThan(200);
+    // Whether an enemy fires is its appearance's call (the engine's own
+    // gate): 64 of DAIOH's 340 are silent, and every firing enemy gets
+    // Saturn-pace bullets.
+    expect(attrs.silenced).toBe(64);
+    expect(attrs.fastBullets).toBe(ENEMY_TYPES - 64);
     expect(attrs.withTransforms).toBeGreaterThan(100);
 
     // --- The save's own scenery ---------------------------------------

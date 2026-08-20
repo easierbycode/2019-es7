@@ -281,6 +281,25 @@ start/end/rate/repeat interpolators:
 Channel byte layout (A,B,C): A bits4-6 step index; B low/high nibble start/end
 value index (rotation: 3-bit); C bits4-5 repeat (0 once, 1 loop, 2 ping-pong),
 bits0-2 a trigger mode packed into a per-enemy status word (semantics open).
+
+**Firing is gated by the appearance, not the record.** The per-frame fire
+dispatcher (GAME.CMP `+0x19870`) skips an enemy when (a) its Y position is
+outside a band near the top of the screen, or (b) bit 4 of its appearance
+definition word is set — the u16 at +8 of the 256-entry pointer table at
+`+0x6088e5c`, loaded per enemy at spawn. 48 of the 256 appearance ids carry
+the no-fire bit (`APPEARANCE_NOFIRE` in `lib/decode/decode-enemy.js`, byte-
+exact). All four `b2` bits6-7 values are volley patterns — the dispatcher
+picks its handler from `b5 & 0xF` (values 10/11/12 special) and every one
+fires; "fire type 0 = silent" was an early misread. Reload = interval +
+rand(window), decremented once per frame while the enemy is active.
+
+**Durability shares one unit space with damage.** Objects live in one pool:
+a bullet's damage is its own hp, and a collision subtracts the two from each
+other (e.g. `+0x1457e`). Enemy LIFE therefore decodes in damage units
+([60,30,15,10,5,3,2,1]); a standard player shot is worth roughly 20 of them,
+so max-LIFE zako die in ~3 hits on hardware. The per-weapon damage table is
+not yet traced — the importer's `STANDARD_SHOT_DAMAGE = 20` is calibrated
+against how the sample games play, not read from the engine.
 The engine negates a channel's step when start > end, and rotation mode 2
 negates it again (counter-clockwise). Cross-checks: the factory-default game
 (SGM_INIT = Gust) decodes to hp 1 / score 50 everywhere — the editor's

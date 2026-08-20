@@ -189,7 +189,7 @@ export function initEnemyBehavior(enemy, behavior) {
         scaleCh: makeChannel(behavior.scale, null),
         directionCh: makeChannel(behavior.direction, { wrap: true }),
         // stagger the first volley inside the engine's randomization window
-        reload: behavior.fire.type
+        reload: behavior.fire.enabled
             ? behavior.fire.interval + Math.floor(Math.random() * (behavior.fire.window || 1))
             : -1,
     });
@@ -236,23 +236,30 @@ export function updateEnemyBehavior(scene, enemy) {
 
 // Fire the decoded pattern. Returns true when it handled shooting (the caller
 // then skips the legacy interval logic).
-// Patterns (b2 bits 6-7): 0 none, 1 spread of `count`, 2 aimed, 3 fixed.
-// The base angle comes from byte 5 (0 = aim at the player) — the exact
-// engine mapping of that byte is the one heuristic left here.
+// Volley patterns (b2 bits 6-7): 0 straight, 1 spread of `count`, 2 aimed,
+// 3 fixed — all four fire when the appearance allows it. The base angle
+// comes from byte 5; its exact engine mapping is the heuristic left here.
 export function updateEnemyFire(scene, enemy, shootFn) {
     var st = enemy.getData("deza");
     if (!st) return false;
     var fire = st.behavior.fire;
-    if (!fire.type || st.reload < 0) return true; // type 0: never shoots
+    // The appearance decides whether an enemy shoots at all (the engine's
+    // dispatcher gate); reload < 0 marks it silent for its whole life.
+    if (!fire.enabled || st.reload < 0) return true;
     st.reload -= 1;
     if (st.reload > 0) return true;
     st.reload = fire.interval + Math.floor(Math.random() * (fire.window || 1));
-    if (!scene.playerSprite || enemy.y >= scene.playerSprite.y - 20) return true;
+    // The engine only lets an enemy fire inside a band near the top of the
+    // screen — it shoots as it comes on, and goes quiet once it has passed.
+    // That band, not the reload, is what keeps a dense stage readable.
+    var GH = scene.scale ? scene.scale.height : 480;
+    if (!scene.playerSprite) return true;
+    if (enemy.y < 16 || enemy.y > GH * 0.4) return true;
 
     var base;
     if (fire.direction) {
         base = fire.direction * (360 / 32) * Math.PI / 180; // 0 = up, cw
-    } else if (fire.type === 3) {
+    } else if (fire.type === 0 || fire.type === 3) {
         base = Math.PI; // straight down
     } else {
         var dx = scene.playerSprite.x - enemy.x;

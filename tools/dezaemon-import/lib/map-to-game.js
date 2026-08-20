@@ -33,6 +33,21 @@ export const BLANK_WAVES = 8;
 // stage runs about as long as it did on hardware.
 export const FRAMES_PER_SOURCE_ROW = 8;
 
+// The engine keeps every object's durability in one shared unit: a bullet
+// carries its damage in its own hp slot and collisions subtract the two
+// (GAME.CMP, see FORMAT.md). Enemy LIFE therefore decodes in DAMAGE UNITS
+// ([60,30,15,10,5,3,2,1]), and a standard player shot is worth roughly 20 of
+// them — Lemureal Nova's max-LIFE zako die in ~3 hits on hardware, not 60.
+// The Phaser runtime's shots do 1 damage each, so LIFE maps to hits here.
+// Calibrated, not traced: the per-weapon damage table is still undecoded.
+export const STANDARD_SHOT_DAMAGE = 20;
+
+// Saturn zako bullets cross the playfield in a couple of seconds; the
+// runtime default of 1 px/frame takes eight, and slow bullets accumulate
+// into the wall you cannot dodge. Global bullet-type speeds are not decoded
+// yet, so imports use one Saturn-typical speed.
+export const ENEMY_BULLET_SPEED = 2.5;
+
 // Bijective base-26: 0 -> A, 25 -> Z, 26 -> AA, 27 -> AB, 701 -> ZZ, 702 -> AAA.
 // Single letters first, so a small roster is byte-for-byte what it always was.
 export function enemyLetters(index) {
@@ -224,13 +239,20 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
         // the speed/rotation/scale/direction change channels — rides on
         // dezaemon.behavior for the runtime's behavior driver.
         if (e.behavior) {
-            rec.hp = e.behavior.hp;
+            // LIFE decodes in engine damage units; the runtime's shots do 1
+            // damage, so convert to hits ([60,30,15,10,5,3,2,1] -> [3,2,1...]).
+            rec.hp = Math.max(1, Math.round(e.behavior.hp / STANDARD_SHOT_DAMAGE));
             rec.score = e.behavior.score;
             // px/frame relative to the scrolling map; near-zero means the
             // enemy rides the scroll, which the runtime adds on top.
             rec.speed = Math.round(e.behavior.speed * 100) / 100;
-            // fire type 0 never shoots; the runtime skips interval <= 0
-            rec.interval = e.behavior.fire.type ? e.behavior.fire.interval : -1;
+            // Whether an enemy fires is the APPEARANCE's call (decode-enemy
+            // .js); the runtime skips interval <= 0. Every fire type is a
+            // volley pattern, including 0.
+            rec.interval = e.behavior.fire.enabled ? e.behavior.fire.interval : -1;
+            if (e.behavior.fire.enabled && rec.bulletData) {
+                rec.bulletData.speed = ENEMY_BULLET_SPEED;
+            }
         }
         if (Array.isArray(e.spriteKeys) && e.spriteKeys.length) {
             rec.texture = e.spriteKeys.map((idx) =>

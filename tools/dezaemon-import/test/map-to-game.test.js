@@ -334,7 +334,7 @@ test("decoded behavior lands on the runtime fields and rides along whole", () =>
         behavior: {
             appearance: 0, hp: 15, score: 500, ground: true, speed: 0.78,
             movePattern: 6,
-            fire: { type: 2, count: 1, wide: false, param: 0, mode: 0, interval: 29, window: 16, direction: 0, directionEx: 0 },
+            fire: { enabled: true, type: 2, count: 1, wide: false, param: 0, mode: 0, interval: 29, window: 16, direction: 0, directionEx: 0 },
             speedChange: { enabled: false, from: 1, to: 1, step: 0, repeat: 0, trigger: 0 },
             rotation: { enabled: true, mode: 1, from: 0, to: 180, step: 1.4, repeat: 2, trigger: 0 },
             scale: { enabled: true, axes: "xy", from: 0.5, to: 2, step: 0.01, repeat: 1, repeatY: 0, trigger: 0 },
@@ -343,11 +343,15 @@ test("decoded behavior lands on the runtime fields and rides along whole", () =>
     }];
     const { gameJson } = mapSaveToGame(decoded);
     const rec = gameJson.enemyData.enemyA;
-    // the fields the Phaser runtime already reads
-    assert.strictEqual(rec.hp, 15);
+    // the fields the Phaser runtime already reads. hp decodes in engine
+    // damage units (a standard shot is worth ~20), so 15 units = 1 hit of
+    // the runtime's 1-damage shot.
+    assert.strictEqual(rec.hp, 1);
     assert.strictEqual(rec.score, 500);
     assert.strictEqual(rec.speed, 0.78);
     assert.strictEqual(rec.interval, 29);
+    // firing enemies get Saturn-pace bullets instead of the 1 px/frame crawl
+    assert.strictEqual(rec.bulletData.speed, 2.5);
     // the full record for the behavior driver
     assert.strictEqual(rec.dezaemon.behavior.rotation.to, 180);
     assert.strictEqual(rec.dezaemon.behavior.scale.axes, "xy");
@@ -355,7 +359,7 @@ test("decoded behavior lands on the runtime fields and rides along whole", () =>
     assert.ok(validateGameJson(gameJson).ok);
 });
 
-test("fire type 0 never shoots: interval maps to -1", () => {
+test("an appearance that cannot fire maps to interval -1", () => {
     const decoded = emptyDecoded();
     decoded.enemies = [{
         name: "quiet", stage: 0, record: 0, placements: 1,
@@ -363,7 +367,7 @@ test("fire type 0 never shoots: interval maps to -1", () => {
         behavior: {
             appearance: 0, hp: 1, score: 50, ground: false, speed: 0,
             movePattern: 0,
-            fire: { type: 0, count: 1, wide: false, param: 0, mode: 0, interval: 119, window: 29, direction: 0, directionEx: 0 },
+            fire: { enabled: false, type: 0, count: 1, wide: false, param: 0, mode: 0, interval: 119, window: 29, direction: 0, directionEx: 0 },
             speedChange: { enabled: false, from: 1, to: 1, step: 0, repeat: 0, trigger: 0 },
             rotation: { enabled: false, mode: 0, from: 0, to: 0, step: 0, repeat: 0, trigger: 0 },
             scale: { enabled: false, axes: "", from: 1, to: 1, step: 0, repeat: 0, repeatY: 0, trigger: 0 },
