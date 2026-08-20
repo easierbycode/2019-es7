@@ -46,12 +46,62 @@ resolved for you in:
 Everywhere else, import `.../characters/browser.js` directly (GitHub Pages
 cannot serve an extensionless path as JavaScript).
 
+## Using `character(name)`
+
+Named exports are baked in when the module is built, but `character(name)`
+looks the character up **at mount time** — it works for any character in the
+library, including ones created seconds ago in the editor, with no rebuild or
+redeploy. Assigning it to a Capitalized const also sidesteps Svelte's
+lowercase-tag rule, so no dot notation or alias is needed:
+
+```svelte
+<script>
+  import { Game, Scene, character } from "https://easierbycode.com/2019-es7/characters";
+
+  // Any /characters entry, by name — resolved when the component mounts.
+  const RedDress = character("red_dress_killer");
+
+  // Optional defaults become the component's baseline props.
+  const Weirdo = character("weirdo", { scale: 2, animation: "idle" });
+</script>
+
+<Game width={480} height={640}>
+  <Scene key="main">
+    <RedDress x={140} y={300} />
+    <Weirdo x={340} y={300} flipX />
+  </Scene>
+</Game>
+```
+
+In a cmg scene script the game is already running, so adopt its scene instead
+of creating a `<Game>`:
+
+```svelte
+<script>
+  import { Adopt, character } from "https://easierbycode.com/2019-es7/characters";
+  const RedDress = character("red_dress_killer");
+  let { ctx } = $props();
+</script>
+
+<Adopt scene={ctx.scene}>
+  <RedDress x={120} y={220} scale={0.6} onready={({ sprite }) => sprite.setDepth(9999)} />
+</Adopt>
+```
+
+For fully dynamic names (e.g. picked from `listCharacters()`), skip the
+factory and pass the name as a prop: `<Character name={picked} x={240} />`.
+
+The scene-script example above ships with the module —
+[`examples/adopt-scene-script.svelte`](examples/adopt-scene-script.svelte) —
+and can be tried on any cmg game page with
+`?titleScript=https://easierbycode.com/2019-es7/characters/examples/adopt-scene-script.svelte`.
+
 ## Exports
 
 - One component per library character (`red_dress_killer`, `weirdo`,
   `dukeNukem`, ... plus PascalCase aliases) and `CHARACTERS` (the list).
 - `character(name, defaults?)` — component for any character, including ones
-  created after this build.
+  created after this build (see above).
 - `Character` — generic component: `<Character name={picked} x={240} />`.
 - `Adopt` — provide a *running* game/scene as context (cmg scene scripts):
   ```svelte
