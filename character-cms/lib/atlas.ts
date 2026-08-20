@@ -123,6 +123,16 @@ async function loadLocalAtlas(atlasKey: string): Promise<Atlas | null> {
   return { image: await loadImage(`${base}.png`), frames, source: base };
 }
 
+/**
+ * Load exactly one RTDB atlas node, skipping both the source order and the
+ * cache. The atlas builder needs this: it reads and writes `atlases/<key>`
+ * specifically, and must see its own last save rather than a cached copy or
+ * the on-disk atlas that happens to share the key.
+ */
+export function loadAtlasAt(path: string): Promise<Atlas | null> {
+  return loadRtdbAtlas(path);
+}
+
 async function loadRtdbAtlas(path: string): Promise<Atlas | null> {
   const snap = await fbGet(fbRef(getDB(), path));
   if (!snap.exists()) return null;
