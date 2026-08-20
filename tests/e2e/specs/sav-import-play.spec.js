@@ -60,17 +60,17 @@ test("an imported save plays with its own enemy art, not game_asset frame 0", as
             missing: keys.filter((k) => !frames[k]),
             // The import's own player: its frames are not in the stock atlas,
             // so they only exist here if the import carried them in.
-            mutoidShip: !!frames["cyberLiberty0.png"],
-            mutoidShot: !!frames["hadoken0.png"],
-            mutoidShield: !!frames["shield0.png"],
+            dukeShip: !!frames["duke_0"],
+            dukeShot: !!frames["bigProjectile_0.png"],
+            dukeShield: !!frames["shield0.png"],
             stockPlayerPresent: !!frames["player00.gif"],
             stockShotPresent: !!frames["shot00.gif"],
         };
     }, wanted);
     expect(resolved.missing).toEqual([]);
-    expect(resolved.mutoidShip).toBe(true);
-    expect(resolved.mutoidShot).toBe(true);
-    expect(resolved.mutoidShield).toBe(true);
+    expect(resolved.dukeShip).toBe(true);
+    expect(resolved.dukeShot).toBe(true);
+    expect(resolved.dukeShield).toBe(true);
     // ...and folding the editor atlas in must not cost the stock art.
     expect(resolved.stockPlayerPresent).toBe(true);
     expect(resolved.stockShotPresent).toBe(true);
@@ -95,7 +95,7 @@ test("an imported save plays with its own enemy art, not game_asset frame 0", as
     });
     expect(drawn.count).toBeGreaterThan(0);
     for (const f of drawn.distinct) expect(f).toMatch(/^deza/);
-    expect(drawn.playerFrame).toMatch(/^cyberLiberty\d\.png$/);
+    expect(drawn.playerFrame).toMatch(/^duke_\d$/);
 
     expect(missingFrameWarnings).toEqual([]);
 });
@@ -148,7 +148,7 @@ test("switching the editor to another atlas does not strip the imported art from
     const resolved = await gamePage.evaluate((keys) => {
         const s = window.__PHASER_4_GAME__.scene.getScene("PhaserGameScene");
         const frames = s.textures.get("game_asset").frames;
-        return { missing: keys.filter((k) => !frames[k]), playerPresent: !!frames["cyberLiberty0.png"] };
+        return { missing: keys.filter((k) => !frames[k]), playerPresent: !!frames["duke_0"] };
     }, wanted);
     expect(resolved.missing).toEqual([]);
     expect(resolved.playerPresent).toBe(true);

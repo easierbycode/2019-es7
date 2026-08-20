@@ -16,14 +16,16 @@ sprites and fonts baked into a save are Athena's copyright.
 | Differential analysis tooling | **done** (`dev/diff-saves.js`) |
 | Section decompression (Okumura LZSS) | **done** (`lib/decompress.js`) — all 16 fixture sections decode to exact region sizes |
 | Payload region decoders (CG pages, palettes, backgrounds, placement, sprite composition, BGM) | **done** (`lib/decode/`) |
-| Enemy *attribute* fields inside the 18-byte record | not decoded — needs delta captures / Ghidra for field offsets |
+| Enemy *attribute* fields inside the 18-byte record | **done** (`lib/decode/decode-enemy.js`) — traced from GAME.CMP's spawn routine: hp, score, speed, fire config, and the four change channels (speed/rotation/scale/direction) |
 | game.json + atlas emit | **done** — lossless (see below) |
 | BGM | decoded (`lib/decode/decode-song.js`); not converted to audio yet |
 
 The container layout is fully reverse-engineered and validated against real
-saves (see `FORMAT.md`). The one field-level gap left is the meaning of the
-bytes inside an enemy record; **controlled-delta sample saves** localize those
-— see "Helping the RE" below.
+saves (see `FORMAT.md`). The record decode is engine-traced (the field map and
+lookup tables come from the play engine's own reads — see FORMAT.md "Enemy
+record"); the small remainders are marked in the decoder: byte 5's exact fire
+direction mapping, the per-channel trigger modes, and the 8 movement-pattern
+shapes (carried as data, not yet re-implemented shape-for-shape).
 
 ## What an import keeps
 
@@ -39,7 +41,8 @@ stages, 3,497 placements — the emitted game carries all of it:
 | Pacing | each wave records the scroll row it came from (`stage.waveRows`), so the gaps between waves — 1 to 177 rows — survive |
 | Art | each enemy is drawn with the art **its own stage** defines; identical compositions share atlas frames |
 | Bosses | every stage that places one gets its own 4-frame boss art and size class |
-| Attributes | the 18-byte record travels verbatim on `enemyData.*.dezaemon.attributes`. The field *names* are still open, so imported enemies play with default stats — but the data is there for a later decode to name, without re-importing |
+| Attributes | **decoded**: hp/score/speed/interval land on the fields the runtime reads, and the full record — fire type/count/rate/direction plus the speed-change, rotation, scale and direction channels — rides on `enemyData.*.dezaemon.behavior`. The raw 18 bytes still travel on `.attributes` for auditability |
+| Backgrounds | each stage's 14x768 tile map is exported as `stage.background` (base64 grid) over `backgroundCells` (one atlas sprite per distinct tile); the runtime composes and scrolls it in place of the stock backdrop, on the scene's worldTime clock |
 
 A Dezaemon save carries no player of its own, so the import supplies one: the
 **Duke character** (`lib/player-art.js`) — the Firebase record

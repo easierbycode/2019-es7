@@ -804,6 +804,12 @@
         // opened before the atlas changed. The sessionStorage write stays for
         // the viewers that already read it. Returns a promise that settles once
         // the bridge is durable, so callers can hand off without racing it.
+        // Publishes must land in call order: an import publishes twice in quick
+        // succession (once from storeBossDataForViewers with the OLD atlas,
+        // once after the merge with the new one), and each write rides its own
+        // toBlob + IndexedDB-open chain — without a queue the stale write can
+        // finish last and silently clobber the imported art.
+        let atlasPublishChain = Promise.resolve();
         function storeAtlasForViewers() {
             // Store atlas frames JSON in sessionStorage
             if (atlasData && atlasData.frames) {
@@ -818,11 +824,16 @@
             // gone from Play with nothing to say why.
             const atlasKey = currentAtlasKey;
             const frames = atlasData.frames;
-            return new Promise((resolve) => {
+            // Snapshot the pixels NOW (drawImage is synchronous); only the
+            // encode + write are queued.
+            let cv = null;
+            try {
+                cv = document.createElement('canvas');
+                cv.width = atlasImage.naturalWidth; cv.height = atlasImage.naturalHeight;
+                cv.getContext('2d').drawImage(atlasImage, 0, 0);
+            } catch (e) { return Promise.resolve(false); }
+            const run = () => new Promise((resolve) => {
                 try {
-                    const cv = document.createElement('canvas');
-                    cv.width = atlasImage.naturalWidth; cv.height = atlasImage.naturalHeight;
-                    cv.getContext('2d').drawImage(atlasImage, 0, 0);
                     cv.toBlob(function (blob) {
                         if (!blob) { resolve(false); return; }
                         openViewerBridge().then((db) => {
@@ -842,6 +853,9 @@
                     }, 'image/png');
                 } catch (e) { resolve(false); }
             });
+            const chained = atlasPublishChain.then(run, run);
+            atlasPublishChain = chained;
+            return chained;
         }
 
         const VIEWER_BRIDGE_ATLAS_PREFIX = 'atlas:';
@@ -2915,7 +2929,7 @@
                 lines.push('Sprites: <span style="color:#84cc16">' + d.sprites.length +
                     '</span> enemy animation frames extracted from this save\'s CG pages');
             }
-            lines.push('<span style="color:#64748b">Every stage, enemy type and spawn in this save is imported — enemies are kept apart per stage, and the grid is the Saturn playfield\'s own 14 columns. Enemy <em>attribute</em> field names are still being reverse-engineered, so imported enemies play with the default stats; their 18-byte definitions ride along verbatim so nothing is lost — see FORMAT.md.</span>');
+            lines.push('<span style="color:#64748b">Every stage, enemy type and spawn in this save is imported — enemies are kept apart per stage, and the grid is the Saturn playfield\'s own 14 columns. Enemy <em>attributes</em> are decoded from the engine field map: hp, score, speed, fire patterns and the rotation/scale/direction/speed-change channels all play as authored, and stage scenery scrolls as the real background — see FORMAT.md.</span>');
             document.getElementById('deza-decoded-summary').innerHTML = lines.join('<br>');
             const spriteGrid = document.getElementById('deza-sprite-preview');
             spriteGrid.innerHTML = '';
@@ -3038,6 +3052,10 @@
             notes.unshift(stageKeys.length + ' stages, ' + Object.keys(enemyData).length +
                 ' enemy types and ' + spawnCount.toLocaleString() + ' spawns imported — nothing dropped.');
             notes.push('Grid is ' + gridWidth(currentGrid) + ' columns wide (the Saturn playfield), and each wave keeps the scroll row it spawned on, so the stage keeps its pacing.');
+            const behaviorCount = Object.values(enemyData).filter(e => e && e.dezaemon && e.dezaemon.behavior).length;
+            if (behaviorCount) notes.push(behaviorCount + ' enemies play with their decoded attributes: hp, score, speed, fire patterns, and the rotation/scale/direction/speed-change channels.');
+            const bgStages = Object.keys(gameData).filter(k => /^stage\d+$/.test(k) && gameData[k].background).length;
+            if (bgStages) notes.push(bgStages + ' stages carry their own scrolling scenery (' + (gameData.backgroundCells || []).length + ' background tiles packed into the atlas).');
             if (bossCount) notes.push(bossCount + ' of ' + stageKeys.length + ' stages place a boss; those use the save\'s own boss art.');
             notes.push('Player and bullets: the Duke character (' +
                 playerData.texture.length + ' idle frames + the sparkler shot/big/3way + a ' +
@@ -5118,6 +5136,12 @@ function GAME3D_RUNTIME(DATA) {
                 if (stageRec && Array.isArray(stageRec.waveRows) && stageRec.waveRows.length === payload.enemylist.length) {
                     payload.waveRows = stageRec.waveRows;
                     payload.waveInterval = stageRec.waveInterval;
+                }
+                // Imported scenery rides with the level: the stage's tile grid
+                // plus the cell list it indexes (level-loader reads both).
+                if (stageRec && stageRec.background && Array.isArray(gameData.backgroundCells)) {
+                    payload.background = stageRec.background;
+                    payload.backgroundCells = gameData.backgroundCells;
                 }
                 // Save audio URL overrides
                 var urlEntries = {};

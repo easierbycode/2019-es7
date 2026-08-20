@@ -19,7 +19,7 @@ import { decompress, SECTION_SIZES, SECTION_HINTS } from "../decompress.js";
 import { decodeCg } from "./decode-cg.js";
 import { decodeStages, sec5Regions, projectForEditor } from "./decode-stage.js";
 import { decodeSongs } from "./decode-song.js";
-import { extractEnemySprites, extractBossSprites } from "./decode-sprites.js";
+import { extractEnemySprites, extractBossSprites, extractBackgroundCells } from "./decode-sprites.js";
 
 export function decodeSave(payload) {
     const result = {
@@ -37,6 +37,8 @@ export function decodeSave(payload) {
         enemies: [],   // {name, stage, record, bytes, placements, spriteKeys?}
         stages: [],    // {rows, waveRows, cols, boss, items} in spawn order
         bosses: [],    // {stage, sizeClass, row, col, spriteKeys?}
+        bgCells: [],   // distinct background tiles: {key, w, h, rgba}
+        bgStages: [],  // per stage: {rows, cols, words: Uint16Array} | null
         regions: [],   // {name, offset, length, decoded, decompressedSize?}
         sections: null,
         tableError: null,
@@ -92,19 +94,18 @@ export function decodeSave(payload) {
                 result.sec5Regions = sec5Regions(assembly.decompressed);
                 // Editor-facing projection: the enemy roster (one entry per
                 // placed (stage, record) pair) and per-stage spawn rows the
-                // level editor renders. Enemy *attributes* (hp/speed/...) are
-                // deliberately left unset — the 18-byte record's fields are
-                // located but not yet named, so the mapper falls back to
-                // engine defaults rather than inventing numbers. The record
-                // bytes themselves travel with each roster entry, so nothing
-                // is lost while that decode is open (see FORMAT.md).
+                // level editor renders. Each roster entry carries its decoded
+                // 18-byte attribute record (decode-enemy.js — hp, score,
+                // speed, fire config and the four change channels), traced
+                // from the play engine's own field reads.
                 const projected = projectForEditor(stages.slice(0, stageCount));
                 result.enemies = projected.enemies;
                 result.stages = projected.stages;
                 result.bosses = projected.stages
                     .map((st, stage) => (st.boss ? { stage, sizeClass: st.boss.sizeClass, row: st.boss.row, col: st.boss.col } : null))
                     .filter(Boolean);
-                result.confidence.enemies = "heuristic";
+                result.confidence.enemies = "confirmed";
+                result.confidence.attributes = "confirmed";
                 result.confidence.stages = "confirmed";
                 // Art: each enemy's 4 animation frames out of its own stage's
                 // sprite composition bank, plus the boss art of every stage
@@ -137,6 +138,17 @@ export function decodeSave(payload) {
                         }
                         result.sprites = sprites.concat(boss.sprites);
                         if (result.sprites.length) result.confidence.sprites = "heuristic";
+                        // Stage backgrounds as art: one sprite per distinct
+                        // tile plus a compact per-stage grid, so the game can
+                        // scroll the save's own scenery.
+                        const bg = extractBackgroundCells(
+                            result.backgrounds,
+                            cgPages,
+                            result.cg.palettes,
+                            stageCount,
+                        );
+                        result.bgCells = bg.cells;
+                        result.bgStages = bg.stages;
                     } catch (err) {
                         result.spriteError = err.message;
                     }

@@ -151,6 +151,22 @@ const NUMERIC_ENEMY_FIELDS = ["score", "spgage", "hp", "speed", "interval", "sha
 const toHex = (bytes) =>
     bytes ? Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("") : null;
 
+// Environment-neutral base64 (Node has no btoa on old versions, browsers no
+// Buffer). Used for the background tile grids.
+const B64_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+function bytesToBase64(bytes) {
+    let out = "";
+    for (let i = 0; i < bytes.length; i += 3) {
+        const a = bytes[i];
+        const b = i + 1 < bytes.length ? bytes[i + 1] : 0;
+        const c = i + 2 < bytes.length ? bytes[i + 2] : 0;
+        out += B64_ALPHABET[a >> 2] + B64_ALPHABET[((a & 3) << 4) | (b >> 4)] +
+            (i + 1 < bytes.length ? B64_ALPHABET[((b & 15) << 2) | (c >> 6)] : "=") +
+            (i + 2 < bytes.length ? B64_ALPHABET[c & 63] : "=");
+    }
+    return out;
+}
+
 // Map a decodeSave() result onto the editor's game.json shape.
 // Returns { gameJson, sprites, warnings }; sprites is the (key-sanitized)
 // list of {key, w, h, rgba} to add to the atlas.
@@ -168,6 +184,15 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
         const key = sanitizeSpriteKey(s.key || `deza_cg${i}`, usedKeys);
         spriteKeyByIndex[i] = key;
         return { key, w: s.w, h: s.h, rgba: s.rgba };
+    });
+
+    // Background tiles, appended after the save's sprites so decoded sprite
+    // indices stay valid. backgroundCells maps each grid ordinal to its atlas
+    // frame name.
+    const backgroundCells = (decoded.bgCells || []).map((cell) => {
+        const key = sanitizeSpriteKey(cell.key, usedKeys);
+        sprites.push({ key, w: cell.w, h: cell.h, rgba: cell.rgba });
+        return key;
     });
 
     // The player's own frames, appended so the save's sprite indices above stay
@@ -193,6 +218,20 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
         for (const f of NUMERIC_ENEMY_FIELDS) {
             if (Number.isFinite(e[f])) rec[f] = e[f];
         }
+        // The save's own attributes, decoded from the 18-byte record
+        // (decode-enemy.js). hp/score/speed/interval land on the fields the
+        // runtime already reads; the full behavior record — fire config and
+        // the speed/rotation/scale/direction change channels — rides on
+        // dezaemon.behavior for the runtime's behavior driver.
+        if (e.behavior) {
+            rec.hp = e.behavior.hp;
+            rec.score = e.behavior.score;
+            // px/frame relative to the scrolling map; near-zero means the
+            // enemy rides the scroll, which the runtime adds on top.
+            rec.speed = Math.round(e.behavior.speed * 100) / 100;
+            // fire type 0 never shoots; the runtime skips interval <= 0
+            rec.interval = e.behavior.fire.type ? e.behavior.fire.interval : -1;
+        }
         if (Array.isArray(e.spriteKeys) && e.spriteKeys.length) {
             rec.texture = e.spriteKeys.map((idx) =>
                 typeof idx === "number" ? (spriteKeyByIndex[idx] || rec.texture[0]) : String(idx)
@@ -210,6 +249,7 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
                 placements: e.placements,
                 attributes: toHex(e.bytes),
             };
+            if (e.behavior) rec.dezaemon.behavior = clone(e.behavior);
         }
         enemyData[`enemy${letters}`] = rec;
     });
@@ -256,6 +296,22 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
             stage.waveInterval = FRAMES_PER_SOURCE_ROW;
         }
         if (decodedStage.items && decodedStage.items.length) stage.items = decodedStage.items;
+        // The save's own scenery: a compact tile grid (u16be words, base64;
+        // bits 0-9 index backgroundCells, bit15/14 = h/v flip, 0xFFFF empty).
+        // The runtime composes and scrolls it in place of the stock backdrop.
+        const bgStage = (decoded.bgStages || [])[s];
+        if (bgStage && bgStage.words) {
+            const bytes = new Uint8Array(bgStage.words.length * 2);
+            bgStage.words.forEach((w, i) => {
+                bytes[i * 2] = w >> 8;
+                bytes[i * 2 + 1] = w & 0xff;
+            });
+            stage.background = {
+                cols: bgStage.cols,
+                rows: bgStage.rows,
+                tiles: bytesToBase64(bytes),
+            };
+        }
         gameJson[`stage${s}`] = stage;
     }
 
@@ -290,6 +346,7 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
     // game pointing at frames that no longer exist: an invisible ship firing
     // invisible shots. This character's frames travel with it, in `sprites`.
     gameJson.playerData = clone(DUKE_PLAYER);
+    if (backgroundCells.length) gameJson.backgroundCells = backgroundCells;
     gameJson.enemyData = enemyData;
     gameJson.bossData = bossData;
     gameJson.meta = { version: "1.0", source: "dezaemon2" };
@@ -319,15 +376,13 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
                 : "no CG/sprite data decoded from this save — using the default art"
         );
     }
-    if (decodedEnemies.length && !decodedEnemies.some((e) => NUMERIC_ENEMY_FIELDS.some((f) => Number.isFinite(e[f])))) {
-        const carried = decodedEnemies.filter((e) => e.bytes).length;
-        warnings.push(
-            "enemy attributes (hp/speed/interval) have no field names yet, so every enemy " +
-            "plays with the default stats — but " +
-            (carried
-                ? `each one's 18-byte definition is stored verbatim on enemyData.*.dezaemon.attributes (${carried} records), so nothing is lost`
-                : "no definition bytes came through for them")
-        );
+    {
+        const decodedAttrs = decodedEnemies.filter((e) => e.behavior).length;
+        if (decodedEnemies.length && !decodedAttrs) {
+            warnings.push(
+                "enemy attribute records did not decode — every imported enemy uses the default stats"
+            );
+        }
     }
     if (!decodedEnemies.length) {
         warnings.push("no enemy table decoded from this save — using the default starter enemy");

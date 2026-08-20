@@ -99,6 +99,22 @@ export function validateGameJson(g) {
         if (st.waveInterval !== undefined && !(Number.isFinite(st.waveInterval) && st.waveInterval > 0)) {
             err(`${k}.waveInterval must be a positive number`);
         }
+        // Imported scenery: a base64 tile grid over backgroundCells.
+        if (st.background !== undefined) {
+            const bg = st.background;
+            if (!isObj(bg) || !Number.isInteger(bg.cols) || !Number.isInteger(bg.rows) ||
+                bg.cols < 1 || bg.rows < 1 || typeof bg.tiles !== "string") {
+                err(`${k}.background must be {cols, rows, tiles} with a base64 tile grid`);
+            } else if (!Array.isArray(g.backgroundCells) || g.backgroundCells.length === 0) {
+                err(`${k}.background needs a non-empty top-level backgroundCells list`);
+            } else {
+                // base64 of rows*cols u16be words
+                const expect = Math.ceil((bg.rows * bg.cols * 2) / 3) * 4;
+                if (bg.tiles.length !== expect) {
+                    err(`${k}.background.tiles is ${bg.tiles.length} chars; ${bg.rows}x${bg.cols} words need ${expect}`);
+                }
+            }
+        }
     }
 
     // --- playerData ---

@@ -90,7 +90,7 @@ test("importing a real Dezaemon 2 .sav populates the modal and the editor", asyn
     expect(grid.withSprite).toBe(grid.occupied);
     expect(grid.distinct).toBeGreaterThan(1);
 
-    // A Dezaemon save has no player of its own, so the import flies the Mutoid
+    // A Dezaemon save has no player of its own, so the import flies Duke
     // character — and every frame it references, ship, bullets and shield
     // alike, has to resolve in the atlas the editor just rebuilt around the
     // save's sprites. Those frames are not in the stock game_asset, so they
@@ -115,8 +115,11 @@ test("importing a real Dezaemon 2 .sav populates the modal and the editor", asyn
             missing: referenced.filter((f) => !frames[f]),
         };
     });
-    expect(player.texture).toEqual(["cyberLiberty0.png", "cyberLiberty1.png"]);
-    expect(player.shootNormal).toEqual(["hadoken0.png", "hadoken1.png"]);
+    expect(player.texture).toEqual(["duke_0", "duke_1", "duke_2", "duke_3"]);
+    expect(player.shootNormal).toEqual([
+        "bigProjectile_0.png", "bigProjectile_1.png",
+        "bigProjectile_2.png", "bigProjectile_3.png",
+    ]);
     expect(player.shootBig).toEqual([
         "bigProjectile0.png", "bigProjectile1.png", "bigProjectile2.png",
     ]);
@@ -126,12 +129,12 @@ test("importing a real Dezaemon 2 .sav populates the modal and the editor", asyn
     const importNotes = notes.join("\n");
     expect(importNotes).not.toContain("Repack Atlas");
     expect(importNotes).toContain("sprites from the save were packed into the atlas");
-    expect(importNotes).toContain("Player and bullets: the Mutoid character");
+    expect(importNotes).toContain("Player and bullets:");
 
     expect(errors).toEqual([]);
 });
 
-test("importing over a level with a custom player still flies the Mutoid ship", async ({ page }) => {
+test("importing over a level with a custom player still flies Duke", async ({ page }) => {
     await blockCdn(page);
     const errors = collectPageErrors(page);
     page.on("dialog", (d) => d.accept());
@@ -171,9 +174,12 @@ test("importing over a level with a custom player still flies the Mutoid ship", 
         // point is that nothing the player references went missing.
         missingPanelHidden: document.getElementById("missing-tex-overlay").classList.contains("hidden"),
     }));
-    expect(after.texture[0]).toBe("cyberLiberty0.png");
+    expect(after.texture[0]).toBe("duke_0");
     expect(after.texture).not.toContain("levelOnlyShip0.gif");
-    expect(after.shootNormal).toEqual(["hadoken0.png", "hadoken1.png"]);
+    expect(after.shootNormal).toEqual([
+        "bigProjectile_0.png", "bigProjectile_1.png",
+        "bigProjectile_2.png", "bigProjectile_3.png",
+    ]);
     expect(after.missingPanelHidden).toBe(true);
 
     expect(errors).toEqual([]);

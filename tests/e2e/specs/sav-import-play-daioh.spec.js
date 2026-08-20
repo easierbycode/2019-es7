@@ -128,3 +128,85 @@ test("the ninth stage of an imported save plays, with its own wide-grid enemies"
 
     expect(missingFrameWarnings).toEqual([]);
 });
+
+test("stage 0 plays the save's scenery and decoded behaviors", async ({ page, context }) => {
+    page.on("dialog", (d) => d.accept());
+
+    await page.goto("/level-editor.html");
+    await expect.poll(() => page.evaluate(() => !!window.Dezaemon)).toBe(true);
+    await expect.poll(() => page.evaluate(() => !!(atlasData && atlasData.frames))).toBe(true);
+
+    await page.setInputFiles("#deza-file-input", DAIOH);
+    await page.locator("#deza-slot-list > div").nth(SLOT).click();
+    await page.locator("#deza-import-btn").click();
+    await expect(page.locator("#dezaemon-import-modal")).toBeHidden();
+
+    await page.evaluate(() => {
+        currentStageKey = "stage0";
+        loadCurrentStage();
+        localStorage.setItem("__editorPhaserRecipe__", JSON.stringify(buildRuntimeRecipe()));
+        localStorage.setItem("__editorPhaserStageId__", "0");
+        storeAtlasForViewers();
+    });
+
+    const gamePage = await context.newPage();
+    await bootGameScene(gamePage, "/phaser-game.html?editorPlay=1&stage=0&lowmode=1");
+
+    // The save's own scenery replaced the stock backdrop, on the world clock.
+    const scenery = await gamePage.evaluate(() => {
+        const s = window.__PHASER_4_GAME__.scene.getScene("PhaserGameScene");
+        return {
+            hasBg: !!s.dezaBg,
+            strips: s.dezaBg ? s.dezaBg.container.length : 0,
+            mapHeight: s.dezaBg ? s.dezaBg.mapHeight : 0,
+            stockHidden: s.stageBg ? !s.stageBg.visible : false,
+            worldTime: s.worldTime,
+        };
+    });
+    expect(scenery.hasBg).toBe(true);
+    expect(scenery.mapHeight).toBe(768 * 16);
+    expect(scenery.strips).toBe(6);       // 768 rows in 128-row strips
+    expect(scenery.stockHidden).toBe(true);
+
+    // Run the stage: the clock ticks, the map scrolls, and the decoded
+    // channels actually transform sprites on screen.
+    const run = await gamePage.evaluate(async () => {
+        const g = window.__PHASER_4_GAME__;
+        const s = g.scene.getScene("PhaserGameScene");
+        let transformed = 0;
+        let behaviorEnemies = 0;
+        let sampled = 0;
+        // DAIOH stage 0 opens with a scenery approach — the first wave sits at
+        // row 99, due at worldTime 560 — so pump well past it.
+        for (let i = 0; i < 2400; i++) {
+            g.loop.step(performance.now() + 3000 + i * 16.7);
+            if (i % 20 === 0) {
+                for (const e of s.enemies || []) {
+                    if (e.getData && e.getData("type") === "boss") continue;
+                    sampled++;
+                    if (e.getData("deza")) behaviorEnemies++;
+                    if (e.rotation !== 0 || e.scaleX !== 1 || e.scaleY !== 1) transformed++;
+                }
+            }
+            if (i === 1200) await new Promise((r) => setTimeout(r, 250));
+        }
+        return {
+            worldTime: s.worldTime,
+            scrollY: s.dezaBg ? s.dezaBg._scroll : -1,
+            sampled,
+            behaviorEnemies,
+            transformed,
+            waveCount: s.waveCount,
+            bullets: (s.enemyBullets || []).length,
+        };
+    });
+    expect(run.worldTime).toBeGreaterThan(1000);
+    // the map scrolled with the clock (2px per tick)
+    expect(run.scrollY).toBeGreaterThan(1000);
+    expect(run.sampled).toBeGreaterThan(0);
+    // every sampled zako runs on the decoded behavior driver
+    expect(run.behaviorEnemies).toBe(run.sampled);
+    // DAIOH stage 0 places rotating and scaled enemies early — the channels
+    // must be visibly driving sprites, not just riding along as data
+    expect(run.transformed).toBeGreaterThan(0);
+});

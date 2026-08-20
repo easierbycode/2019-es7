@@ -325,3 +325,80 @@ test("enemies with decoded sprites get their texture repointed by sprite index",
     const { gameJson } = mapSaveToGame(decoded);
     assert.deepStrictEqual(gameJson.enemyData.enemyA.texture, ["zako.gif"]);
 });
+
+test("decoded behavior lands on the runtime fields and rides along whole", () => {
+    const decoded = emptyDecoded();
+    decoded.enemies = [{
+        name: "zako", stage: 0, record: 3, placements: 2,
+        bytes: new Uint8Array(18),
+        behavior: {
+            appearance: 0, hp: 15, score: 500, ground: true, speed: 0.78,
+            movePattern: 6,
+            fire: { type: 2, count: 1, wide: false, param: 0, mode: 0, interval: 29, window: 16, direction: 0, directionEx: 0 },
+            speedChange: { enabled: false, from: 1, to: 1, step: 0, repeat: 0, trigger: 0 },
+            rotation: { enabled: true, mode: 1, from: 0, to: 180, step: 1.4, repeat: 2, trigger: 0 },
+            scale: { enabled: true, axes: "xy", from: 0.5, to: 2, step: 0.01, repeat: 1, repeatY: 0, trigger: 0 },
+            direction: { enabled: false, from: 180, to: 180, step: 0, repeat: 0, trigger: 0 },
+        },
+    }];
+    const { gameJson } = mapSaveToGame(decoded);
+    const rec = gameJson.enemyData.enemyA;
+    // the fields the Phaser runtime already reads
+    assert.strictEqual(rec.hp, 15);
+    assert.strictEqual(rec.score, 500);
+    assert.strictEqual(rec.speed, 0.78);
+    assert.strictEqual(rec.interval, 29);
+    // the full record for the behavior driver
+    assert.strictEqual(rec.dezaemon.behavior.rotation.to, 180);
+    assert.strictEqual(rec.dezaemon.behavior.scale.axes, "xy");
+    assert.strictEqual(rec.dezaemon.behavior.ground, true);
+    assert.ok(validateGameJson(gameJson).ok);
+});
+
+test("fire type 0 never shoots: interval maps to -1", () => {
+    const decoded = emptyDecoded();
+    decoded.enemies = [{
+        name: "quiet", stage: 0, record: 0, placements: 1,
+        bytes: new Uint8Array(18),
+        behavior: {
+            appearance: 0, hp: 1, score: 50, ground: false, speed: 0,
+            movePattern: 0,
+            fire: { type: 0, count: 1, wide: false, param: 0, mode: 0, interval: 119, window: 29, direction: 0, directionEx: 0 },
+            speedChange: { enabled: false, from: 1, to: 1, step: 0, repeat: 0, trigger: 0 },
+            rotation: { enabled: false, mode: 0, from: 0, to: 0, step: 0, repeat: 0, trigger: 0 },
+            scale: { enabled: false, axes: "", from: 1, to: 1, step: 0, repeat: 0, repeatY: 0, trigger: 0 },
+            direction: { enabled: false, from: 180, to: 180, step: 0, repeat: 0, trigger: 0 },
+        },
+    }];
+    const { gameJson } = mapSaveToGame(decoded);
+    assert.strictEqual(gameJson.enemyData.enemyA.interval, -1);
+});
+
+test("stage backgrounds emit a valid tile grid over packed cells", () => {
+    const decoded = emptyDecoded();
+    decoded.stages = [{ rows: [new Array(GRID_COLS).fill(null)] }];
+    decoded.bgCells = [
+        { key: "dezaBgCell5", w: 16, h: 16, rgba: new Uint8ClampedArray(16 * 16 * 4) },
+        { key: "dezaBgCell9", w: 16, h: 16, rgba: new Uint8ClampedArray(16 * 16 * 4) },
+    ];
+    const words = new Uint16Array(2 * 14).fill(0xffff);
+    words[0] = 0;              // cell 0, no flips
+    words[1] = 0x8001;         // cell 1, h-flipped
+    decoded.bgStages = [{ rows: 2, cols: 14, words }];
+    const { gameJson, sprites } = mapSaveToGame(decoded);
+    assert.deepStrictEqual(gameJson.backgroundCells, ["dezaBgCell5.gif", "dezaBgCell9.gif"]);
+    const bg = gameJson.stage0.background;
+    assert.strictEqual(bg.rows, 2);
+    assert.strictEqual(bg.cols, 14);
+    // the packed cells are in the atlas sprite list
+    const keys = sprites.map((s) => s.key);
+    assert.ok(keys.includes("dezaBgCell5.gif"));
+    assert.ok(keys.includes("dezaBgCell9.gif"));
+    const v = validateGameJson(gameJson);
+    assert.deepStrictEqual(v.errors, []);
+    // round-trip the base64 back to the words
+    const bin = Buffer.from(bg.tiles, "base64");
+    assert.strictEqual((bin[0] << 8) | bin[1], 0);
+    assert.strictEqual((bin[2] << 8) | bin[3], 0x8001);
+    assert.strictEqual((bin[4] << 8) | bin[5], 0xffff);
+});

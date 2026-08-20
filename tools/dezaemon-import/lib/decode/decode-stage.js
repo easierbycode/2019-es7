@@ -12,6 +12,8 @@
 //
 // Environment-neutral ESM (Node + browser).
 
+import { decodeEnemyRecord } from "./decode-enemy.js";
+
 export const SEC5_REGIONS = {
     stageBanks: { offset: 0x00000, count: 10, stride: 0x5400 },
     stageHeaders: { offset: 0x34800, count: 10, stride: 0x00c0 },
@@ -265,6 +267,7 @@ export function projectForEditor(stages, { cols = PLACEMENT_COLS } = {}) {
         for (const record of [...placed].sort((a, b) => a - b)) {
             const key = enemyPairKey(s, record);
             indexOf.set(key, enemies.length);
+            const bytes = st.enemies.records[record] ? st.enemies.records[record].bytes : null;
             enemies.push({
                 // stage-qualified so two stages' record 7 stay distinct
                 name: `deza${s}_${String(record).padStart(2, "0")}`,
@@ -272,12 +275,13 @@ export function projectForEditor(stages, { cols = PLACEMENT_COLS } = {}) {
                 record,
                 key,
                 placements: uses.get(key),
-                // The 18-byte definition, carried verbatim. Its field layout is
-                // still open (FORMAT.md), so nothing here invents hp/speed
-                // numbers — but the bytes ride along instead of being dropped,
-                // and the mapper writes them into the game so a later decode
-                // can fill the attributes in without a re-import.
-                bytes: st.enemies.records[record] ? st.enemies.records[record].bytes : null,
+                // The 18-byte definition decoded into named fields — hp, score,
+                // speed, fire config and the four change channels. Engine-traced
+                // (see decode-enemy.js); this is what makes imported enemies
+                // play with their own stats instead of defaults.
+                behavior: bytes ? decodeEnemyRecord(bytes) : null,
+                // The raw 18 bytes still ride along for auditability.
+                bytes,
             });
         }
     });

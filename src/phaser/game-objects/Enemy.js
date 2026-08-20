@@ -7,6 +7,7 @@ import { gameState } from "../../gameState.js";
 import { PLAYER_STATES } from "../../enums/player-boss-states.js";
 import { createShadow, updateShadowPosition } from "./Shadow.js";
 import { triggerHaptic } from "../../haptics.js";
+import { initEnemyBehavior, updateEnemyBehavior, updateEnemyFire } from "../dezaemon-runtime.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
 var GH = GAME_DIMENSIONS.HEIGHT;
@@ -66,6 +67,12 @@ export function createEnemy(scene, data, x, y, itemName) {
     enemy.setData("animTimer", 0);
     enemy.setData("projData", data.bulletData || data.projectileData || null);
     enemy.setData("enemyKey", data._enemyKey || null);
+
+    // Dezaemon import: the decoded 18-byte record drives movement, fire and
+    // the visual channels instead of the legacy per-name patterns.
+    if (data.dezaemon && data.dezaemon.behavior) {
+        initEnemyBehavior(enemy, data.dezaemon.behavior);
+    }
 
     // PIXI BaseUnit shadow (same sprite, tinted black, 50% alpha, Y-flipped)
     var shadowReverse = data.shadowReverse !== false;
@@ -135,6 +142,29 @@ export function enemyWave(scene) {
  * @param {Phaser.Scene} scene
  * @param {Phaser.GameObjects.Sprite} enemy
  */
+export function spawnEnemyBullet(scene, enemy, rotX, rotY) {
+    var projData = enemy.getData("projData");
+    if (!projData) return null;
+    var frames = resolveFrames(scene, "game_asset", projData.texture || []);
+    var frameKey = frames[0] || "normalProjectile0.gif";
+    var bullet = scene.add.sprite(enemy.x, enemy.y + (enemy.height / 2), "game_asset", frameKey);
+    bullet.setOrigin(0.5);
+    bullet.setDepth(41);
+    bullet.setData("speed", projData.speed || 1);
+    bullet.setData("damage", projData.damage || 1);
+    bullet.setData("hp", projData.hp || 1);
+    bullet.setData("score", projData.score || 0);
+    bullet.setData("spgage", projData.spgage || 0);
+    bullet.setData("frames", frames);
+    bullet.setData("animIdx", 0);
+    bullet.setData("animTimer", 0);
+    if (projData.frameRate) bullet.setData("frameRate", projData.frameRate);
+    bullet.setData("rotX", rotX);
+    bullet.setData("rotY", rotY);
+    scene.enemyBullets.push(bullet);
+    return bullet;
+}
+
 export function enemyShoot(scene, enemy) {
     var projData = enemy.getData("projData");
     if (!projData) return;
@@ -240,6 +270,17 @@ export function enemyDie(scene, enemy, isSp) {
  * @param {number} step – logical step time in ms
  */
 export function updateEnemy(scene, enemy, step) {
+    // Dezaemon behavior: decoded movement/transform channels + fire pattern
+    // replace the legacy per-name movement and the fixed-interval shooting.
+    if (updateEnemyBehavior(scene, enemy)) {
+        var dShadow = enemy.getData("shadow");
+        if (dShadow && dShadow.active) {
+            updateShadowPosition(dShadow, enemy);
+        }
+        updateEnemyFire(scene, enemy, spawnEnemyBullet);
+        return;
+    }
+
     var speed = enemy.getData("speed") || 0.8;
     enemy.y += speed;
 

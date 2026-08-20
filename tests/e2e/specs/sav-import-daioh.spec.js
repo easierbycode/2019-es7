@@ -102,10 +102,54 @@ test("a nine-stage DAIOH save imports whole — every stage, type and spawn", as
     expect(identity.withRecord).toBe(ENEMY_TYPES);
     expect(identity.distinctPairs).toBe(ENEMY_TYPES);
     expect(identity.stagesCovered).toBe(STAGES);
-    // Attributes have no field names yet, so they are carried verbatim rather
-    // than guessed at — 18 bytes, hex, one per enemy.
+    // The raw 18 bytes still ride along for auditability...
     expect(identity.withAttributes).toBe(ENEMY_TYPES);
     expect(identity.record0Differs).toBe(true);
+
+    // ...and they are DECODED: hp/score/speed/fire land on the runtime fields,
+    // the transform channels on dezaemon.behavior. Values must come from the
+    // engine's own tables, not defaults.
+    const attrs = await page.evaluate(() => {
+        const HP = [60, 30, 15, 10, 5, 3, 2, 1];
+        const SCORE = [50, 100, 200, 500, 1000, 2000, 5000, 10000];
+        const recs = Object.values(gameData.enemyData);
+        return {
+            total: recs.length,
+            withBehavior: recs.filter((e) => e.dezaemon && e.dezaemon.behavior).length,
+            hpFromTable: recs.filter((e) => HP.includes(e.hp)).length,
+            scoreFromTable: recs.filter((e) => SCORE.includes(e.score)).length,
+            silenced: recs.filter((e) => e.interval === -1).length,
+            withTransforms: recs.filter((e) => {
+                const b = e.dezaemon && e.dezaemon.behavior;
+                return b && (b.rotation.enabled || b.scale.enabled ||
+                    b.direction.enabled || b.speedChange.enabled);
+            }).length,
+        };
+    });
+    expect(attrs.withBehavior).toBe(ENEMY_TYPES);
+    expect(attrs.hpFromTable).toBe(ENEMY_TYPES);
+    expect(attrs.scoreFromTable).toBe(ENEMY_TYPES);
+    // DAIOH's measured shape: 249 silent enemies, 149 with visual transforms
+    expect(attrs.silenced).toBeGreaterThan(200);
+    expect(attrs.withTransforms).toBeGreaterThan(100);
+
+    // --- The save's own scenery ---------------------------------------
+    const scenery = await page.evaluate(() => {
+        const stageKeys = Object.keys(gameData).filter((k) => /^stage\d+$/.test(k));
+        return {
+            cells: (gameData.backgroundCells || []).length,
+            withBg: stageKeys.filter((k) => gameData[k].background).length,
+            stage0: gameData.stage0.background
+                ? { rows: gameData.stage0.background.rows, cols: gameData.stage0.background.cols }
+                : null,
+            packed: (gameData.backgroundCells || []).every((name) =>
+                !!(atlasData && atlasData.frames && atlasData.frames[name]) ||
+                document.querySelector('img') !== undefined),
+        };
+    });
+    expect(scenery.cells).toBe(250);
+    expect(scenery.withBg).toBe(8);       // stage 8 has an empty background
+    expect(scenery.stage0).toEqual({ rows: 768, cols: 14 });
 
     // --- Every spawn keeps the row it spawned on ----------------------
     const pacing = await page.evaluate(() => {

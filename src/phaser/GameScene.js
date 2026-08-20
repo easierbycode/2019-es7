@@ -6,6 +6,7 @@ import { gameState, saveHighScore } from "../gameState.js";
 import { PLAYER_STATES } from "../enums/player-boss-states.js";
 import { triggerHaptic } from "../haptics.js";
 import { assetStageId, lastStageId } from "./stages.js";
+import { buildStageBackground, SCROLL_PX_PER_FRAME } from "./dezaemon-runtime.js";
 import {
     getDisplayedHighScore,
     getWorldBestLabel,
@@ -180,6 +181,34 @@ export class PhaserGameScene extends Phaser.Scene {
         this.stageEndBg.setOrigin(0, 0);
         this.stageEndBg.y = -this.stageEndBg.height;
         this.stageEndBg.setVisible(false);
+
+        // The stage's own clock: one tick per fixedUpdate while the stage is
+        // live (frozen by the time-stop). Drives the imported background
+        // scroll and, through it, the map-aligned wave timing below.
+        this.worldTime = 0;
+        // A Dezaemon import ships the save's scenery; when present it replaces
+        // the stock scrolling backdrop entirely.
+        this.dezaBg = buildStageBackground(this, stageData, this.recipe);
+        if (this.dezaBg) {
+            this.stageBg.setVisible(false);
+            if (this.stageBgOverlay) this.stageBgOverlay.setVisible(false);
+        }
+        // With a real map, waves fire when their scroll row reaches the top of
+        // the screen — the stage opens with the same scenery approach the
+        // Saturn played. Without one, the first wave still fires immediately.
+        this.waveDueTicks = null;
+        if (this.stageWaveRows) {
+            // stageWaveRows is already reversed into spawn order (ascending)
+            var rowsAsc = this.stageWaveRows;
+            var firstRow = rowsAsc[0] || 0;
+            var perRow = this.waveInterval || 8;
+            var self0 = this;
+            this.waveDueTicks = rowsAsc.map(function (row) {
+                return self0.dezaBg
+                    ? Math.max(0, row * perRow - 232)
+                    : (row - firstRow) * perRow;
+            });
+        }
 
         // Second parallax layer, for the custom-enemy space background only: the
         // corridor sits over the starfield at partial alpha and scrolls faster,
@@ -909,7 +938,12 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     fixedUpdate(time, step) {
-        if (this.stageBg && !this.playerDead && !this.stageCleared) {
+        if (this.gameStarted && !this.playerDead && !this.stageCleared && !this.theWorldFlg) {
+            this.worldTime += 1;
+        }
+        if (this.dezaBg) {
+            this.dezaBg.setScroll(this.worldTime * SCROLL_PX_PER_FRAME);
+        } else if (this.stageBg && !this.playerDead && !this.stageCleared) {
             if (!this.bossActive && !this.bossReached) {
                 var bgMove = this.gameStarted ? (this.stageBgAmountMove || 0.7) : 0.7;
                 this.stageBg.tilePositionY -= bgMove;
@@ -1245,23 +1279,23 @@ export class PhaserGameScene extends Phaser.Scene {
         // --- Wave spawning ---
         if (this.enemyWaveFlg) {
             this.enemyWaveFrameCounter += 1;
-            if (this.stageWaveRows) {
+            if (this.waveDueTicks) {
                 // The level carries the scroll row of every wave, so waves are
                 // due when the stage has scrolled that far — the gaps between
                 // them are part of the level, not an artefact of a fixed beat.
-                var first = this.stageWaveRows[0];
+                // With an imported background the due ticks are map-absolute,
+                // which keeps spawns glued to their scenery.
+                var waveClock = this.dezaBg ? this.worldTime : this.enemyWaveFrameCounter;
                 while (
                     this.waveCount < this.stageEnemyPositionList.length &&
-                    this.enemyWaveFrameCounter >=
-                        (this.stageWaveRows[this.waveCount] - first) * this.waveInterval
+                    waveClock >= this.waveDueTicks[this.waveCount]
                 ) {
                     _enemyWave(this);
                 }
                 // Past the last wave the boss is due after one more beat.
                 if (
                     this.waveCount >= this.stageEnemyPositionList.length &&
-                    this.enemyWaveFrameCounter >=
-                        (this.stageWaveRows[this.stageWaveRows.length - 1] - first + 1) * this.waveInterval
+                    waveClock >= this.waveDueTicks[this.waveDueTicks.length - 1] + this.waveInterval
                 ) {
                     _enemyWave(this);
                 }

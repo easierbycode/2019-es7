@@ -198,6 +198,56 @@ export function extractEnemySprites(sec5, sections, palettes, enemies, stagesPla
     return { sprites, spriteKeysByEnemy };
 }
 
+
+// --- Stage backgrounds -------------------------------------------------
+//
+// Each stage's background is 14x768 tiles of 16x16 CG cells (decode-stage.js).
+// For the editor/runtime the tilemap is exported as (a) one RGBA sprite per
+// DISTINCT cell any used stage references, and (b) a compact per-stage grid of
+// words that index that list (bits 0-9 ordinal, bit15 hflip, bit14 vflip,
+// 0xFFFF empty). Flips stay in the grid, so a cell mirrored both ways still
+// costs one sprite.
+//
+// Returns {cells: [{key,w,h,rgba}], stages: [{rows, words: Uint16Array}|null]}
+// where words is rows*14 long and `rows` is trimmed to the last non-empty row.
+export function extractBackgroundCells(backgrounds, sections, palettes, stageCount) {
+    const ordinalByCell = new Map();
+    const cells = [];
+    const stages = [];
+    for (let s = 0; s < stageCount; s++) {
+        const bg = backgrounds[s];
+        if (!bg || bg.empty) { stages.push(null); continue; }
+        // trim to the used extent — most stages stop well short of row 768
+        let lastRow = -1;
+        for (let i = 0; i < bg.tiles.length; i++) {
+            if (bg.tiles[i]) lastRow = Math.max(lastRow, (i / bg.cols) | 0);
+        }
+        if (lastRow < 0) { stages.push(null); continue; }
+        const rows = lastRow + 1;
+        const words = new Uint16Array(rows * bg.cols).fill(0xffff);
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < bg.cols; c++) {
+                const t = bg.tiles[r * bg.cols + c];
+                if (!t) continue;
+                if (!ordinalByCell.has(t.cell)) {
+                    ordinalByCell.set(t.cell, cells.length);
+                    const indexed = cellIndexed(sections, t.cell);
+                    cells.push({
+                        key: `dezaBgCell${t.cell}`,
+                        w: CG_CELL_DIM,
+                        h: CG_CELL_DIM,
+                        rgba: indexedToRgba(indexed, palettes),
+                    });
+                }
+                words[r * bg.cols + c] = ordinalByCell.get(t.cell) |
+                    (t.hflip ? 0x8000 : 0) | (t.vflip ? 0x4000 : 0);
+            }
+        }
+        stages.push({ rows, cols: bg.cols, words });
+    }
+    return { cells, stages };
+}
+
 // --- Bosses -----------------------------------------------------------
 //
 // The composition bank's last four slots are the four boss size classes. Each

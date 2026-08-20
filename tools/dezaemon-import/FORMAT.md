@@ -257,13 +257,40 @@ stage. The per-stage sprite composition bank agrees — 327 painted
 on the record number alone collapses unrelated enemies together; the importer
 keys on the **(stage, record) pair** (`lib/decode/decode-stage.js`).
 
-**Enemy record (18 B)** — not yet fully mapped, but strongly field-specialised:
-96.5% of its nibbles are ≤ 8 across 6799 populated records, and per-byte
-distinct-value counts are 200, 108, 138, 68, 94, 79, **16**, 65, **14**, 40,
-51, **14**, 33, 77, **12**, **16**, 72, **15** — the low-cardinality columns
-are 0–8 sliders, 0–4 enums and outright booleans, matching the editor's
-attribute model (LIFE / speed / fire timing / anim speed are 1–8; fire type is
-a 5-way choice). The layout falls into a 6-byte head plus four 3-byte groups.
+**Enemy record (18 B)** — **decoded** (2026-08-08) by disassembling the zako
+spawn routine in GAME.CMP (loaded at `0x06064000`; the routine at file
+`+0x153C8` computes `record = 0x0029A7E0 + stage*0x478 + index*18` — the only
+three literal-pool references to the record base in the whole engine are that
+spawn routine and two small per-field query helpers at `+0x166B4`/`+0x1670C`).
+Layout: a 6-byte head plus four 3-byte **change channels** — the editor's
+start/end/rate/repeat interpolators:
+
+| Byte | Field |
+|------|-------|
+| 0 | appearance id: full byte indexes a 256-entry pointer table (`+0x6088e5c`) of sprite/animation definitions; `b0>>3` also classifies (a `>3` query helper exists) |
+| 1 | bits0-2 **hp** index → `[60,30,15,10,5,3,2,1]` (`+0x6085ee8`; index 0 = toughest, 7 = the editor default); bits4-6 **score** index → `[50,100,200,500,1000,2000,5000,10000]` (`+0x6085ef0`); bit7 **ground** flag |
+| 2 | bits0-2 **speed** index → u32 `[256,12800,…,512000]` (`+0x6085f20`, 16.16 px/frame, ×1.5 at rank ≥2 and again at rank 6); bit3+bits4-5 **movement pattern** (0-7, `((b2>>4)&3)\|((b2&8)>>1)`); bits6-7 **fire type** |
+| 3 | fire params (type 1: bits0-2 count−1, bit3 wide; other types OR raw) |
+| 4 | bits0-1 fire mode; bits4-6 **fire rate** index → interval `[119,59,29,19,9,5,3,1]` (`+0x6085f81`; mode 3 uses `[119,59,39,19,11,7,3,1]`) + randomization window `[29,22,16,11,7,4,2,1]` (`+0x6085f61`) — reload = interval + rand(window) |
+| 5 | bits0-4 fire direction (0 = default/aimed), bits5-7 extra (passed to the shooter at `+0x607cfac`) |
+| 6-8 | **speed-change channel** (enable `b6&1`) — values `[0,4,8,12,16,24,32,48,64]`/16 = ×0..×4 (`+0x6086004`), steps `[16..1024]`/256 (`+0x608600e`) |
+| 9-11 | **rotation channel** (mode `b9&7`: 0 off, 1 cw, 2 ccw, 3/4 engine-special) — angles `[0,32,…,224]` of the 256-circle (`+0x6085fec`), steps `[16..2048]`/256 (`+0x6085ff4`) |
+| 12-14 | **scale channel** (mode `b12&3`: 0 off, 1 XY, 2 X, 3 Y) — values ×0..×4 (`+0x6085fd0`, 16 = ×1.0, the spawn default `0x1000` = 16<<8), steps `[16..1024]`/256 (`+0x6085fda`); `b14` bits4-5 repeat X, bits2-3 repeat Y |
+| 15-17 | **direction channel** (enable `b15&1`) — movement angles `[0,16,…,128]` (`+0x6086020`; default 0x80 = 128 = straight down), steps `[128..32767]`/256 (`+0x608602a`) |
+
+Channel byte layout (A,B,C): A bits4-6 step index; B low/high nibble start/end
+value index (rotation: 3-bit); C bits4-5 repeat (0 once, 1 loop, 2 ping-pong),
+bits0-2 a trigger mode packed into a per-enemy status word (semantics open).
+The engine negates a channel's step when start > end, and rotation mode 2
+negates it again (counter-clockwise). Cross-checks: the factory-default game
+(SGM_INIT = Gust) decodes to hp 1 / score 50 everywhere — the editor's
+defaults — and DAIOH's turret rows decode to hp 60 ground objects with aimed
+fire, matching how it plays. Decoder: `lib/decode/decode-enemy.js`.
+
+The old statistical profile (96.5% of nibbles ≤ 8 across 6799 records;
+per-byte cardinalities 200, 108, 138, 68, 94, 79, 16, 65, 14, 40, 51, 14, 33,
+77, 12, 16, 72, 15) matches this layout exactly — the "12-16 distinct" columns
+are the channel A/C bytes.
 
 **Settings byte map** (`+0x5A780`, 96 B):
 
