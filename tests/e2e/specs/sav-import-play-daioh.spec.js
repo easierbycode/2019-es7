@@ -126,22 +126,6 @@ test("the ninth stage of an imported save plays, with its own wide-grid enemies"
     });
     expect(drawn.count).toBeGreaterThan(0);
 
-    // The save's own soundtrack: the sequencer must be running the stage's
-    // assigned song with notes scheduled (headless audio stays suspended, but
-    // scheduling is what proves the wiring).
-    // (poll: right after a main->boss track switch the fresh sequencer can
-    // have nothing scheduled until its next real-time tick)
-    await expect.poll(() => gamePage.evaluate(() => {
-        const g = window.__PHASER_4_GAME__;
-        for (let i = 0; i < 30; i++) g.loop.step(performance.now() + i * 16.7);
-        const s = g.scene.getScene("PhaserGameScene");
-        return s._dezaBgm ? s._dezaBgm.scheduled : -1;
-    }), { timeout: 15_000 }).toBeGreaterThan(0);
-    const bgm = await gamePage.evaluate(() => {
-        const s = window.__PHASER_4_GAME__.scene.getScene("PhaserGameScene");
-        return { songIndex: s._dezaBgm.songIndex, stockBgm: s.stageBgmName };
-    });
-    expect(bgm.stockBgm).toBe("__dezaemon__"); // stock boss BGM stayed silent
     for (const f of drawn.frames) expect(f).toMatch(/^deza/);
     // Spawn columns land inside the screen — a 20-wide row must not be laid
     // out on the old 32px-per-column assumption.

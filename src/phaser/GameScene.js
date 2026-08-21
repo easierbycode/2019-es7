@@ -114,7 +114,7 @@ export class PhaserGameScene extends Phaser.Scene {
     bossDie(boss) { _bossDie(this, boss); }
     bossAdd() {
         // the save's own boss track takes over when its boss appears
-        if (this.recipe && this.recipe.dezaemonBgm && !this.bossActive) {
+        if (this.recipe && this.recipe.dezaemonBgm && !this.bossActive && !gameState.lowModeFlg) {
             startDezaemonBgm(this, "boss");
         }
         _bossAdd(this);
@@ -890,7 +890,10 @@ export class PhaserGameScene extends Phaser.Scene {
         // An imported Dezaemon save carries its own soundtrack: the settings
         // BGM table assigns a main song per stage, sequenced from the save's
         // sec6 slots. When that starts, the stock boss BGM stays silent.
-        if (this.recipe && this.recipe.dezaemonBgm) {
+        // Low mode silences every other audio path (playBgm/playSound below),
+        // so the sequencer honours it too rather than being the one voice
+        // that keeps playing.
+        if (this.recipe && this.recipe.dezaemonBgm && !gameState.lowModeFlg) {
             this.bossStageId = stageId;
             if (startDezaemonBgm(this, "main")) {
                 this.stageBgmName = "__dezaemon__";
