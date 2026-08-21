@@ -320,9 +320,27 @@ itself, and the whole timing chain is now engine-exact:
     editor tempo positions run 54.5-200 BPM (`BPM = 3600 / divisor`).
   - The walker (`+0x1bfc`) advances ONE cursor position 0..15 per armed
     step: a measure is **16 steps**, and per part it reads byte
-    `[8 + part*32 + cursor]` AND byte `[24 + part*32 + cursor]` — each part
-    is **two simultaneous voices** (A = bytes 0-15, B = bytes 16-31; voice
-    B's note ids reach the driver offset by +0x36, a second slot bank).
+    `[8 + part*32 + cursor]` AND byte `[24 + part*32 + cursor]`. Those are
+    two COLUMNS of the same 16 steps, and the note sender (`+0x15bc`) says
+    what each one is:
+      - **bytes 0-15 = the voice column.** `0` rests (the sender writes gate
+        `0x40`, key off); **bit 7 set = tie** (gate `0x10`, and the pitch
+        register is left untouched); any other value is a note **onset**
+        whose value picks the instrument — it is forwarded on the companion
+        channel bank 4-7 as command 4.
+      - **bytes 16-31 = the pitch column**, stored to the per-part note
+        register `0x601F418` on each onset (`+0x36` is a constant bank
+        offset, so it does not change relative pitch). The composer repeats
+        the pitch byte on every held step; the driver ignores it there.
+
+    The save data confirms this over Ramsie's 14 songs: a tie always has a
+    pitch byte beside it (6427/6427) and that pitch is the identical value
+    6401/6427 times; the voice column carries only a handful of distinct
+    values per part (Ramsie's stage-0 song uses three across the whole
+    piece) while the pitch column lands on a diatonic scale with five
+    near-empty pitch classes. Reading the two columns as two melodic voices
+    plays an instrument-select column as a tune and re-strikes every held
+    note once per step.
   - byte 0 = **loop-start measure** (on wrap the measure cursor rewinds
     here, `+0x1d6e`) — byte 1 = **loop-end measure** (compared at `+0x1d56`)
   - byte 2 = **echo send 0-7**: stored at `0x601F3E0` with a dirty flag
@@ -332,20 +350,30 @@ itself, and the whole timing chain is now engine-exact:
     `+0x17` — **EFSDL|EFPAN**, the effect/reverb send of the BGM output
     pair. (Driver cmds 0x80/0x81 split the same byte hi-3/lo-5; 0x82 is
     master volume, MVOL at `$401(a5)`.)
-  - measure control byte 3 = **transpose**: indexes the signed semitone
-    table at `0x601F3C8` (`-3 -2 -1 0 +1 +2 +3 +4 +5 +6 -5 -4`), added to
-    every note id by the note sender (`+0x16fc`). The editor default
-    control `00 00 80 03` selects entry 3 = no transpose.
+  - measure control byte 3 = **accompaniment transpose**: indexes the
+    signed semitone table at `0x601F3C8` (`-3 -2 -1 0 +1 +2 +3 +4 +5 +6 -5
+    -4`). The sender adds it (`+0x16fc`) only to the seven auto-accompaniment
+    channels the measure selects out of the kernel pattern table at
+    `0x601F490` (row = `ctrl0*140 + (ctrl1*5 + (ctrl2&0x7F)>>1)*7 + channel`,
+    16 bytes per row = the measure's 16 steps) — never to the four composed
+    parts. The editor default control `00 00 80 03` selects pattern row 0
+    and entry 3 = no transpose. **The accompaniment patterns live in kernel
+    ROM, not in the save**, so a save that uses them carries music the
+    importer does not yet reproduce; extracting `0x601F490` (kernel file
+    `+0x1B490`) would add that track.
 
 (The 68000 driver's own timers, for completeness: TIMA reload 0x4E = 247.75
 Hz main-loop tick driving envelope/portamento engines at `+0x2704`/`+0x1562`;
 TIMB reload 0x1D4 = 501 Hz on interrupt level 2 for mixing. Neither paces
 the sequencer — the 60 Hz frame pump does.)
 
-The runtime plays exactly this: 16-step measures, both voices per part
-(chords), `stepSeconds = divisor/240`, per-measure transpose, loop points
-(pass 0 from the top, later passes rewind to loop-start), and the echo send
-approximated as a feedback-delay tap scaled by `header[2]/7`.
+The runtime plays exactly this: 16-step measures, one voice per part taking
+its pitch from the pitch column and holding it through ties,
+`stepSeconds = divisor/240`, loop points (pass 0 from the top, later passes
+rewind to loop-start), and the echo send approximated as a feedback-delay
+tap scaled by `header[2]/7`. Not reproduced: the ROM accompaniment patterns
+and the instrument column's timbres (the Saturn's samples are not in the
+save, so each part keeps a fixed synth voice).
 
 **Firing is gated by the appearance, not the record.** The per-frame fire
 dispatcher (GAME.CMP `+0x19870`) skips an enemy when (a) its Y position is

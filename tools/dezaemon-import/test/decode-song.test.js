@@ -17,12 +17,15 @@ import {
     MEASURES,
     MEASURE_SIZE,
     SONG_HEADER,
+    MEASURE_HEADER,
     PARTS,
-    VOICES,
     STEPS_PER_MEASURE,
     PART_BLOCK,
+    VOICE_OFFSET,
+    PITCH_OFFSET,
     TEMPO_TABLE,
     TRANSPOSE_TABLE,
+    isOnset,
 } from "../lib/decode/decode-song.js";
 import { SECTION_SIZES } from "../lib/decompress.js";
 
@@ -30,30 +33,54 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 
 test("song geometry accounts for every byte of a slot and of sec6", () => {
     assert.equal(SONG_HEADER + MEASURES * MEASURE_SIZE, SONG_SIZE);
-    assert.equal(4 + PARTS * VOICES * STEPS_PER_MEASURE, MEASURE_SIZE);
+    assert.equal(4 + PARTS * PART_BLOCK, MEASURE_SIZE);
+    assert.equal(PART_BLOCK, 2 * STEPS_PER_MEASURE);   // voice column + pitch column
     assert.equal(SONG_SLOTS * SONG_SIZE, SECTION_SIZES[6]);
 });
 
-test("step classification: notes, sustains and empties are disjoint", () => {
+test("step classification: onsets, ties and rests are disjoint", () => {
     assert.ok(isNote(0x01) && isNote(0x3b));
     assert.ok(!isNote(0x00) && !isNote(0x3c) && !isNote(0x80));
-    assert.ok(isSustain(0x80) && isSustain(0x88));
-    assert.ok(!isSustain(0x7f) && !isSustain(0x89));
+    // only bit 7 marks a tie — that is all the engine tests
+    assert.ok(isSustain(0x80) && isSustain(0x88) && isSustain(0xff));
+    assert.ok(!isSustain(0x7f) && !isSustain(0x00));
+    assert.ok(isOnset(0x08) && !isOnset(0x00) && !isOnset(0x80));
 });
 
-test("a song decodes into 32 measures of 4 two-voice parts", () => {
+test("a note takes its pitch from the pitch column and holds through ties", () => {
     const bytes = new Uint8Array(SONG_SIZE);
-    // measure 3, part 2, voice A step 5 gets note 0x1a; voice B step 5 a fifth up
-    bytes[SONG_HEADER + 3 * MEASURE_SIZE + 4 + 2 * PART_BLOCK + 5] = 0x1a;
-    bytes[SONG_HEADER + 3 * MEASURE_SIZE + 4 + 2 * PART_BLOCK + STEPS_PER_MEASURE + 5] = 0x21;
+    const part2 = SONG_HEADER + 3 * MEASURE_SIZE + MEASURE_HEADER + 2 * PART_BLOCK;
+    // measure 3, part 2: onset at step 5 on instrument 0x08, pitch 0x1a,
+    // held through steps 6 and 7 (the composer repeats the pitch byte).
+    bytes[part2 + VOICE_OFFSET + 5] = 0x08;
+    bytes[part2 + PITCH_OFFSET + 5] = 0x1a;
+    bytes[part2 + VOICE_OFFSET + 6] = 0x80;
+    bytes[part2 + PITCH_OFFSET + 6] = 0x1a;
+    bytes[part2 + VOICE_OFFSET + 7] = 0x80;
+    bytes[part2 + PITCH_OFFSET + 7] = 0x1a;
     const song = decodeSong(bytes);
     assert.equal(song.measures.length, MEASURES);
     assert.equal(song.measures[3].parts.length, PARTS);
-    assert.equal(song.measures[3].parts[2][5], 0x1a);
-    assert.equal(song.measures[3].parts[2][STEPS_PER_MEASURE + 5], 0x21);
-    assert.equal(song.noteCount, 2);
+
+    const events = song.events[2];
+    assert.equal(events.length, 1, "a held note is one event, not three");
+    assert.deepEqual(events[0], {
+        step: 3 * STEPS_PER_MEASURE + 5,
+        note: 0x1a,
+        instrument: 0x08,
+        len: 3,
+    });
+    assert.equal(song.onsetCount, 1);
+    assert.equal(song.noteCount, 3);        // three sounding steps
     assert.equal(song.empty, false);
     assert.ok(decodeSong(new Uint8Array(SONG_SIZE)).empty);
+});
+
+test("a voice byte with no pitch beside it sounds nothing", () => {
+    const bytes = new Uint8Array(SONG_SIZE);
+    const part0 = SONG_HEADER + MEASURE_HEADER;
+    bytes[part0 + VOICE_OFFSET + 2] = 0x10;     // instrument, but pitch column empty
+    assert.equal(decodeSong(bytes).events[0].length, 0);
 });
 
 test("ramsie's BGM bank decodes with the expected number of live songs", async () => {
@@ -67,13 +94,29 @@ test("ramsie's BGM bank decodes with the expected number of live songs", async (
     // the first slot is a real arrangement: notes spread over several parts
     const first = decoded.songs[0];
     assert.ok(first.noteCount > 100);
-    const partsWithNotes = new Set();
-    for (const m of first.measures) {
-        m.parts.forEach((steps, p) => {
-            if ([...steps].some(isNote)) partsWithNotes.add(p);
-        });
+    assert.ok(first.events.filter((e) => e.length).length >= 3,
+        "a real song uses multiple parts");
+});
+
+test("the pitch column carries the melody and the voice column the instrument", async () => {
+    const { data } = await normalize(fs.readFileSync(path.join(here, "..", "fixtures", "ramsie.sav")));
+    const d = decodeSave(bup.parse(data).find((s) => s.payload).payload.buffer);
+    // Ramsie's stage-0 main song. The engine reading is falsifiable here:
+    // a part draws on a handful of instruments but many pitches, and every
+    // sounding note lands in the pitch column's range.
+    const song = d.songs[4];
+    for (const events of song.events) {
+        if (events.length < 20) continue;
+        const instruments = new Set(events.map((e) => e.instrument));
+        const pitches = new Set(events.map((e) => e.note));
+        assert.ok(instruments.size <= 4, `part uses few instruments (${instruments.size})`);
+        assert.ok(pitches.size > instruments.size, "but many pitches");
+        for (const e of events) assert.ok(isNote(e.note));
     }
-    assert.ok(partsWithNotes.size >= 3, "a real song uses multiple parts");
+    // Held notes exist and are single events, not one per step.
+    const held = song.events.flat().filter((e) => e.len > 1);
+    assert.ok(held.length > 20, "a real song holds notes across steps");
+    assert.ok(song.onsetCount < song.noteCount, "sounding steps outnumber onsets");
 });
 
 test("every measure of every song slot stays inside the slot", () => {
@@ -104,13 +147,19 @@ test("each song carries the header's tempo index, step seconds and echo", async 
     }
 });
 
-test("per-measure control byte 3 becomes a semitone transpose", () => {
+test("per-measure control byte 3 is the accompaniment's semitone transpose", () => {
     const bytes = new Uint8Array(SONG_SIZE);
     bytes[SONG_HEADER + 2 * MEASURE_SIZE + 3] = 5;       // table entry 5 = +2
+    // an onset in measure 2 whose pitch must NOT be shifted: the engine
+    // transposes only the accompaniment channels, never the composed parts
+    const part0 = SONG_HEADER + 2 * MEASURE_SIZE + MEASURE_HEADER;
+    bytes[part0 + VOICE_OFFSET] = 0x08;
+    bytes[part0 + PITCH_OFFSET] = 0x1a;
     const song = decodeSong(bytes);
     assert.equal(song.measures[2].transpose, 2);
     assert.equal(song.measures[0].transpose, -3);        // ctrl3=0 -> -3
     assert.equal(TRANSPOSE_TABLE[3], 0);                 // editor default
+    assert.equal(song.events[0][0].note, 0x1a, "the melody is not transposed");
 });
 
 test("header bytes 0/1 are loop points the kernel's walker uses", async () => {

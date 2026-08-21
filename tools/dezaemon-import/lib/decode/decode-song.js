@@ -4,8 +4,8 @@
 // byte-identical to the song slots of games that use them, and against the
 // kernel's own song pointer arithmetic songIndex * 0x1084 + sec6base):
 //
-//   song  = 4-byte header + 32 measures of 132 bytes            = 4228
-//   measure = 4 control bytes + 4 parts x (2 voices x 16 steps) = 132
+//   song  = 4-byte header + 32 measures of 132 bytes             = 4228
+//   measure = 4 control bytes + 4 parts x 32 bytes               = 132
 //
 // The 32-measure / 4-part grid is exactly the editor's documented model.
 // Measure boundaries are visible in the raw data: in an otherwise empty
@@ -13,16 +13,26 @@
 // exactly 132 bytes apart. The control default is `00 00 80 03` (1254 of
 // 2336 preset measures).
 //
-// A measure is SIXTEEN time steps, not 32: the kernel's walker (0KERNEL
-// +0x1bfc) advances a 0..15 cursor and, per part, reads BOTH byte
-// [cursor] and byte [cursor + 16] of the part's 32-byte block each step —
-// two simultaneous voices (the second is sent to the driver with its note
-// id offset by +0x36, i.e. on a second slot bank). So a part's 32 bytes
-// are voice A steps 0-15 followed by voice B steps 0-15.
+// A measure is SIXTEEN time steps, and a part's 32 bytes are TWO COLUMNS of
+// those 16 steps, not 32 successive steps. The kernel's walker (0KERNEL
+// +0x1bfc) advances a 0..15 cursor and reads, per part, byte [cursor] and
+// byte [cursor + 16]; its note sender (+0x15bc) shows what each column is:
 //
-// Step bytes: 0x00 = empty, 0x01-0x3B = note (a ~5-octave range), 0x80 plus
-// small even offsets (0x80/0x82/0x84/0x86/0x88) = sustain/tie of the note
-// already sounding. Values 0xE7/0xFF occur only in part 0 and are rare.
+//   bytes 0-15  = VOICE column: 0 = rest (key off), bit 7 set = tie (hold
+//                 the sounding note: the sender writes gate 0x10 and leaves
+//                 the pitch register alone), any other value = a note ONSET
+//                 whose value selects the instrument (it lands on the
+//                 companion channel bank 4-7 as command 4).
+//   bytes 16-31 = PITCH column, stored to the per-part note register
+//                 0x601F418 on every onset (+0x36, a constant bank offset).
+//                 During a tie the composer repeats the same pitch byte and
+//                 the driver ignores it.
+//
+// The save data agrees on every count: across Ramsie's 14 songs a tie in the
+// voice column is accompanied by a pitch byte 6427/6427 times and that pitch
+// is the identical value 6401/6427 times; the voice column carries only a
+// handful of distinct values per song (instruments) while the pitch column
+// lands on a diatonic scale with five near-empty pitch classes.
 //
 // Environment-neutral ESM (Node + browser).
 
@@ -33,20 +43,55 @@ export const MEASURES = 32;
 export const MEASURE_SIZE = 132;
 export const MEASURE_HEADER = 4;
 export const PARTS = 4;
-export const VOICES = 2;
 export const STEPS_PER_MEASURE = 16;
-export const PART_BLOCK = VOICES * STEPS_PER_MEASURE;   // 32 bytes per part
+export const PART_BLOCK = 32;              // voice column + pitch column
+export const VOICE_OFFSET = 0;
+export const PITCH_OFFSET = 16;
 
 export const STEP_EMPTY = 0x00;
 export const NOTE_MIN = 0x01;
 export const NOTE_MAX = 0x3b;
 
+// A pitch-column byte that sounds.
 export function isNote(step) {
     return step >= NOTE_MIN && step <= NOTE_MAX;
 }
 
+// A voice-column byte that holds the note already sounding. Only bit 7 is
+// tested by the engine; saves use 0x80-0x88.
 export function isSustain(step) {
-    return step >= 0x80 && step <= 0x88;
+    return (step & 0x80) !== 0;
+}
+
+// A voice-column byte that starts a note (and picks its instrument).
+export function isOnset(step) {
+    return step !== STEP_EMPTY && (step & 0x80) === 0;
+}
+
+// One part's 16 steps of a measure -> [{step, note, instrument, len}].
+// `len` runs on through following measures' ties, so callers get whole notes.
+export function readPartEvents(bytes, part) {
+    const events = [];
+    let current = null;
+    for (let m = 0; m < MEASURES; m++) {
+        const base = SONG_HEADER + m * MEASURE_SIZE + MEASURE_HEADER + part * PART_BLOCK;
+        for (let st = 0; st < STEPS_PER_MEASURE; st++) {
+            const voice = bytes[base + VOICE_OFFSET + st];
+            const pitch = bytes[base + PITCH_OFFSET + st];
+            const at = m * STEPS_PER_MEASURE + st;
+            if (voice === STEP_EMPTY) {
+                current = null;
+            } else if (isSustain(voice)) {
+                if (current) current.len = at - current.step + 1;
+            } else if (isNote(pitch)) {
+                current = { step: at, note: pitch, instrument: voice, len: 1 };
+                events.push(current);
+            } else {
+                current = null;
+            }
+        }
+    }
+    return events;
 }
 
 // The 4-byte song header, traced through the kernel's own sequencer
@@ -74,10 +119,12 @@ export const TEMPO_TABLE = [
     0x19, 0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12,
 ];
 
-// Per-measure transpose (measure control byte 3 indexes the signed table at
-// 0x601F3C8; the send-notes routine at +0x16fc adds the value to every note
-// id, i.e. semitones). Saves only use indexes 0-11; the editor default
-// control `00 00 80 03` selects entry 3 = no transpose.
+// Per-measure transpose in semitones (measure control byte 3 indexes the
+// signed table at 0x601F3C8). It applies to the AUTO-ACCOMPANIMENT only:
+// the sender adds it at +0x16fc to the seven pattern channels the measure
+// selects out of the kernel table at 0x601F490 (row = ctrl0, ctrl1 and
+// ctrl2 pick the pattern), never to the four composed parts. The editor
+// default control `00 00 80 03` selects entry 3 = no transpose.
 export const TRANSPOSE_TABLE = [-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, -5, -4];
 
 export function songStepSeconds(tempoIndex) {
@@ -88,25 +135,30 @@ export function songStepSeconds(tempoIndex) {
 export function decodeSong(bytes, slot = 0) {
     if (bytes.length < SONG_SIZE) throw new Error(`song too small: ${bytes.length}`);
     const measures = [];
-    let noteCount = 0;
+    let soundingSteps = 0;
     for (let m = 0; m < MEASURES; m++) {
         const base = SONG_HEADER + m * MEASURE_SIZE;
         const parts = [];
         for (let p = 0; p < PARTS; p++) {
             const at = base + MEASURE_HEADER + p * PART_BLOCK;
-            // 32 bytes: voice A steps 0-15, then voice B steps 0-15
+            // 32 bytes: the voice column (0-15) then the pitch column (16-31)
             const steps = bytes.subarray(at, at + PART_BLOCK);
-            for (const s of steps) if (isNote(s)) noteCount++;
+            for (let st = 0; st < STEPS_PER_MEASURE; st++) {
+                if (steps[VOICE_OFFSET + st] !== STEP_EMPTY) soundingSteps++;
+            }
             parts.push(steps);
         }
         const control = bytes.subarray(base, base + MEASURE_HEADER);
         measures.push({
             index: m,
             control,
+            // accompaniment transpose — see TRANSPOSE_TABLE
             transpose: TRANSPOSE_TABLE[control[3]] || 0,
             parts,
         });
     }
+    const events = [];
+    for (let p = 0; p < PARTS; p++) events.push(readPartEvents(bytes, p));
     const tempoIndex = bytes[SONG_TEMPO_OFFSET] & 31;
     return {
         slot,
@@ -117,8 +169,10 @@ export function decodeSong(bytes, slot = 0) {
         loopStart: bytes[SONG_LOOP_START_OFFSET],
         loopEnd: bytes[SONG_LOOP_END_OFFSET],
         measures,
-        noteCount,
-        empty: noteCount === 0,
+        events,
+        noteCount: soundingSteps,
+        onsetCount: events.reduce((n, e) => n + e.length, 0),
+        empty: soundingSteps === 0,
     };
 }
 
