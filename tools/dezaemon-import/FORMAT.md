@@ -282,6 +282,37 @@ Channel byte layout (A,B,C): A bits4-6 step index; B low/high nibble start/end
 value index (rotation: 3-bit); C bits4-5 repeat (0 once, 1 loop, 2 ping-pong),
 bits0-2 a trigger mode packed into a per-enemy status word (semantics open).
 
+**Byte 5 is dual-use: pattern selector AND angle.** The fire dispatcher
+(`+0x1989e`) masks `b5 & 0xF` and routes 10/11/12 to three special pattern
+handlers (`+0x193d0` / `+0x19538` / `+0x196a8` — three variants of one
+routine; which shape each draws is still open). Every other value falls
+through to the default handler (`+0x192d4`), which passes `b5 & 0x1F` as the
+angle argument to the kernel's shot-spawn helper (`0x6010be6`) alongside the
+object's current heading. So 10-12 are patterns, not directions — 765 of the
+12,153 enemies measured across 60 community saves (6.3%) carry one, and
+reading them as angles pointed those enemies sideways.
+
+**Movement is a 2-bit mode plus a flag, not an 8-way enum.** The spawn packs
+`b2` bits 4-5 and bit 3 into one byte at `0x6091550`
+(`((b2>>4)&3) | (bit3 ? 4 : 0)`), and the engine reads that byte BITWISE
+across its 56 read sites: masks `0x1` (17x), `0x4` (13x), `0x3` (12x), `0x2`
+(2x), `0x8` (1x). Mode 3 never occurs in the corpus. `decode-enemy.js` now
+exposes `move: {mode, flag}` alongside the packed `movePattern`.
+
+**Song tempo: the field is found, the rate is not.** Header byte 2 of a song
+slot is a clean 3-bit field — exactly 8 distinct values across the 1,030
+note-bearing songs in the corpus, while header bytes 0/1/3 each span ~30 —
+and it does not correlate with any structural property (note count, parts
+used and song length are flat across its eight values), which is what a
+playback parameter looks like rather than a compositional one. Converting it
+to an actual rate is NOT traced: playback lives in `LOG_SND.CMP`, which
+decompresses to 160 KB of **68000** code (203 `4E75`/`4E71` against 20 SH-2
+`000B`) for the SCSP sound CPU, not the SH-2 overlays this toolkit
+disassembles. `decodeSong()` exposes it as `tempoIndex` and the importer
+carries it on `dezaemonBgm.tempos`; the sequencer deliberately does not act
+on it, because the polarity is unknown and guessing it would mis-time half
+the corpus.
+
 **Firing is gated by the appearance, not the record.** The per-frame fire
 dispatcher (GAME.CMP `+0x19870`) skips an enemy when (a) its Y position is
 outside a band near the top of the screen, or (b) bit 4 of its appearance

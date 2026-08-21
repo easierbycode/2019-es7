@@ -405,11 +405,19 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
             songs[idx] = bytesToBase64(sec6.subarray(idx * 4228, (idx + 1) * 4228));
         }
         if (Object.keys(songs).length) {
+            // Each song's tempo index rides along (decode-song.js): a decoded
+            // 3-bit field whose conversion to a real rate lives in the 68000
+            // sound driver and is not traced, so the runtime does not act on
+            // it yet — but the value travels with the song rather than being
+            // thrown away.
+            const tempos = {};
+            for (const idx of Object.keys(songs)) tempos[idx] = decoded.songs[idx].tempoIndex;
             gameJson.dezaemonBgm = {
                 sfxSet: decoded.settings.sfxSet,
                 special,
                 stages: stagePairs,
                 songs,
+                tempos,
             };
         }
     }

@@ -77,3 +77,17 @@ test("every measure of every song slot stays inside the slot", () => {
     assert.ok(songs.every((s) => s.measures.length === MEASURES));
     assert.ok(songs.every((s) => s.empty));
 });
+
+test("each song carries its 3-bit tempo index from the header", async () => {
+    const { data } = await normalize(fs.readFileSync(path.join(here, "..", "fixtures", "ramsie.sav")));
+    const d = decodeSave(bup.parse(data).find((s) => s.payload).payload.buffer);
+    const live = d.songs.filter((s) => s.noteCount);
+    assert.ok(live.length > 5);
+    for (const song of live) {
+        assert.ok(song.tempoIndex >= 0 && song.tempoIndex <= 7,
+            `song ${song.slot} tempoIndex ${song.tempoIndex} in range`);
+        assert.equal(song.tempoIndex, song.header[2] & 7);
+    }
+    // ramsie uses several different tempos, so the field is not constant
+    assert.ok(new Set(live.map((s) => s.tempoIndex)).size > 1);
+});

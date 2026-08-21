@@ -75,6 +75,11 @@ export function appearanceFires(appearance) {
     return (byte & (1 << (appearance & 7))) === 0;
 }
 
+// `b5 & 0xF` values the fire dispatcher routes away from the angle path.
+// Their handlers are three variants of one routine; which shape each draws is
+// still open, so they are numbered rather than named.
+export const SPECIAL_FIRE_PATTERNS = { 10: 0, 11: 1, 12: 2 };
+
 // Per-channel step tables, 8.8 fixed point value-units per frame.
 export const FACTOR_STEP_TABLE = [16, 32, 64, 128, 256, 384, 512, 1024];
 export const ROTATION_STEP_TABLE = [16, 32, 64, 128, 256, 512, 1024, 2048];
@@ -115,7 +120,16 @@ export function decodeEnemyRecord(bytes) {
         score: SCORE_TABLE[(b[1] >> 4) & 7],
         ground: (b[1] & 0x80) !== 0,
         speed: SPEED_TABLE[b[2] & 7] / 65536,
+        // The spawn packs b2 bits 4-5 and bit 3 into one byte (0x6091550), and
+        // the engine reads that byte BITWISE — masks 0x1/0x2/0x3 (the low
+        // two-bit mode) and 0x4 (an independent flag) across its 56 read
+        // sites. So this is a 2-bit mode plus a flag, not an 8-way enum;
+        // movePattern keeps the packed value for continuity.
         movePattern: ((b[2] >> 4) & 3) | ((b[2] & 8) >> 1),
+        move: {
+            mode: (b[2] >> 4) & 3,          // engine tests &1, &2, &3
+            flag: (b[2] & 8) !== 0,         // engine tests &4 of the packed byte
+        },
         fire: {
             // The gate is the appearance, not the record: the engine's
             // dispatcher fires any enemy whose appearance allows it, on the
@@ -130,7 +144,16 @@ export function decodeEnemyRecord(bytes) {
             interval: clampIndex((b[4] >> 4) & 7,
                 (b[4] & 3) === 3 ? FIRE_INTERVAL_TABLE_ALT : FIRE_INTERVAL_TABLE),
             window: FIRE_WINDOW_TABLE[(b[4] >> 4) & 7],
-            direction: b[5] & 0x1f,          // 0 = aimed/default, else fixed
+            // Byte 5 is dual-use, and the engine reads it two ways. The fire
+            // dispatcher (+0x1989e) takes `b5 & 0xF` and routes 10/11/12 to
+            // three special pattern handlers (+0x193d0/+0x19538/+0x196a8 —
+            // three variants of one routine); everything else falls to the
+            // default handler (+0x192d4), which passes `b5 & 0x1F` on as the
+            // shot's angle parameter. So a value of 10-12 is a PATTERN, not a
+            // direction — 6.3% of the corpus's 12,153 enemies use one, and
+            // reading them as angles aimed those enemies sideways.
+            pattern: SPECIAL_FIRE_PATTERNS[b[5] & 0x0f] ?? null,
+            direction: SPECIAL_FIRE_PATTERNS[b[5] & 0x0f] !== undefined ? 0 : (b[5] & 0x1f),
             directionEx: (b[5] >> 5) & 7,
         },
         speedChange: channel(b[6], b[7], b[8], {

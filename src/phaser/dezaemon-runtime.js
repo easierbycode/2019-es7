@@ -257,7 +257,15 @@ export function updateEnemyFire(scene, enemy, shootFn) {
     if (enemy.y < 16 || enemy.y > GH * 0.4) return true;
 
     var base;
-    if (fire.direction) {
+    if (fire.pattern !== null && fire.pattern !== undefined) {
+        // b5 & 0xF of 10/11/12 routes to one of the engine's three special
+        // pattern handlers rather than the angle path. Their shapes are not
+        // decoded, so these aim at the player instead of firing at the angle
+        // those values would have meant — which pointed them sideways.
+        var pdx = scene.playerSprite.x - enemy.x;
+        var pdy = scene.playerSprite.y - enemy.y;
+        base = Math.atan2(pdx, -pdy);
+    } else if (fire.direction) {
         base = fire.direction * (360 / 32) * Math.PI / 180; // 0 = up, cw
     } else if (fire.type === 0 || fire.type === 3) {
         base = Math.PI; // straight down

@@ -119,6 +119,43 @@ test("every populated corpus record decodes without throwing, in range", async (
     }
 });
 
+test("b5 10/11/12 are special fire patterns, not angles", () => {
+    // The dispatcher routes b5 & 0xF of 10/11/12 to three special handlers;
+    // everything else reaches the default handler, which uses b5 & 0x1F as
+    // the shot angle. Reading 10-12 as angles aimed those enemies sideways.
+    const withB5 = (v) => {
+        const bytes = new Uint8Array(18);
+        bytes[0] = 0x21; bytes[5] = v;
+        return decodeEnemyRecord(bytes);
+    };
+    for (const [v, pattern] of [[10, 0], [11, 1], [12, 2]]) {
+        const d = withB5(v);
+        assert.equal(d.fire.pattern, pattern, `b5=${v} is pattern ${pattern}`);
+        assert.equal(d.fire.direction, 0, "a pattern carries no angle");
+    }
+    // neighbouring values stay angles
+    assert.equal(withB5(9).fire.pattern, null);
+    assert.equal(withB5(9).fire.direction, 9);
+    assert.equal(withB5(13).fire.pattern, null);
+    assert.equal(withB5(13).fire.direction, 13);
+});
+
+test("movement decodes as a 2-bit mode plus an independent flag", () => {
+    // The engine reads the packed byte bitwise (masks 0x1/0x2/0x3 and 0x4),
+    // so it is not an 8-way enum.
+    const withB2 = (v) => {
+        const bytes = new Uint8Array(18);
+        bytes[0] = 0x21; bytes[2] = v;
+        return decodeEnemyRecord(bytes);
+    };
+    assert.deepEqual(withB2(0x00).move, { mode: 0, flag: false });
+    assert.deepEqual(withB2(0x10).move, { mode: 1, flag: false });
+    assert.deepEqual(withB2(0x20).move, { mode: 2, flag: false });
+    assert.deepEqual(withB2(0x28).move, { mode: 2, flag: true });
+    // the packed value the engine actually stores stays available
+    assert.equal(withB2(0x28).movePattern, 2 | 4);
+});
+
 test("the fire gate is the appearance, straight from the engine's table", () => {
     // 48 of 256 appearance ids carry the no-fire bit (dispatcher +0x19882).
     let silent = 0;
