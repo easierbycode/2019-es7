@@ -405,13 +405,12 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
             songs[idx] = bytesToBase64(sec6.subarray(idx * 4228, (idx + 1) * 4228));
         }
         if (Object.keys(songs).length) {
-            // Each song's tempo index rides along (decode-song.js): a decoded
-            // 3-bit field whose conversion to a real rate lives in the 68000
-            // sound driver and is not traced, so the runtime does not act on
-            // it yet — but the value travels with the song rather than being
-            // thrown away.
+            // Song timing is engine-traced (decode-song.js): header byte 3
+            // indexes the kernel's divisor table, header byte 2 is the echo
+            // send. Both live inside the raw song bytes the runtime parses,
+            // so `tempos` here is informational (step seconds per song).
             const tempos = {};
-            for (const idx of Object.keys(songs)) tempos[idx] = decoded.songs[idx].tempoIndex;
+            for (const idx of Object.keys(songs)) tempos[idx] = decoded.songs[idx].stepSeconds;
             gameJson.dezaemonBgm = {
                 sfxSet: decoded.settings.sfxSet,
                 special,

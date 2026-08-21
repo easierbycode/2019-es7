@@ -299,33 +299,53 @@ across its 56 read sites: masks `0x1` (17x), `0x4` (13x), `0x3` (12x), `0x2`
 (2x), `0x8` (1x). Mode 3 never occurs in the corpus. `decode-enemy.js` now
 exposes `move: {mode, flag}` alongside the packed `movePattern`.
 
-**Song header + tempo: TRACED through the kernel's own sequencer.** BGM
-playback is not in the 68000 driver at all — 0KERNEL sequences a playing
-song itself: `songPtr = 0x2A0F60 + idx * 0x1084` (+0x1b0a), a step walker at
-`+0x1bfc` reads two steps per call across the 4 parts (16 iterations x 2 =
-the 32 steps), gated by a driver-ready handshake byte, and sends note events
-to the SCSP driver. The walker gives the header its meaning:
+**Song playback: FULLY TRACED — timing has no calibrated constants.** BGM
+sequencing is not in the 68000 driver at all — 0KERNEL walks a playing song
+itself, and the whole timing chain is now engine-exact:
 
-  - byte 0 = **loop-start measure** (on wrap, the measure cursor rewinds
+  - Every game overlay calls the kernel end-of-frame service (`0x6004850` /
+    `0x60048b4`, GAME.BIN calls it from 27 sites), which runs the sound pump
+    `0x6006ADC` once per frame (60 Hz). The pump, gated on the mailbox-ready
+    bit (`0x25A004E0` bit 7, cleared by the driver within one spin of its
+    main loop), runs the sequencer tick `0x6005DB8` and flushes the command
+    queue `0x6041C00` -> `0x25A00700`.
+  - The tick ends in a **step divider** (`+0x625e`): a word accumulator at
+    `0x601F3FE` gains **+4 per frame**; when it reaches the song's divisor it
+    subtracts it (keeping the remainder — phase-exact) and re-arms the
+    walker, which the note sender disarms after every step. The divisor is
+    **`TEMPO_TABLE[header byte 3]`** — the kernel table at `0x601F3A8` (file
+    `+0x1B3A8`): `42 3C 39 36 34 31 2F 2D 2B 2A 28 27 26 24 23 22 21 20 1F
+    1E 1D 1C 1B 1A 19 18 17 16 15 14 13 12`. So
+    **`stepSeconds = divisor / 240`**, and with 4 steps per beat the 32
+    editor tempo positions run 54.5-200 BPM (`BPM = 3600 / divisor`).
+  - The walker (`+0x1bfc`) advances ONE cursor position 0..15 per armed
+    step: a measure is **16 steps**, and per part it reads byte
+    `[8 + part*32 + cursor]` AND byte `[24 + part*32 + cursor]` — each part
+    is **two simultaneous voices** (A = bytes 0-15, B = bytes 16-31; voice
+    B's note ids reach the driver offset by +0x36, a second slot bank).
+  - byte 0 = **loop-start measure** (on wrap the measure cursor rewinds
     here, `+0x1d6e`) — byte 1 = **loop-end measure** (compared at `+0x1d56`)
-  - byte 2 = **tempo index 0-7**: read at `+0x1c54` and sent to the driver
-    at each measure boundary (`+0x1c52` -> `0x6005498`, stored at
-    `0x601F3E0` with a dirty flag); the consumer (`+0x213c`) programs the
-    driver's per-channel rate byte as **`(tempo << 5) | 0x1F`** — an
-    accumulator rate, linear in `tempo + 1`, split hi-3/lo-5 by the driver
-    (`LOG_SND +0x1dd8`) into its channel state. Higher = faster.
-  - byte 3 = an index into a kernel lookup at `0x601F3A8`, forwarded with
-    each measure alongside measure control byte 3 (meaning open —
-    volume/voice-ish).
+  - byte 2 = **echo send 0-7**: stored at `0x601F3E0` with a dirty flag
+    (`0x6005498`); on change the tick emits driver command 0x88 with
+    **`(echo << 5) | 0x1F`**, which the driver (`LOG_SND +0x218c`, via the
+    0x80-0x90 jump table at `+0x1b96`) writes to SCSP slot 16/17 register
+    `+0x17` — **EFSDL|EFPAN**, the effect/reverb send of the BGM output
+    pair. (Driver cmds 0x80/0x81 split the same byte hi-3/lo-5; 0x82 is
+    master volume, MVOL at `$401(a5)`.)
+  - measure control byte 3 = **transpose**: indexes the signed semitone
+    table at `0x601F3C8` (`-3 -2 -1 0 +1 +2 +3 +4 +5 +6 -5 -4`), added to
+    every note id by the note sender (`+0x16fc`). The editor default
+    control `00 00 80 03` selects entry 3 = no transpose.
 
-The one number not traced is the driver's tick frequency (its timer setup is
-deep in the 68000 code). The importer therefore plays
-`stepsPerSecond = TICK_HZ x ((32 x (tempo+1) - 1) / 256)` with `TICK_HZ = 30`
-calibrated so the corpus's modal tempo (3) reproduces the rate the sequencer
-always played — relative tempo between songs is engine-exact, absolute speed
-carries one calibrated constant. The runtime's scheduler also honours the
-loop points: pass 0 plays from the top, later passes rewind to the header's
-loop-start measure.
+(The 68000 driver's own timers, for completeness: TIMA reload 0x4E = 247.75
+Hz main-loop tick driving envelope/portamento engines at `+0x2704`/`+0x1562`;
+TIMB reload 0x1D4 = 501 Hz on interrupt level 2 for mixing. Neither paces
+the sequencer — the 60 Hz frame pump does.)
+
+The runtime plays exactly this: 16-step measures, both voices per part
+(chords), `stepSeconds = divisor/240`, per-measure transpose, loop points
+(pass 0 from the top, later passes rewind to loop-start), and the echo send
+approximated as a feedback-delay tap scaled by `header[2]/7`.
 
 **Firing is gated by the appearance, not the record.** The per-frame fire
 dispatcher (GAME.CMP `+0x19870`) skips an enemy when (a) its Y position is

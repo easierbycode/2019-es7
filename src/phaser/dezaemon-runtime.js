@@ -293,8 +293,12 @@ export function updateEnemyFire(scene, enemy, shootFn) {
 //
 // gameJson.dezaemonBgm (map-to-game.js) carries the settings BGM table and
 // the raw 4228-byte song slots it references, base64-packed. A song is a
-// 4-byte header + 32 measures of (4 control bytes + 4 parts x 32 steps);
-// step 0x00 is empty, 0x01-0x3B a note over ~5 octaves, 0x80-0x88 a tie.
+// 4-byte header + 32 measures of (4 control bytes + 4 parts x 32 bytes).
+// A measure is SIXTEEN steps: the kernel walker (0KERNEL +0x1bfc) reads,
+// per part and per step, byte [step] AND byte [step + 16] of the 32-byte
+// part block — two simultaneous voices (voice B reaches the driver with
+// its note id offset by +0x36, a second slot bank). Byte 0x00 is empty,
+// 0x01-0x3B a note over ~5 octaves, 0x80-0x88 a tie.
 // The Saturn plays these through sampled instruments we do not have, so the
 // sequencer voices them as chiptune through WebAudio: two pulse parts, a
 // triangle bass and a noise part, which keeps the save's composition —
@@ -304,20 +308,25 @@ export function updateEnemyFire(scene, enemy, shootFn) {
 // synthesized effect flavors for shot / hit / explosion / boss events.
 // =====================================================================
 
-// Tempo, traced through the whole chain: the kernel's sequencer sends the
-// song's header byte +2 to the sound driver at each measure boundary
-// (0KERNEL +0x1c52 -> +0x6005498), and its consumer (+0x213c) programs the
-// driver's per-channel rate byte as (tempoIndex << 5) | 0x1F — a classic
-// accumulator rate, LINEAR in (tempoIndex + 1). The driver's tick frequency
-// is the one untraced constant (it lives in the 68000 SCSP driver's timer
-// setup); TICK_HZ = 30 anchors the corpus's modal tempo (3) to the rate this
-// sequencer always played, so absolute speed is calibrated while RELATIVE
-// tempo between songs is engine-exact.
-var BGM_TICK_HZ = 30;
+// Tempo, engine-traced end to end: every frame (60 Hz) the kernel's sound
+// pump ticks the sequencer (0KERNEL +0x1db8), which adds 4 to a word
+// accumulator and fires ONE walker step when it reaches the song's divisor
+// — TEMPO_TABLE[header byte 3], the kernel table at 0x601F3A8 — keeping
+// the remainder. So a step lasts divisor/240 seconds exactly, and the
+// editor's 32 tempo positions span 54.5-200 BPM (BPM = 3600/divisor at 4
+// steps per beat). No calibrated constants remain.
+var DEZA_TEMPO_TABLE = [
+    0x42, 0x3c, 0x39, 0x36, 0x34, 0x31, 0x2f, 0x2d,
+    0x2b, 0x2a, 0x28, 0x27, 0x26, 0x24, 0x23, 0x22,
+    0x21, 0x20, 0x1f, 0x1e, 0x1d, 0x1c, 0x1b, 0x1a,
+    0x19, 0x18, 0x17, 0x16, 0x15, 0x14, 0x13, 0x12,
+];
+// Per-measure transpose in semitones: measure control byte 3 indexes the
+// signed kernel table at 0x601F3C8; the note sender (+0x16fc) adds the
+// value to every note id. The editor's default control selects entry 3 (0).
+var DEZA_TRANSPOSE_TABLE = [-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, -5, -4];
 function bgmStepSeconds(tempoIndex) {
-    var t = typeof tempoIndex === "number" ? (tempoIndex & 7) : 3;
-    var rate = ((t + 1) * 32 - 1) / 256;   // (t<<5)|0x1F over an 8-bit accumulator
-    return 1 / (BGM_TICK_HZ * rate);
+    return DEZA_TEMPO_TABLE[tempoIndex & 31] / 240;
 }
 var BGM_LOOKAHEAD = 0.35;        // seconds scheduled ahead of the clock
 var BGM_TICK_MS = 90;
@@ -341,34 +350,47 @@ function b64ToBytes(s) {
     return out;
 }
 
-// One song slot -> per-part event lists [{step, note, len}] in step units.
+// One song slot -> per-voice event lists [{step, note, len}] in 16-step
+// measures. Streams 2p and 2p+1 are part p's voice A and voice B; both
+// voices share the part's synth timbre, so simultaneous notes form chords
+// exactly as the walker plays them.
 export function parseBgmSong(b64) {
     var raw = b64ToBytes(b64);
-    var parts = [[], [], [], []];
+    var parts = [[], [], [], [], [], [], [], []];
     for (var p = 0; p < 4; p++) {
-        var current = null;
-        for (var m = 0; m < 32; m++) {
-            var base = 4 + m * 132 + 4 + p * 32;
-            for (var st = 0; st < 32; st++) {
-                var v = raw[base + st];
-                var abs = m * 32 + st;
-                if (v >= 0x01 && v <= 0x3b) {
-                    current = { step: abs, note: v, len: 1 };
-                    parts[p].push(current);
-                } else if (v >= 0x80 && v <= 0x88 && current) {
-                    current.len = abs - current.step + 1;
-                } else if (v === 0) {
-                    current = null;
+        for (var v0 = 0; v0 < 2; v0++) {
+            var stream = parts[p * 2 + v0];
+            var current = null;
+            for (var m = 0; m < 32; m++) {
+                var base = 4 + m * 132 + 4 + p * 32 + v0 * 16;
+                var trans = DEZA_TRANSPOSE_TABLE[raw[4 + m * 132 + 3]] || 0;
+                for (var st = 0; st < 16; st++) {
+                    var v = raw[base + st];
+                    var abs = m * 16 + st;
+                    if (v >= 0x01 && v <= 0x3b) {
+                        current = { step: abs, note: Math.max(1, v + trans), len: 1 };
+                        stream.push(current);
+                    } else if (v >= 0x80 && v <= 0x88 && current) {
+                        current.len = abs - current.step + 1;
+                    } else if (v === 0) {
+                        current = null;
+                    }
                 }
             }
         }
     }
     // The header's own loop points (kernel walker, 0KERNEL +0x1d56/+0x1d6e):
     // byte 0 = measure playback rewinds TO, byte 1 = last measure played.
-    var loopStartStep = Math.min(raw[0], 31) * 32;
-    var loopEndStep = (Math.min(raw[1], 31) + 1) * 32;
-    if (loopEndStep <= loopStartStep) { loopStartStep = 0; loopEndStep = 32 * 32; }
-    return { parts: parts, loopStartStep: loopStartStep, loopEndStep: loopEndStep };
+    var loopStartStep = Math.min(raw[0], 31) * 16;
+    var loopEndStep = (Math.min(raw[1], 31) + 1) * 16;
+    if (loopEndStep <= loopStartStep) { loopStartStep = 0; loopEndStep = 32 * 16; }
+    return {
+        parts: parts,
+        loopStartStep: loopStartStep,
+        loopEndStep: loopEndStep,
+        stepSeconds: bgmStepSeconds(raw[3]),
+        echoLevel: raw[2] & 7,
+    };
 }
 
 function audioCtx(scene) {
@@ -411,22 +433,40 @@ export function startDezaemonBgm(scene, which) {
     if (idx == null || !bgm.songs || bgm.songs[idx] == null) return false;
 
     stopDezaemonBgm(scene);
+    var song = parseBgmSong(bgm.songs[idx]);
     var st = scene._dezaBgm = {
         ctx: ctx,
-        song: parseBgmSong(bgm.songs[idx]),
-        stepSeconds: bgmStepSeconds(bgm.tempos ? bgm.tempos[idx] : undefined),
+        song: song,
+        stepSeconds: song.stepSeconds,
         songIndex: idx,
         which: which,
-        cursor: [0, 0, 0, 0],
+        cursor: [0, 0, 0, 0, 0, 0, 0, 0],
         startTime: ctx.currentTime + 0.05,
         loop: 0,
         master: ctx.createGain(),
         noise: makeNoiseBuffer(ctx),
         timer: null,
         scheduled: 0,
+        echo: null,
     };
     st.master.gain.value = BGM_GAIN;
     st.master.connect(ctx.destination);
+    // header byte 2 — the song's echo send (EFSDL of the Saturn mix slots),
+    // approximated as a feedback delay tap off the master bus.
+    if (song.echoLevel > 0) {
+        var delay = ctx.createDelay(0.5);
+        delay.delayTime.value = 0.18;
+        var fb = ctx.createGain();
+        fb.gain.value = 0.3;
+        var wet = ctx.createGain();
+        wet.gain.value = 0.45 * (song.echoLevel / 7);
+        st.master.connect(delay);
+        delay.connect(fb);
+        fb.connect(delay);
+        delay.connect(wet);
+        wet.connect(ctx.destination);
+        st.echo = wet;
+    }
     var pump = function () { scheduleBgm(scene, st); };
     st.timer = scene.time.addEvent({ delay: BGM_TICK_MS, loop: true, callback: pump });
     pump();
@@ -438,21 +478,22 @@ function scheduleBgm(scene, st) {
     var horizon = ctx.currentTime + BGM_LOOKAHEAD;
     var song = st.song;
     var span = song.loopEndStep - song.loopStartStep;
-    for (var p = 0; p < 4; p++) {
+    var n = song.parts.length;
+    for (var p = 0; p < n; p++) {
         var events = song.parts[p];
         if (!events.length) continue;
-        var voice = PART_VOICES[p];
+        var voice = PART_VOICES[p >> 1];
         for (;;) {
             var i = st.cursor[p];
             if (i >= events.length) {
                 // wrapped: rewind every part to the song's own loop measure
                 var allDone = true;
-                for (var q = 0; q < 4; q++) {
+                for (var q = 0; q < n; q++) {
                     if (st.cursor[q] < song.parts[q].length) { allDone = false; break; }
                 }
                 if (allDone) {
                     st.loop += 1;
-                    for (var r = 0; r < 4; r++) {
+                    for (var r = 0; r < n; r++) {
                         var evs = song.parts[r];
                         var at = evs.length;
                         for (var k = 0; k < evs.length; k++) {
@@ -510,6 +551,7 @@ export function stopDezaemonBgm(scene) {
     if (!st) return;
     if (st.timer) st.timer.remove();
     try { st.master.disconnect(); } catch (e) { /* context may be gone */ }
+    if (st.echo) { try { st.echo.disconnect(); } catch (e2) { /* ditto */ } }
     scene._dezaBgm = null;
 }
 
