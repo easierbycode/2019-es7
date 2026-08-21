@@ -284,6 +284,30 @@ function mergeAtlasIntoGameAsset(scene, image, frames) {
     return true;
 }
 
+// One stage out of a cloud level's `stages` map, in the shape GameScene and
+// dezaemon-runtime read: the wave grid, the per-wave scroll rows that keep an
+// imported stage's pacing (only meaningful with one entry per wave), and the
+// tile grid that replaces the stock backdrop.
+function cloudStageRecord(src) {
+    if (!src || !Array.isArray(src.enemylist) || !src.enemylist.length) {
+        return null;
+    }
+    var stage = { enemylist: src.enemylist };
+    if (Array.isArray(src.waveRows) && src.waveRows.length === src.enemylist.length) {
+        stage.waveRows = src.waveRows;
+        if (Number.isFinite(src.waveInterval) && src.waveInterval > 0) {
+            stage.waveInterval = src.waveInterval;
+        }
+    }
+    if (src.background) {
+        stage.background = src.background;
+    }
+    if (src.items) {
+        stage.items = src.items;
+    }
+    return stage;
+}
+
 function primeGameStateForStage(recipe, stageId) {
     if (recipe && recipe.playerData) {
         gameState.spDamage = recipe.playerData.spDamage;
@@ -553,6 +577,18 @@ export class BootScene extends Phaser.Scene {
                 loadedStage.waveInterval = data.waveInterval;
             }
             baseRecipe[stageKey] = loadedStage;
+            // A newer record carries every other stage of the game under
+            // `stages`, so ?stage=3 plays stage 3's own enemies and scenery
+            // instead of silently falling through to the stock game's third
+            // stage. Records written before that only have the flat fields
+            // above, and keep working unchanged.
+            if (data.stages && typeof data.stages === "object") {
+                for (var sKey in data.stages) {
+                    if (!/^stage\d+$/.test(sKey)) continue;
+                    var sRec = cloudStageRecord(data.stages[sKey]);
+                    if (sRec) baseRecipe[sKey] = sRec;
+                }
+            }
             if (data.backgroundCells) baseRecipe.backgroundCells = data.backgroundCells;
             // A Dezaemon import's soundtrack: dezaemon-runtime.js sequences it
             // straight out of the recipe, and no other boot path supplies music
