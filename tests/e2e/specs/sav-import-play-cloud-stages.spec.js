@@ -1,7 +1,7 @@
 "use strict";
 const path = require("path");
 const { test, expect } = require("@playwright/test");
-const { installFirebaseStub } = require("../helpers/firebase-stub");
+const { installFirebaseStub, readCloudRecord } = require("../helpers/firebase-stub");
 const { buildOfflineLevelRecord } = require("../../../tools/build-level/lib/strip-assets");
 
 // A cloud record used to hold one stage: whichever the editor happened to have
@@ -66,21 +66,6 @@ async function saveToCloud(page, name) {
             hasAtlas: !!(rec.atlasImageDataURL && rec.atlasFrames),
             bytes: JSON.stringify(rec).length,
         };
-    }, name);
-}
-
-// The record as a client reads it — through once("value"), so index-keyed
-// nodes come back rebuilt the way the Realtime Database rebuilds them, not as
-// the raw store holds them. frameThumbnails is an editor-only field (BootScene
-// never reads it) and by far the heaviest, so it is dropped rather than
-// ferried across to the game page.
-async function readCloudRecord(page, name) {
-    return page.evaluate(async (levelName) => {
-        const snap = await firebase.database().ref("levels/" + levelName).once("value");
-        const rec = snap.val();
-        if (!rec) throw new Error("nothing stored at levels/" + levelName);
-        delete rec.frameThumbnails;
-        return rec;
     }, name);
 }
 

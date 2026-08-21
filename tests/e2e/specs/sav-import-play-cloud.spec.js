@@ -2,6 +2,7 @@
 const path = require("path");
 const { test, expect } = require("@playwright/test");
 const { blockCdn } = require("../helpers/hermetic");
+const { installFirebaseStub, readCloudRecord } = require("../helpers/firebase-stub");
 
 // Saving an imported .sav to the cloud and playing it back has to sound and
 // look like the import did. It didn't: the payload never carried
@@ -14,12 +15,18 @@ const { blockCdn } = require("../helpers/hermetic");
 // stages, 13 songs referenced by its BGM table, SFX set 3 (SF), and scenery
 // on stage 0.
 //
-// The cloud is stood up in-page as a stub with Realtime Database semantics —
-// update() is a shallow merge, nulls delete, keys are charset-checked — so a
-// payload that RTDB would mangle or reject fails here rather than in
+// The cloud is stood up in-page by helpers/firebase-stub.js, served in place
+// of the gstatic compat bundles so the editor's own initFirebase() path runs
+// against it. It keeps the Realtime Database semantics that actually shape a
+// payload — update() is a shallow merge, undefined is an error, nulls delete,
+// keys are charset-checked, and index-keyed nodes are rebuilt into arrays on
+// read — so a payload RTDB would mangle or reject fails here rather than in
 // production. Playback then feeds that stored record back through the very
 // same boot path via __OFFLINE_LEVEL__, with the CDN blocked, proving the
 // record alone carries the game.
+//
+// sav-import-play-cloud-stages.spec.js covers the rest of the game travelling
+// with it: every stage of a nine-stage import, not just the open one.
 const RAMSIE = path.resolve(__dirname, "..", "..", "..", "tools", "dezaemon-import", "fixtures", "ramsie.sav");
 const LEVEL = "roundtrip-ramsie";
 const STAGE0_MAIN_SONG = 4; // its BGM table's stage-0 main assignment
@@ -28,7 +35,7 @@ const SFX_SET_SF = 3;
 test("a cloud round-trip keeps an imported save's soundtrack and scenery", async ({ page, context }) => {
     test.setTimeout(240_000);
     page.on("dialog", (d) => d.accept());
-    await blockCdn(page);
+    await installFirebaseStub(page);
 
     await page.goto("/level-editor.html");
     await expect.poll(() => page.evaluate(() => !!window.Dezaemon)).toBe(true);
@@ -58,54 +65,6 @@ test("a cloud round-trip keeps an imported save's soundtrack and scenery", async
     expect(imported.cells).toBeGreaterThan(0);
     expect(imported.waveRows).toBe(imported.waves);
 
-    // A stand-in for Realtime Database that keeps the semantics that bite:
-    // update() merges at the top level only, null deletes, and a key outside
-    // RTDB's charset is a hard error.
-    await page.evaluate((levelName) => {
-        const BAD_KEY = /[.$#[\]\/]|[\u0000-\u001f\u007f]/;
-        const store = (window.__cloud = {});
-        const scrub = (v, at) => {
-            if (v === null || v === undefined) return undefined;
-            if (Array.isArray(v)) return v.map((x, i) => scrub(x, at + "/" + i));
-            if (typeof v !== "object") return v;
-            const out = {};
-            for (const k of Object.keys(v)) {
-                if (BAD_KEY.test(k)) throw new Error("illegal RTDB key at " + at + ": " + JSON.stringify(k));
-                const sv = scrub(v[k], at + "/" + k);
-                if (sv !== undefined) out[k] = sv;
-            }
-            return out;
-        };
-        const nodeFor = (refPath) => {
-            const key = String(refPath).replace(/^.*\//, "");
-            return store[key] || (store[key] = {});
-        };
-        window.firebase = {
-            apps: [],
-            initializeApp() { this.apps = [{}]; return this.apps[0]; },
-            database: Object.assign(
-                () => ({
-                    ref: (refPath) => ({
-                        update(payload) {
-                            const rec = nodeFor(refPath);
-                            for (const k of Object.keys(payload)) {
-                                if (payload[k] === null || payload[k] === undefined) delete rec[k];
-                                else rec[k] = scrub(payload[k], k);
-                            }
-                            return Promise.resolve();
-                        },
-                        once() {
-                            const rec = nodeFor(refPath);
-                            const snap = JSON.parse(JSON.stringify(rec));
-                            return Promise.resolve({ val: () => snap });
-                        },
-                    }),
-                }),
-                { ServerValue: { TIMESTAMP: 1700000000000 } }
-            ),
-        };
-    }, LEVEL);
-
     // The name field lives in the slide-out menu; set it directly rather than
     // driving the menu open just to type into it.
     await page.evaluate((levelName) => {
@@ -115,7 +74,7 @@ test("a cloud round-trip keeps an imported save's soundtrack and scenery", async
 
     // The stored record carries the soundtrack and the scenery.
     const stored = await page.evaluate((levelName) => {
-        const r = window.__cloud[levelName];
+        const r = window.__FAKE_RTDB__.levels[levelName];
         return {
             hasBgm: !!r.dezaemonBgm,
             sfxSet: r.dezaemonBgm && r.dezaemonBgm.sfxSet,
@@ -152,7 +111,7 @@ test("a cloud round-trip keeps an imported save's soundtrack and scenery", async
 
     // Now play the stored record. Deliberately no ?lowmode=1 — low mode
     // silences every audio path, the sequencer included.
-    const record = await page.evaluate((levelName) => window.__cloud[levelName], LEVEL);
+    const record = await readCloudRecord(page, LEVEL);
     const gamePage = await context.newPage();
     await blockCdn(gamePage);
     await gamePage.addInitScript((rec) => { window.__OFFLINE_LEVEL__ = rec; }, record);

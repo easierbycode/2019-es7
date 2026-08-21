@@ -123,8 +123,11 @@ const STUB_SOURCE = `(function () {
             if (n > max) max = n;
         }
         if (max >= keys.length * 2) return out;
+        // Sparse, not null-filled: the client assigns each stored index into a
+        // fresh array and leaves the gaps as holes, so a table that skips an
+        // index still reports its real key count.
         var arr = [];
-        for (var k = 0; k <= max; k++) arr.push(out[String(k)] === undefined ? null : out[String(k)]);
+        for (var k = 0; k < keys.length; k++) arr[Number(keys[k])] = out[keys[k]];
         return arr;
     }
 
@@ -184,7 +187,9 @@ const STUB_SOURCE = `(function () {
 
 // Serve the stub in place of the gstatic compat bundles. The app bundle
 // carries the whole stub; the database/storage bundles resolve to nothing,
-// exactly as they would if the stub had already defined everything.
+// exactly as they would if the stub had already defined everything. This also
+// keeps the page hermetic, the way helpers/hermetic.js blockCdn does — nothing
+// reaches the network either way.
 async function installFirebaseStub(page) {
     await page.route("https://www.gstatic.com/**", (route) => {
         const isApp = route.request().url().includes("firebase-app-compat");
@@ -195,4 +200,19 @@ async function installFirebaseStub(page) {
     });
 }
 
-module.exports = { installFirebaseStub, STUB_SOURCE };
+// A stored level, as a client reads it — through once("value"), so index-keyed
+// nodes come back rebuilt the way the Realtime Database rebuilds them rather
+// than as the raw store holds them. frameThumbnails is an editor-only field
+// (BootScene never reads it) and by far the heaviest, so it is dropped rather
+// than ferried across to a game page.
+async function readCloudRecord(page, name, levelsPath = "levels") {
+    return page.evaluate(async ([path, levelName]) => {
+        const snap = await firebase.database().ref(path + "/" + levelName).once("value");
+        const rec = snap.val();
+        if (!rec) throw new Error("nothing stored at " + path + "/" + levelName);
+        delete rec.frameThumbnails;
+        return rec;
+    }, [levelsPath, name]);
+}
+
+module.exports = { installFirebaseStub, readCloudRecord, STUB_SOURCE };
