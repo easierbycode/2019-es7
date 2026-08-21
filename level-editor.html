@@ -5148,7 +5148,18 @@ function GAME3D_RUNTIME(DATA) {
                 if (stageRec && stageRec.background && Array.isArray(gameData.backgroundCells)) {
                     payload.background = stageRec.background;
                     payload.backgroundCells = gameData.backgroundCells;
+                } else {
+                    // The write below is an update(), i.e. a merge — a level that
+                    // no longer carries scenery has to clear the old snapshot or
+                    // it keeps scrolling a backdrop that is no longer its own.
+                    payload.background = null;
+                    payload.backgroundCells = null;
                 }
+                // The save's own soundtrack rides with the level too. It is the
+                // only music a Dezaemon import has — there is no mp3 in
+                // customAudioURLs to fall back on — so a level saved without it
+                // plays in silence everywhere it is loaded from the cloud.
+                payload.dezaemonBgm = (gameData && gameData.dezaemonBgm) || null;
                 // Save audio URL overrides
                 var urlEntries = {};
                 for (var ak in audioURLs) { if (audioURLs[ak]) urlEntries[ak] = audioURLs[ak]; }
@@ -5270,6 +5281,22 @@ function GAME3D_RUNTIME(DATA) {
                     gameData.storyData = d.storyData;
                 }
                 if (d.stageKey) currentStageKey = d.stageKey;
+                // Fold the cloud level's own stage record and soundtrack back into
+                // gameData. saveToFirebase() reads scenery, wave pacing and BGM from
+                // there, so without this a load-then-save round-trip wrote whatever
+                // the previously-open game happened to hold — and Play (which builds
+                // its recipe from gameData) ran the level with the wrong backdrop.
+                if (!gameData) gameData = {};
+                var loadedStage = gameData[currentStageKey] = { enemylist: currentGrid };
+                if (d.background) loadedStage.background = d.background;
+                if (Array.isArray(d.waveRows) && d.waveRows.length === currentGrid.length) {
+                    loadedStage.waveRows = d.waveRows;
+                    loadedStage.waveInterval = d.waveInterval;
+                }
+                if (Array.isArray(d.backgroundCells)) gameData.backgroundCells = d.backgroundCells;
+                else delete gameData.backgroundCells;
+                if (d.dezaemonBgm) gameData.dezaemonBgm = d.dezaemonBgm;
+                else delete gameData.dezaemonBgm;
                 titleBgDataURL = d.titleBgDataURL || null;
                 logoDataURL = d.logoDataURL || null;
                 subTitleDataURL = d.subTitleDataURL || null;

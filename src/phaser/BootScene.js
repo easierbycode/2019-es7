@@ -541,7 +541,23 @@ export class BootScene extends Phaser.Scene {
             var baseRecipe = self.cache.json.get("recipe") || {};
             var localEnemyData = baseRecipe.enemyData ? JSON.parse(JSON.stringify(baseRecipe.enemyData)) : {};
             var stageKey = data.stageKey || "stage0";
-            baseRecipe[stageKey] = { enemylist: data.enemylist };
+            // Everything the editor saved about this stage, not just its waves:
+            // the scroll row each wave came from (its pacing) and the tile grid
+            // of its scenery. Rebuilding the record from enemylist alone left a
+            // Dezaemon import playing evenly-spaced waves over the stock
+            // backdrop, with none of the scenery it was imported with.
+            var loadedStage = { enemylist: data.enemylist };
+            if (data.background) loadedStage.background = data.background;
+            if (data.waveRows) {
+                loadedStage.waveRows = data.waveRows;
+                loadedStage.waveInterval = data.waveInterval;
+            }
+            baseRecipe[stageKey] = loadedStage;
+            if (data.backgroundCells) baseRecipe.backgroundCells = data.backgroundCells;
+            // A Dezaemon import's soundtrack: dezaemon-runtime.js sequences it
+            // straight out of the recipe, and no other boot path supplies music
+            // for such a level, so without this the cloud copy is silent.
+            if (data.dezaemonBgm) baseRecipe.dezaemonBgm = data.dezaemonBgm;
 
             function finishLevelLoad() {
                 if (data.enemyData) {
