@@ -58,3 +58,44 @@ test("the import button surfaces that message rather than opening a file picker"
     await expect.poll(() => alerted).toContain("could not be fetched");
     expect(filePickerOpened).toBe(false);
 });
+
+// The mirror image of the specs above: a module that is merely LATE must not
+// be reported as one that failed.
+//
+// The importer arrives through dynamic import()s inside a module script with a
+// top-level await, which does not hold up window.onload. The ?sav= auto-import
+// runs from onload, sampled window.Dezaemon once, and on a cold cache or a
+// loaded machine found it still undefined — so a shared link died with "the
+// module script never ran" against a module that finished loading a moment
+// later, and nothing retried. It was also the suite's longest-standing flake.
+test("a slow importer module is waited for, not blamed", async ({ page }) => {
+    const fs = require("fs");
+    const path = require("path");
+    const DAIOH = path.resolve(__dirname, "..", "..", "..", "dev-fixtures", "Dezaemon 2 (DAIOH).sav");
+    const REMOTE_URL = "https://easierbycode.com/assets/Dezaemon 2 (DAIOH).sav";
+
+    const alerts = [];
+    page.on("dialog", (d) => { alerts.push(d.message()); d.accept(); });
+    await blockCdn(page);
+    await page.route(REMOTE_URL, (route) =>
+        route.fulfill({
+            status: 200,
+            contentType: "application/octet-stream",
+            headers: { "access-control-allow-origin": "*" },
+            body: fs.readFileSync(DAIOH),
+        })
+    );
+    // Hold the importer modules back so they land well after window.onload —
+    // the same ordering a cold cache produces, made deterministic.
+    await page.route("**/tools/dezaemon-import/lib/**", async (route) => {
+        await new Promise((r) => setTimeout(r, 2500));
+        return route.continue();
+    });
+
+    await page.goto("/level-editor.html?sav=" + encodeURIComponent(REMOTE_URL));
+
+    // The import waits for the module and then goes through.
+    await expect(page.locator("#dezaemon-import-modal")).toBeVisible({ timeout: 60_000 });
+    await expect(page.locator("#deza-container-kind")).toContainText("Dezaemon 2 (DAIOH).sav");
+    expect(alerts).toEqual([]);
+});

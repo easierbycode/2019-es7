@@ -1320,8 +1320,18 @@
             checkMissingTextures();
         }
 
+        // Runs are not instantaneous — the alt-atlas reads below are awaited —
+        // and several can be in flight at once, since every atlas rebuild
+        // triggers one through buildFrameThumbs(). Without a token the slower
+        // of two overlapping runs wins and the panel reports a state the
+        // editor left behind: loading a level whose player art is level-only
+        // and then importing a save over it used to leave the panel accusing
+        // the frames the import had already replaced.
+        let missingTexCheckSeq = 0;
+
         async function checkMissingTextures() {
             if (!atlasData || !atlasData.frames) return;
+            const seq = ++missingTexCheckSeq;
             const frames = Object.assign({}, atlasData.frames);
             // Sprites added in-memory (imports, Firebase pulls) but not yet
             // repacked into the atlas still count as present.
@@ -1377,9 +1387,25 @@
                 if (playerData.barrier) collectTextures(playerData.barrier.texture);
             }
 
+            // A newer check started while this one was awaiting the alt
+            // atlases; its answer is the current one, so drop this result
+            // rather than painting the panel with a stale reading.
+            if (seq !== missingTexCheckSeq) return;
+
             if (missing.size > 0) {
                 console.warn('Level editor: missing textures in atlas:', [...missing]);
                 showMissingTexturesPanel([...missing]);
+            } else {
+                // Nothing is missing any more, so the panel has to come down —
+                // it reports current state, not the worst state ever seen. Left
+                // up, it kept accusing frames that an import or a repack had
+                // already resolved. A panel the user is part-way through
+                // filling in is left alone; repackFromMissingPanel() closes it
+                // once those uploads land.
+                if (Object.keys(pendingTextureUploads).length === 0) {
+                    currentMissingSet = new Set();
+                    document.getElementById('missing-tex-overlay').classList.add('hidden');
+                }
             }
         }
 
@@ -2821,7 +2847,41 @@
             return 'Dezaemon module failed to load.\n\n' + why + '\n\n' + hint;
         }
 
-        function openDezaemonImport() {
+        // The importer arrives through dynamic import()s inside a module script
+        // with a top-level await, and that does NOT hold up window.onload — so
+        // an entry point that samples window.Dezaemon once can miss it by a
+        // fraction of a second and blame a module that is merely late. Opening
+        // the editor at ?sav=<url> hit this exactly: the auto-import gave up
+        // with "the module script never ran" against a module that finished
+        // loading moments later, and nothing retried.
+        //
+        // The module reports either way before it dispatches dezaemon-ready, so
+        // waiting on that settles as soon as there is an answer. The timeout is
+        // the backstop for the module script never running at all (file://,
+        // a blocked script), where the alert below is the right outcome.
+        const DEZAEMON_READY_TIMEOUT_MS = 15000;
+        let dezaemonReadyPromise = null;
+        function dezaemonReady() {
+            if (window.Dezaemon || window.DezaemonLoadError) return Promise.resolve();
+            // Modules can never load over file://, so there is nothing to wait
+            // for — report it now rather than after a 15s stall.
+            if (location.protocol === 'file:') return Promise.resolve();
+            if (!dezaemonReadyPromise) {
+                dezaemonReadyPromise = new Promise((resolve) => {
+                    const done = () => {
+                        window.removeEventListener('dezaemon-ready', done);
+                        clearTimeout(timer);
+                        resolve();
+                    };
+                    const timer = setTimeout(done, DEZAEMON_READY_TIMEOUT_MS);
+                    window.addEventListener('dezaemon-ready', done);
+                });
+            }
+            return dezaemonReadyPromise;
+        }
+
+        async function openDezaemonImport() {
+            await dezaemonReady();
             if (!window.Dezaemon) { alert(dezaemonUnavailableMessage()); return; }
             document.getElementById('deza-file-input').click();
         }
@@ -2835,6 +2895,7 @@
         // identifies the image in the modal header. Returns true on success so
         // callers can react; all failures are reported to the user here.
         async function ingestDezaemonBytes(u8, label) {
+            await dezaemonReady();
             if (!window.Dezaemon) { alert(dezaemonUnavailableMessage()); return false; }
             let saves, kind;
             try {
@@ -2869,6 +2930,7 @@
         // file, so a failure here is usually the remote's headers rather than a
         // bad URL — say so instead of a bare "Failed to fetch".
         async function loadDezaemonFromUrl(url) {
+            await dezaemonReady();
             if (!window.Dezaemon) { alert(dezaemonUnavailableMessage()); return false; }
             let resp;
             try {
@@ -3072,7 +3134,10 @@
             // grid cell draws empty.
             if (sprites.length) await mergeExtraSpritesIntoAtlas();
             populateStagePills(); loadCurrentStage(); renderEnemyList(); renderAtlas(); updateToolUI();
-            checkMissingTextures();
+            // Awaited: the import's own verdict on its art is part of finishing
+            // the import, so the modal does not close on a panel state that
+            // still belongs to the game this one replaced.
+            await checkMissingTextures();
             const nameInput = document.getElementById('firebase-level-name');
             if (nameInput) nameInput.value = '';
             const title = st.decoded.title || save.comment || 'Dezaemon 2 game';

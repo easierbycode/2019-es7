@@ -94,7 +94,12 @@ test("?sav= loads the importer straight from a link", async ({ page }) => {
 
     await page.goto("/level-editor.html?sav=" + encodeURIComponent(REMOTE_URL));
 
-    await expect(page.locator("#dezaemon-import-modal")).toBeVisible();
+    // window.onload awaits autoLoadFromServer() — the base game plus a 7MB
+    // atlas — before it so much as looks at ?sav=, and only then fetches and
+    // parses the save. Measured at 8s on a loaded machine, so the default 5s
+    // assertion timeout is a stopwatch on the asset load rather than on the
+    // feature under test.
+    await expect(page.locator("#dezaemon-import-modal")).toBeVisible({ timeout: 60_000 });
     await expect(page.locator("#deza-container-kind")).toContainText("Dezaemon 2 (DAIOH).sav");
     // The field is seeded so the URL is visible and re-runnable.
     await expect(page.locator("#deza-url-input")).toHaveValue(REMOTE_URL);

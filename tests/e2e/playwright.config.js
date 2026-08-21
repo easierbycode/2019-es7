@@ -19,8 +19,18 @@ module.exports = defineConfig({
     },
     projects: [
         {
+            // Every editor spec opens level-editor.html, which auto-loads the
+            // shipped game and a 7MB atlas before it is usable — and does so
+            // while the game-smoke worker is booting Phaser alongside it, since
+            // the two projects share one worker pool. The defaults (30s per
+            // test, 5s per assertion) are budgets for that asset load rather
+            // than for the feature under test, and they were what actually
+            // failed: a `?sav=` import measured at 0.8s-9.3s idle would blow
+            // the 30s test timeout under contention.
             name: "editor",
             testIgnore: /editor-play-smoke|sav-import-play/,
+            timeout: 90_000,
+            expect: { timeout: 20_000 },
             use: { browserName: "chromium" },
         },
         {
@@ -30,6 +40,7 @@ module.exports = defineConfig({
             name: "game-smoke",
             testMatch: /editor-play-smoke|sav-import-play/,
             timeout: 240_000,
+            expect: { timeout: 20_000 },
             workers: 1,
             use: { browserName: "chromium" },
         },

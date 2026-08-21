@@ -11,11 +11,14 @@ test("editor auto-loads the shipped game and the Dezaemon module", async ({ page
     expect((await gameJsonResp).status()).toBe(200);
 
     // Auto-load seeds the shipped game: 5 stages, 12 enemy types.
+    // __editorState is installed at parse time and answers with empty arrays
+    // until autoLoadFromServer() lands, so waiting for it to be non-null waits
+    // for nothing — poll the stages themselves.
     await expect
-        .poll(async () => page.evaluate(() => (window.__editorState ? window.__editorState() : null)))
-        .not.toBeNull();
+        .poll(async () => page.evaluate(() =>
+            (window.__editorState ? window.__editorState().stageKeys : null)))
+        .toEqual(["stage0", "stage1", "stage2", "stage3", "stage4"]);
     const state = await page.evaluate(() => window.__editorState());
-    expect(state.stageKeys).toEqual(["stage0", "stage1", "stage2", "stage3", "stage4"]);
     expect(state.enemyKeys).toContain("enemyA");
     expect(state.waveCount).toBeGreaterThan(0);
 

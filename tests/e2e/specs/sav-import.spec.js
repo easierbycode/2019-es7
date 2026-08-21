@@ -184,3 +184,70 @@ test("importing over a level with a custom player still flies Duke", async ({ pa
 
     expect(errors).toEqual([]);
 });
+
+// The panel reports current state, not the worst state ever seen. It used to
+// only ever be raised: nothing lowered it once the frames it named were
+// resolved, so a level whose player art lived in its own atlas left the panel
+// accusing those frames long after an import had replaced the player. Worse,
+// every atlas rebuild fires a fresh check through buildFrameThumbs(), and each
+// one awaits the alt-atlas reads — so the slower of two overlapping runs could
+// paint the panel with the older answer.
+test("the missing-texture panel comes down once an import resolves the frames", async ({ page }) => {
+    await blockCdn(page);
+    const errors = collectPageErrors(page);
+    page.on("dialog", (d) => d.accept());
+
+    await page.goto("/level-editor.html");
+    await expect.poll(() => page.evaluate(() => !!window.Dezaemon)).toBe(true);
+    await expect.poll(() => page.evaluate(() => !!(atlasData && atlasData.frames))).toBe(true);
+
+    // Point the player at art no atlas has and let the check finish: the panel
+    // is up, naming exactly those frames.
+    const raised = await page.evaluate(async () => {
+        playerData = {
+            name: "borrowed",
+            maxHp: 5,
+            spDamage: 10,
+            defaultShootName: "normal",
+            defaultShootSpeed: "speed_normal",
+            texture: ["levelOnlyShip0.gif"],
+            shootNormal: { name: "normal", damage: 1, hp: 1, interval: 9, texture: ["levelOnlyShot0.gif"] },
+            shootBig: { name: "big", damage: 2, hp: 1, interval: 9, texture: ["levelOnlyShot0.gif"] },
+            shoot3way: { name: "3way", damage: 1, hp: 1, interval: 9, texture: ["levelOnlyShot0.gif"] },
+            barrier: { time: 2, texture: ["levelOnlyBarrier0.gif"] },
+        };
+        gameData.playerData = playerData;
+        await checkMissingTextures();
+        return {
+            hidden: document.getElementById("missing-tex-overlay").classList.contains("hidden"),
+            list: [...document.querySelectorAll("#missing-tex-list .missing-tex-name")].map((e) => e.textContent),
+        };
+    });
+    expect(raised.hidden).toBe(false);
+    expect(raised.list).toEqual([
+        "levelOnlyShip0.gif", "levelOnlyShot0.gif", "levelOnlyBarrier0.gif",
+    ]);
+
+    // Import a save, which flies Duke out of the stock atlas — every frame the
+    // panel was complaining about is gone from the game entirely.
+    await page.setInputFiles("#deza-file-input", RAMSIE);
+    await page.locator("#deza-slot-list > div").first().click();
+    await page.locator("#deza-import-btn").click();
+    await expect(page.locator("#dezaemon-import-modal")).toBeHidden();
+
+    const after = await page.evaluate(() => ({
+        hidden: document.getElementById("missing-tex-overlay").classList.contains("hidden"),
+        player: gameData.playerData.texture[0],
+    }));
+    expect(after.player).toBe("duke_0");
+    expect(after.hidden).toBe(true);
+
+    // A stale answer must not raise it again: the import's own check is the
+    // last word, and an older overlapping run is dropped.
+    await page.waitForTimeout(2000);
+    const settled = await page.evaluate(() =>
+        document.getElementById("missing-tex-overlay").classList.contains("hidden"));
+    expect(settled).toBe(true);
+
+    expect(errors).toEqual([]);
+});
