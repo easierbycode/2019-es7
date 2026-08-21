@@ -304,7 +304,21 @@ export function updateEnemyFire(scene, enemy, shootFn) {
 // synthesized effect flavors for shot / hit / explosion / boss events.
 // =====================================================================
 
-var BGM_STEP_SECONDS = 1 / 15;   // 32 steps/measure ~ 128 BPM in 8ths
+// Tempo, traced through the whole chain: the kernel's sequencer sends the
+// song's header byte +2 to the sound driver at each measure boundary
+// (0KERNEL +0x1c52 -> +0x6005498), and its consumer (+0x213c) programs the
+// driver's per-channel rate byte as (tempoIndex << 5) | 0x1F — a classic
+// accumulator rate, LINEAR in (tempoIndex + 1). The driver's tick frequency
+// is the one untraced constant (it lives in the 68000 SCSP driver's timer
+// setup); TICK_HZ = 30 anchors the corpus's modal tempo (3) to the rate this
+// sequencer always played, so absolute speed is calibrated while RELATIVE
+// tempo between songs is engine-exact.
+var BGM_TICK_HZ = 30;
+function bgmStepSeconds(tempoIndex) {
+    var t = typeof tempoIndex === "number" ? (tempoIndex & 7) : 3;
+    var rate = ((t + 1) * 32 - 1) / 256;   // (t<<5)|0x1F over an 8-bit accumulator
+    return 1 / (BGM_TICK_HZ * rate);
+}
 var BGM_LOOKAHEAD = 0.35;        // seconds scheduled ahead of the clock
 var BGM_TICK_MS = 90;
 var BGM_GAIN = 0.10;
@@ -349,16 +363,12 @@ export function parseBgmSong(b64) {
             }
         }
     }
-    var last = 0;
-    for (p = 0; p < 4; p++) {
-        for (var i = 0; i < parts[p].length; i++) {
-            var e = parts[p][i];
-            if (e.step + e.len > last) last = e.step + e.len;
-        }
-    }
-    // loop at the end of the last measure that holds anything
-    var loopSteps = Math.max(32, Math.ceil(last / 32) * 32);
-    return { parts: parts, loopSteps: loopSteps };
+    // The header's own loop points (kernel walker, 0KERNEL +0x1d56/+0x1d6e):
+    // byte 0 = measure playback rewinds TO, byte 1 = last measure played.
+    var loopStartStep = Math.min(raw[0], 31) * 32;
+    var loopEndStep = (Math.min(raw[1], 31) + 1) * 32;
+    if (loopEndStep <= loopStartStep) { loopStartStep = 0; loopEndStep = 32 * 32; }
+    return { parts: parts, loopStartStep: loopStartStep, loopEndStep: loopEndStep };
 }
 
 function audioCtx(scene) {
@@ -404,6 +414,7 @@ export function startDezaemonBgm(scene, which) {
     var st = scene._dezaBgm = {
         ctx: ctx,
         song: parseBgmSong(bgm.songs[idx]),
+        stepSeconds: bgmStepSeconds(bgm.tempos ? bgm.tempos[idx] : undefined),
         songIndex: idx,
         which: which,
         cursor: [0, 0, 0, 0],
@@ -425,28 +436,41 @@ export function startDezaemonBgm(scene, which) {
 function scheduleBgm(scene, st) {
     var ctx = st.ctx;
     var horizon = ctx.currentTime + BGM_LOOKAHEAD;
+    var song = st.song;
+    var span = song.loopEndStep - song.loopStartStep;
     for (var p = 0; p < 4; p++) {
-        var events = st.song.parts[p];
+        var events = song.parts[p];
         if (!events.length) continue;
         var voice = PART_VOICES[p];
         for (;;) {
             var i = st.cursor[p];
-            var loopBase = st.loop * st.song.loopSteps;
             if (i >= events.length) {
-                // wrapped: advance the shared loop counter once all parts pass
+                // wrapped: rewind every part to the song's own loop measure
                 var allDone = true;
                 for (var q = 0; q < 4; q++) {
-                    if (st.cursor[q] < st.song.parts[q].length) { allDone = false; break; }
+                    if (st.cursor[q] < song.parts[q].length) { allDone = false; break; }
                 }
                 if (allDone) {
                     st.loop += 1;
-                    for (var r = 0; r < 4; r++) st.cursor[r] = 0;
+                    for (var r = 0; r < 4; r++) {
+                        var evs = song.parts[r];
+                        var at = evs.length;
+                        for (var k = 0; k < evs.length; k++) {
+                            if (evs[k].step >= song.loopStartStep) { at = k; break; }
+                        }
+                        st.cursor[r] = at;
+                    }
                     continue;
                 }
                 break;
             }
             var e = events[i];
-            var t = st.startTime + (loopBase + e.step) * BGM_STEP_SECONDS;
+            if (e.step >= song.loopEndStep) { st.cursor[p] = events.length; continue; }
+            // pass 0 plays from the top; later passes play loopStart..loopEnd
+            var pos = st.loop === 0
+                ? e.step
+                : song.loopEndStep + (st.loop - 1) * span + (e.step - song.loopStartStep);
+            var t = st.startTime + pos * st.stepSeconds;
             if (t > horizon) break;
             st.cursor[p] = i + 1;
             if (t < ctx.currentTime - 0.02) continue;
@@ -458,7 +482,7 @@ function scheduleBgm(scene, st) {
 
 function playBgmNote(st, voice, e, t) {
     var ctx = st.ctx;
-    var dur = Math.max(0.05, e.len * BGM_STEP_SECONDS * 0.95);
+    var dur = Math.max(0.05, e.len * st.stepSeconds * 0.95);
     var g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.linearRampToValueAtTime(voice.gain * 0.5, t + 0.01);

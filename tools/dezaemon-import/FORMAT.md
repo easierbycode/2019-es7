@@ -299,19 +299,33 @@ across its 56 read sites: masks `0x1` (17x), `0x4` (13x), `0x3` (12x), `0x2`
 (2x), `0x8` (1x). Mode 3 never occurs in the corpus. `decode-enemy.js` now
 exposes `move: {mode, flag}` alongside the packed `movePattern`.
 
-**Song tempo: the field is found, the rate is not.** Header byte 2 of a song
-slot is a clean 3-bit field — exactly 8 distinct values across the 1,030
-note-bearing songs in the corpus, while header bytes 0/1/3 each span ~30 —
-and it does not correlate with any structural property (note count, parts
-used and song length are flat across its eight values), which is what a
-playback parameter looks like rather than a compositional one. Converting it
-to an actual rate is NOT traced: playback lives in `LOG_SND.CMP`, which
-decompresses to 160 KB of **68000** code (203 `4E75`/`4E71` against 20 SH-2
-`000B`) for the SCSP sound CPU, not the SH-2 overlays this toolkit
-disassembles. `decodeSong()` exposes it as `tempoIndex` and the importer
-carries it on `dezaemonBgm.tempos`; the sequencer deliberately does not act
-on it, because the polarity is unknown and guessing it would mis-time half
-the corpus.
+**Song header + tempo: TRACED through the kernel's own sequencer.** BGM
+playback is not in the 68000 driver at all — 0KERNEL sequences a playing
+song itself: `songPtr = 0x2A0F60 + idx * 0x1084` (+0x1b0a), a step walker at
+`+0x1bfc` reads two steps per call across the 4 parts (16 iterations x 2 =
+the 32 steps), gated by a driver-ready handshake byte, and sends note events
+to the SCSP driver. The walker gives the header its meaning:
+
+  - byte 0 = **loop-start measure** (on wrap, the measure cursor rewinds
+    here, `+0x1d6e`) — byte 1 = **loop-end measure** (compared at `+0x1d56`)
+  - byte 2 = **tempo index 0-7**: read at `+0x1c54` and sent to the driver
+    at each measure boundary (`+0x1c52` -> `0x6005498`, stored at
+    `0x601F3E0` with a dirty flag); the consumer (`+0x213c`) programs the
+    driver's per-channel rate byte as **`(tempo << 5) | 0x1F`** — an
+    accumulator rate, linear in `tempo + 1`, split hi-3/lo-5 by the driver
+    (`LOG_SND +0x1dd8`) into its channel state. Higher = faster.
+  - byte 3 = an index into a kernel lookup at `0x601F3A8`, forwarded with
+    each measure alongside measure control byte 3 (meaning open —
+    volume/voice-ish).
+
+The one number not traced is the driver's tick frequency (its timer setup is
+deep in the 68000 code). The importer therefore plays
+`stepsPerSecond = TICK_HZ x ((32 x (tempo+1) - 1) / 256)` with `TICK_HZ = 30`
+calibrated so the corpus's modal tempo (3) reproduces the rate the sequencer
+always played — relative tempo between songs is engine-exact, absolute speed
+carries one calibrated constant. The runtime's scheduler also honours the
+loop points: pass 0 plays from the top, later passes rewind to the header's
+loop-start measure.
 
 **Firing is gated by the appearance, not the record.** The per-frame fire
 dispatcher (GAME.CMP `+0x19870`) skips an enemy when (a) its Y position is

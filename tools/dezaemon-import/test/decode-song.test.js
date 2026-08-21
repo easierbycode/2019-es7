@@ -91,3 +91,13 @@ test("each song carries its 3-bit tempo index from the header", async () => {
     // ramsie uses several different tempos, so the field is not constant
     assert.ok(new Set(live.map((s) => s.tempoIndex)).size > 1);
 });
+
+test("header bytes 0/1 are loop points the kernel's walker uses", async () => {
+    const { data } = await normalize(fs.readFileSync(path.join(here, "..", "fixtures", "ramsie.sav")));
+    const d = decodeSave(bup.parse(data).find((s) => s.payload).payload.buffer);
+    for (const song of d.songs.filter((s) => s.noteCount)) {
+        assert.ok(song.loopEnd <= 31, `song ${song.slot} loopEnd ${song.loopEnd}`);
+        assert.ok(song.loopStart <= song.loopEnd,
+            `song ${song.slot} loop ${song.loopStart}..${song.loopEnd}`);
+    }
+});

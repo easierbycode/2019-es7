@@ -44,14 +44,17 @@ export function isSustain(step) {
     return step >= 0x80 && step <= 0x88;
 }
 
-// Header byte 2 is a clean 3-bit field: exactly 8 distinct values across the
-// 1,030 note-bearing songs in the corpus, while bytes 0/1/3 each span ~30.
-// It does not correlate with any structural property (note count, parts used
-// and song length are flat across its eight values), which is what a playback
-// parameter — tempo — looks like. The mapping from index to an actual rate is
-// NOT traced: playback lives in LOG_SND, a 68000 SCSP driver, not in the SH-2
-// overlays, so nothing here converts it to BPM. It is decoded and carried so
-// the value is available; see FORMAT.md.
+// The 4-byte song header, traced through the kernel's own sequencer
+// (0KERNEL.BIN +0x1bfc, the routine that walks a playing song):
+//   +0  loop-START measure (on reaching the end, playback rewinds here)
+//   +1  loop-END measure   (the walker compares its cursor against +1, +1)
+//   +2  TEMPO index 0-7    (sent to the sound driver each measure boundary
+//       at +0x1c52; the consumer at +0x213c programs the driver rate byte as
+//       (tempo << 5) | 0x1F — linear in tempo+1; see FORMAT.md)
+//   +3  an index into a kernel lookup table at 0x601F3A8 (volume/voice-ish,
+//       forwarded with each measure — exact meaning open)
+export const SONG_LOOP_START_OFFSET = 0;
+export const SONG_LOOP_END_OFFSET = 1;
 export const SONG_TEMPO_OFFSET = 2;
 
 // Decode one 4228-byte song image.
@@ -74,6 +77,8 @@ export function decodeSong(bytes, slot = 0) {
         slot,
         header: bytes.subarray(0, SONG_HEADER),
         tempoIndex: bytes[SONG_TEMPO_OFFSET] & 7,
+        loopStart: bytes[SONG_LOOP_START_OFFSET],
+        loopEnd: bytes[SONG_LOOP_END_OFFSET],
         measures,
         noteCount,
         empty: noteCount === 0,
