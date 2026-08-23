@@ -396,6 +396,13 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
                     rec.anim = decodedBoss.coreArt
                         ? { idle: frames, attack: frames }
                         : { idle: [frames[0]], attack: [frames[1] || frames[0]] };
+                    // The runtime needs to know WHICH it got: an unpainted
+                    // core fights invisible over the chamber scenery (the
+                    // wall painting is the boss), so it hides the core sprite
+                    // when this is false. Only written when art exists at all
+                    // — a boss with no frames keeps the default starter art
+                    // and must stay visible.
+                    rec.dezaemon.coreArt = decodedBoss.coreArt === true;
                 }
             }
         }

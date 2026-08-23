@@ -194,7 +194,9 @@ test("a stage's own boss art and placement are carried over", () => {
     decoded.bosses = [{ stage: 0, sizeClass: 2, row: 479, col: 8, spriteKeys: [0, 1], coreArt: true }];
     const { gameJson } = mapSaveToGame(decoded);
     assert.deepStrictEqual(gameJson.bossData.boss0.anim.idle, ["dezaBoss0_0.gif", "dezaBoss0_1.gif"]);
-    assert.deepStrictEqual(gameJson.bossData.boss0.dezaemon, { sizeClass: 2, row: 479, col: 8 });
+    // coreArt travels: the runtime keeps a painted core visible, and hides an
+    // unpainted (figure-fallback) one over the chamber scenery.
+    assert.deepStrictEqual(gameJson.bossData.boss0.dezaemon, { sizeClass: 2, row: 479, col: 8, coreArt: true });
     // a stage the save gave no boss still ends, on the default one
     assert.strictEqual(gameJson.bossData.boss1.name, BUILTIN_DEFAULTS.starterBoss.name);
     assert.ok(validateGameJson(gameJson).ok);
@@ -231,6 +233,9 @@ test("fallback boss pieces become idle/attack forms, not an animation", () => {
     const { gameJson } = mapSaveToGame(decoded);
     assert.deepStrictEqual(gameJson.bossData.boss0.anim.idle, ["dezaBoss0_0.gif"]);
     assert.deepStrictEqual(gameJson.bossData.boss0.anim.attack, ["dezaBoss0_1.gif"]);
+    // and the record says so, so the runtime fights it as an invisible core
+    // over the chamber scenery (Ramsie stage 0's statue boss).
+    assert.strictEqual(gameJson.bossData.boss0.dezaemon.coreArt, false);
     assert.ok(validateGameJson(gameJson).ok);
 });
 

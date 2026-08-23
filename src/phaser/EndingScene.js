@@ -47,9 +47,9 @@ export class PhaserEndingScene extends Phaser.Scene {
         // Black background
         this.add.rectangle(GCX, GCY, GW, GH, 0x000000);
 
-        // Check new record
+        // Check new record — an invincible (?god=1) run's score is not one.
         this.continueFlg = false;
-        if (Number(gameState.score || 0) > Number(gameState.highScore || 0)) {
+        if (!gameState.godFlg && Number(gameState.score || 0) > Number(gameState.highScore || 0)) {
             gameState.highScore = Number(gameState.score || 0);
             saveHighScore();
             this.continueFlg = true;

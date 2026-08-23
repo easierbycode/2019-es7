@@ -282,7 +282,8 @@ export class PhaserContinueScene extends Phaser.Scene {
     }
 
     showGameOverPanel() {
-        if (Number(gameState.score || 0) > Number(gameState.highScore || 0)) {
+        // An invincible (?god=1) run's score is not a record.
+        if (!gameState.godFlg && Number(gameState.score || 0) > Number(gameState.highScore || 0)) {
             gameState.highScore = Number(gameState.score || 0);
             saveHighScore();
 

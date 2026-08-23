@@ -110,6 +110,11 @@ export function syncRuntimeFlagsFromLocation(state = gameState) {
     } else if (typeof state.secondLoop !== "boolean") {
         state.secondLoop = false;
     }
+
+    // God mode (?god=1): the player takes no damage. The level editor's PLAY
+    // flow appends this when its GOD MODE toggle is on, so a level author can
+    // watch a whole stage — boss patterns included — without dying mid-check.
+    state.godFlg = readBooleanSearchParam("god", typeof state.godFlg === "boolean" ? state.godFlg : false);
 }
 
 syncRuntimeFlagsFromLocation(gameState);

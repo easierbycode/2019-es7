@@ -137,7 +137,16 @@ export function bossAdd(scene) {
     // A Dezaemon import's decoded boss record (parts, HP-stage playlist,
     // fire points) arms its own driver; bossShootStart starts it in place
     // of the stock patterns.
-    initDezaBoss(scene, bossData);
+    var dezaArmed = initDezaBoss(scene, bossData);
+
+    // A save whose author left the boss core unpainted (coreArt false) fights
+    // as an invisible anchor over the chamber scenery — on hardware the wall
+    // painting IS the boss, and only the trailer's parts, specials and hit
+    // impacts show. The record's own hitbox stays where the sprite is.
+    if (dezaArmed && bossData.dezaemon && bossData.dezaemon.coreArt === false) {
+        scene.bossSprite.setVisible(false);
+        if (scene.bossShadow) scene.bossShadow.setVisible(false);
+    }
 
     var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
     var voiceKey = "boss_" + (bossNames[assetStageId(stageId)] || "bison") + "_voice_add";
@@ -147,6 +156,20 @@ export function bossAdd(scene) {
     // Phaser uses center origin (0.5), so add half sprite height to match PIXI visual pos.
     var pixiRestY = (stageId === 4) ? 48 : GH / 4;
     var entryY = pixiRestY + scene.bossSprite.height / 2;
+    if (dezaArmed && bossData.dezaemon && scene.dezaBg &&
+        typeof bossData.dezaemon.row === "number") {
+        // The imported map parks on the boss chamber, and the engine stands
+        // the class-sized core ON the boss placement row — the core's center
+        // sits half its class height above it. Derive the row's screen
+        // position from the ACTUAL parked scroll (which clamps to the map's
+        // extent) rather than assuming the nominal GH/4 + BOSS_PARK_SHIFT
+        // park, so a boss row near the map's edges stays glued to its
+        // chamber. Ramsie stage 0 (F2, 64x128): the demon-face part at
+        // (0,-15) lands on the chamber goddess's head, as on hardware.
+        var coreH = [64, 64, 128, 128][(bossData.dezaemon.sizeClass || 0) & 3];
+        var rowTopY = GH - (bossData.dezaemon.row + 1) * 16 + scene.dezaBg.stopScroll;
+        entryY = rowTopY - coreH / 2;
+    }
     scene.bossBaseY = entryY;
     scene.tweens.add({
         targets: scene.bossSprite,
@@ -178,9 +201,15 @@ export function bossAdd(scene) {
         },
     });
 
-    scene.stageEndBg.setVisible(true);
-    scene.bossAppearBgFlg = true;
-    scene.bossAppearBgScroll = 0;
+    // The stock stage-end backdrop scrolls in behind the boss — but an
+    // imported map IS the boss chamber, and the stock art showing through the
+    // map's transparent cells breaks the scenery (those cells are black on
+    // hardware). The map already parked on the chamber, so skip it.
+    if (!scene.dezaBg) {
+        scene.stageEndBg.setVisible(true);
+        scene.bossAppearBgFlg = true;
+        scene.bossAppearBgScroll = 0;
+    }
 }
 
 // -----------------------------------------------------------------------
@@ -771,7 +800,7 @@ export function bossDie(scene, boss) {
     var idx = scene.enemies.indexOf(boss);
     if (idx >= 0) scene.enemies.splice(idx, 1);
 
-    clearDezaBoss(scene);
+    clearDezaBoss(scene, true); // a defeat: the attached parts explode too
     scene.bossSprite = null;
     scene.bossActive = false;
     scene.bossDangerShown = false;
@@ -960,6 +989,17 @@ export function gokiPlayerAttack(scene) {
     // 2.7s: kill the player (100 damage = instant death)
     scene.time.delayedCall(2700, function () {
         scene.playerDamage(100);
+        // GOD MODE makes that scripted kill a no-op, and the player's death
+        // transition is the only thing that ends this sequence — without this
+        // unwind, theWorldFlg stays set and the game soft-locks. Resume the
+        // fight instead: the author survives the shungokusatsu.
+        if (gameState.godFlg) {
+            scene.time.delayedCall(800, function () {
+                scene.theWorldFlg = false;
+                scene.spBtn.setAlpha(1);
+                bossShootStart(scene);
+            });
+        }
     });
 
     // 3.0s: KO display (akebonofinish)

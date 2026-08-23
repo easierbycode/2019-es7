@@ -163,6 +163,7 @@ export function handleKeyboardInput(scene) {
  * @param {number} amount
  */
 export function playerDamage(scene, amount) {
+    if (gameState.godFlg) return; // editor GOD MODE launch (?god=1)
     if (scene.barrierActive) return;
     if (scene.damageAnimationFlg) return;
 

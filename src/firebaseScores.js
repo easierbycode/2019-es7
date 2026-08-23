@@ -132,6 +132,11 @@ export function initializeFirebaseScores() {
 }
 
 export function submitHighScore(score) {
+    // An invincible (?god=1) run's score is not a record: keep it out of the
+    // shared leaderboard AND the local high-score persistence.
+    if (gameState.godFlg) {
+        return Promise.resolve(normalizeScore(gameState.highScore));
+    }
     const candidate = normalizeScore(score);
     const ref = ensureDatabaseRef();
     const firebaseNamespace = getFirebaseNamespace();

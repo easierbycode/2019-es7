@@ -17,6 +17,11 @@ var TILE = 16;
 // px of map per worldTime tick: 16px rows at 8 frames/row (see
 // FRAMES_PER_SOURCE_ROW in the importer).
 export var SCROLL_PX_PER_FRAME = 2;
+// The scroll runs this much past the plain boss-row park, so the chamber
+// artwork (and the boss standing on it) clears the HUD bar instead of being
+// half-hidden under it — the Saturn's own window puts the chamber top right
+// below its (much thinner) score line.
+export var BOSS_PARK_SHIFT = 48;
 // GPU-safe strip height for the composed background textures.
 var STRIP_ROWS = 128;
 
@@ -117,7 +122,7 @@ export function buildStageBackground(scene, stageData, recipe, bossRow) {
     var stopScroll = maxScroll;
     if (typeof bossRow === "number") {
         stopScroll = Math.max(0, Math.min(maxScroll,
-            (bossRow + 1) * TILE - GH + Math.floor(GH / 4)));
+            (bossRow + 1) * TILE - GH + Math.floor(GH / 4) + BOSS_PARK_SHIFT));
     }
     var controller = {
         container: container,
@@ -320,9 +325,44 @@ export function updateEnemyFire(scene, enemy, shootFn) {
 // phase pacing is untraced; ~6s keeps a 4-entry loop visible inside a 99s
 // boss timer.
 var BOSS_ENTRY_FRAMES = 360;
-var BEAM_WARN_FRAMES = 45;   // thin warning shaft before the beam goes live
-var BEAM_ON_FRAMES = 100;    // frames the beam stays live
-var BEAM_WIDTH = 22;
+// The type-5 special, from a 60fps Saturn capture of one full cycle (~66
+// frames): one dithered red ELLIPSE pinned under the fire point that morphs
+// continuously — a screen-wide horizontal band holds at the mouth, contracts
+// through a lens into a ball, stretches into the tall veil reaching the
+// bottom of the screen, thins to a vertical line, then swings back out to
+// the band. The cycle is seamless (last key = first key) and repeats for the
+// attack's life. Keyframes are [t, width, height]; height null means "the
+// full drop from the fire point to the screen bottom". The ellipse's TOP
+// edge stays at the fire point throughout (the band sits at the mouth, the
+// veil hangs below it).
+var BEAM_LOOP_FRAMES = 150;
+var BEAM_LOOPS = 2;
+var BEAM_KEYS = [
+    [0.00, 300, 18],   // screen-wide horizontal band...
+    [0.17, 300, 18],   // ...holds
+    [0.24, 130, 17],   // contracts to a lens
+    [0.30, 70, 85],    // rounds into a ball at the chest
+    [0.47, 52, null],  // stretches into the full veil
+    [0.73, 22, null],  // narrows, still full height
+    [0.87, 8, null],   // a thin line down the column
+    [1.00, 300, 18],   // swings back out to the band
+];
+
+function beamShape(age, hFull) {
+    var t = (age % BEAM_LOOP_FRAMES) / BEAM_LOOP_FRAMES;
+    var prev = BEAM_KEYS[0];
+    for (var i = 1; i < BEAM_KEYS.length; i++) {
+        var next = BEAM_KEYS[i];
+        if (t <= next[0]) {
+            var f = (t - prev[0]) / (next[0] - prev[0]);
+            var ph = prev[2] === null ? hFull : prev[2];
+            var nh = next[2] === null ? hFull : next[2];
+            return { w: prev[1] + (next[1] - prev[1]) * f, h: ph + (nh - ph) * f };
+        }
+        prev = next;
+    }
+    return { w: prev[1], h: prev[2] === null ? hFull : prev[2] };
+}
 // Bullet record used when the boss data carries no weapon of its own (a
 // Dezaemon import's boss bulletData is empty — global bullet art is not
 // decoded). The frames ship in the stock atlas, which an import merges into.
@@ -537,7 +577,11 @@ function fireDezaBullet(scene, fp) {
         dirX = dx / d;
         dirY = dy / d;
     }
-    spawnDezaBossBullet(scene, x, y, dirX, dirY, bossWeapon(scene, fp.shot ? fp.shot.weapon : 0), 0);
+    var projData = bossWeapon(scene, fp.shot ? fp.shot.weapon : 0);
+    // The save's own bullet art is not decoded; the Saturn capture shows blue
+    // orbs, so the stand-in stock projectile is tinted toward them.
+    spawnDezaBossBullet(scene, x, y, dirX, dirY, projData,
+        projData === DEZA_BOSS_BULLET ? 0x7fb2ff : 0);
 }
 
 // Type 6: a slow fan of tinted shots below the fire point.
@@ -558,45 +602,55 @@ function fireDezaFlame(scene, fp) {
     }
 }
 
-// Type 5: a full-height beam shaft — warn thin, then live. Not a bullet: the
-// player cannot shoot it down, and it checks the player itself.
+// Type 5: the morphing red veil (see BEAM_KEYS). Not a bullet: the player
+// cannot shoot it down, and it checks the player itself with an ellipse test.
 function startDezaBeam(scene, st, fp) {
     var key = fpKey(fp);
     for (var i = 0; i < st.beams.length; i++) {
         if (st.beams[i].key === key) return; // already running
     }
     var boss = scene.bossSprite;
-    var GH = scene.scale ? scene.scale.height : 480;
-    var topY = boss.y + fp.dy;
-    var h = Math.max(1, GH - topY);
-    var rect = scene.add.rectangle(boss.x + fp.dx, topY + h / 2, BEAM_WIDTH, h, 0x99ddff, 0.25);
-    rect.setDepth(44); // under the boss core, over the parts' playfield
-    rect.setScale(0.25, 1);
-    st.beams.push({ key: key, fp: fp, sprite: rect, topY: topY, age: 0, cooldown: 0 });
+    // Unit ellipse scaled per-frame — rescaling a solid fill is lossless,
+    // where resizing the shape's geometry is not.
+    var oval = scene.add.ellipse(boss.x + fp.dx, boss.y + fp.dy, 100, 100, 0xdd2233, 0.45);
+    oval.setDepth(44); // under the boss core, over the parts' playfield
+    oval.setScale(0, 0);
+    st.beams.push({ key: key, fp: fp, sprite: oval, age: 0, cooldown: 0 });
 }
 
 function updateDezaBeams(scene, st) {
     var boss = scene.bossSprite;
+    var GH = scene.scale ? scene.scale.height : 480;
+    var life = BEAM_LOOP_FRAMES * BEAM_LOOPS;
     for (var i = st.beams.length - 1; i >= 0; i--) {
         var beam = st.beams[i];
         beam.age++;
-        beam.sprite.x = boss.x + beam.fp.dx; // ride the boss sway
-        if (beam.age <= BEAM_WARN_FRAMES) {
-            beam.sprite.setAlpha(0.2 + 0.15 * Math.sin(beam.age * 0.5));
-        } else if (beam.age <= BEAM_WARN_FRAMES + BEAM_ON_FRAMES) {
-            beam.sprite.setScale(1, 1);
-            beam.sprite.setAlpha(0.65 + 0.15 * Math.sin(beam.age * 0.6));
-            if (beam.cooldown > 0) beam.cooldown--;
-            var player = scene.playerSprite;
-            if (player && beam.cooldown <= 0 && !scene.barrierActive &&
-                player.y > beam.topY &&
-                Math.abs(player.x - beam.sprite.x) < BEAM_WIDTH / 2 + 8) {
+        if (beam.age > life) {
+            beam.sprite.destroy();
+            st.beams.splice(i, 1);
+            continue;
+        }
+        var topY = boss.y + beam.fp.dy;
+        var shape = beamShape(beam.age, Math.max(60, GH - topY));
+        var cx = boss.x + beam.fp.dx;
+        var cy = topY + shape.h / 2; // top edge pinned at the fire point
+        beam.sprite.x = cx;
+        beam.sprite.y = cy;
+        beam.sprite.setScale(shape.w / 100, shape.h / 100);
+        // dither stand-in: translucent red with a shimmer, fading at the ends
+        var fade = Math.min(1, beam.age / 12, (life - beam.age) / 25);
+        beam.sprite.setFillStyle(0xdd2233, (0.4 + 0.1 * Math.sin(beam.age * 0.5)) * fade);
+        if (beam.cooldown > 0) beam.cooldown--;
+        var player = scene.playerSprite;
+        // no damage while the veil is still fading in/out — a nearly
+        // invisible full-size ellipse must not be a hitbox
+        if (player && fade > 0.6 && beam.cooldown <= 0 && !scene.barrierActive) {
+            var nx = (player.x - cx) / (shape.w / 2 + 8);
+            var ny = (player.y - cy) / (shape.h / 2 + 8);
+            if (nx * nx + ny * ny <= 1) {
                 beam.cooldown = 60;
                 scene.playerDamage(1);
             }
-        } else {
-            beam.sprite.destroy();
-            st.beams.splice(i, 1);
         }
     }
 }
@@ -623,6 +677,11 @@ export function updateDezaBoss(scene) {
         st.bandIdx = band;
         st.entryIdx = 0;
         st.entryAge = 0;
+        // The Saturn marks an HP-stage change with a whole-screen mosaic
+        // flourish; a camera flash is this engine's closest transition beat.
+        if (scene.cameras && scene.cameras.main) {
+            scene.cameras.main.flash(350, 255, 255, 255);
+        }
         activatePattern(scene, st, playlistPattern(b, band, 0));
     } else {
         st.entryAge++;
@@ -635,8 +694,10 @@ export function updateDezaBoss(scene) {
 
     var pattern = st.pattern;
     // The movement scripts are engine ROM the save does not carry; sway at
-    // the pattern's speed so a moving pattern reads as one.
-    if (pattern && pattern.moveSpeed > 0 && !scene.bossEntering) {
+    // the pattern's speed so a moving pattern reads as one. Script 0 is the
+    // editor's default and holds position — Ramsie's statue boss never moves,
+    // whatever speed its patterns carry — so only a nonzero script sways.
+    if (pattern && pattern.moveScript > 0 && pattern.moveSpeed > 0 && !scene.bossEntering) {
         var GW = scene.scale ? scene.scale.width : 256;
         var amp = Math.min(10 + pattern.moveSpeed * 8, (GW - boss.width) / 2);
         boss.x = GW / 2 + Math.sin(st.age * (0.006 + pattern.moveSpeed * 0.002)) * amp;
@@ -698,13 +759,18 @@ export function updateDezaBossPart(scene, part) {
     return true;
 }
 
-// Tear the fight down (boss death or scene cleanup).
-export function clearDezaBoss(scene) {
+// Tear the fight down. `explode` marks a real defeat (bossDie passes it):
+// the attached parts go up with the core — the Saturn blows the whole
+// assembly — where a scene cleanup removes them silently.
+export function clearDezaBoss(scene, explode) {
     var st = scene.dezaBossState;
     if (!st) return;
     for (var i = 0; i < st.parts.length; i++) {
         var part = st.parts[i];
-        if (part && part.active) removeDezaPart(scene, part);
+        if (part && part.active) {
+            if (explode && scene.showExplosion) scene.showExplosion(part.x, part.y);
+            removeDezaPart(scene, part);
+        }
     }
     st.parts = [];
     clearBeams(st);

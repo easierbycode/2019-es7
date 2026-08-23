@@ -238,14 +238,23 @@ export class PhaserGameScene extends Phaser.Scene {
         this.bossDueTick = this.dezaBg && dezaBossRow !== null
             ? Math.ceil(this.dezaBg.stopScroll / SCROLL_PX_PER_FRAME)
             : null;
+        // Boss rush (shortFlg) already emptied the waves; with an imported
+        // map the boss is ALSO gated on the scroll reaching its chamber, so
+        // jump the clock there — otherwise the fight starts over whatever
+        // scenery happens to be mid-map instead of the boss chamber.
+        if (gameState.shortFlg && this.bossDueTick !== null) {
+            this.worldTime = this.bossDueTick;
+        }
 
         // Second parallax layer, for the custom-enemy space background only: the
         // corridor sits over the starfield at partial alpha and scrolls faster,
         // so the stage reads as depth rather than as one flat tile. Added here,
         // before any gameplay object and with no depth of its own, so it stays
         // above the two background layers and below everything else.
+        // Not on an imported map: the save's own scenery is complete, and the
+        // stock circuit pattern washing over it at 0.6 alpha reads as haze.
         this.stageBgOverlay = null;
-        if (gameState.hasCustomEnemies && this.textures.exists("stage_over_c")) {
+        if (gameState.hasCustomEnemies && !this.dezaBg && this.textures.exists("stage_over_c")) {
             this.stageBgOverlay = this.add.tileSprite(0, 0, GW, GH, "stage_over_c");
             this.stageBgOverlay.setOrigin(0, 0);
             this.stageBgOverlay.setAlpha(0.6);
@@ -427,7 +436,9 @@ export class PhaserGameScene extends Phaser.Scene {
     }
 
     createCover() {
-        if (!this.textures.getFrame("game_asset", "stagebgOver.gif")) {
+        // An imported map plays with the save's own scenery, clean — the
+        // stock pattern overlay does not exist on the Saturn's screen.
+        if (this.dezaBg || !this.textures.getFrame("game_asset", "stagebgOver.gif")) {
             this.coverOverlay = null;
             return;
         }
@@ -1361,7 +1372,10 @@ export class PhaserGameScene extends Phaser.Scene {
         }
 
         // --- Boss timer ---
-        if (this.bossTimerStartFlg) {
+        // God mode exists to watch a whole boss fight; the 99s timer would
+        // eject the author (and a Continue would flip continueCnt, changing
+        // which boss spawns) — hold it while the flag is on.
+        if (this.bossTimerStartFlg && !gameState.godFlg) {
             this.bossTimerFrameCnt += step;
             if (this.bossTimerFrameCnt >= 1000) {
                 this.bossTimerFrameCnt -= 1000;
