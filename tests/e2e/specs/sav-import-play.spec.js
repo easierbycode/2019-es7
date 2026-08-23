@@ -1,6 +1,7 @@
 "use strict";
 const path = require("path");
 const { test, expect } = require("@playwright/test");
+const { bootGameScene, waitForStageStart } = require("../helpers/phaser-game");
 
 const RAMSIE = path.resolve(__dirname, "..", "..", "..", "tools", "dezaemon-import", "fixtures", "ramsie.sav");
 
@@ -39,18 +40,7 @@ test("an imported save plays with its own enemy art, not game_asset frame 0", as
     });
     await page.evaluate(() => storeAtlasForViewers());
 
-    await gamePage.goto("/phaser-game.html?editorPlay=1&stage=0&lowmode=1");
-    await expect.poll(() => gamePage.evaluate(() => {
-        const g = window.__PHASER_4_GAME__;
-        if (!g) return "booting";
-        const now = g.loop ? g.loop.time : 0;
-        if (window.__lastLoopTime === now && g.loop) {
-            for (let i = 0; i < 20; i++) g.loop.step(performance.now() + i * 16.7);
-        }
-        window.__lastLoopTime = now;
-        const active = g.scene.getScenes(true).map((s) => s.scene.key);
-        return active.includes("PhaserGameScene") ? "PhaserGameScene" : active.join(",") || "none";
-    }), { timeout: 210_000, intervals: [1000] }).toBe("PhaserGameScene");
+    await bootGameScene(gamePage, "/phaser-game.html?editorPlay=1&stage=0&lowmode=1");
 
     // Every frame the imported enemies ask for resolves in the runtime atlas...
     const resolved = await gamePage.evaluate((keys) => {
@@ -74,6 +64,11 @@ test("an imported save plays with its own enemy art, not game_asset frame 0", as
     // ...and folding the editor atlas in must not cost the stock art.
     expect(resolved.stockPlayerPresent).toBe(true);
     expect(resolved.stockShotPresent).toBe(true);
+
+    // Waves are paced off the world clock, which only starts once the stage
+    // intro hands over to play — and the intro cannot finish inside a stepping
+    // burst, see helpers/phaser-game.
+    await waitForStageStart(gamePage);
 
     // Run the stage far enough to spawn, then check the enemies on screen are
     // drawn from the save's frames rather than all collapsing onto one.
@@ -132,18 +127,7 @@ test("switching the editor to another atlas does not strip the imported art from
     await page.evaluate(() => storeAtlasForViewers());
 
     const gamePage = await context.newPage();
-    await gamePage.goto("/phaser-game.html?editorPlay=1&stage=0&lowmode=1");
-    await expect.poll(() => gamePage.evaluate(() => {
-        const g = window.__PHASER_4_GAME__;
-        if (!g) return "booting";
-        const now = g.loop ? g.loop.time : 0;
-        if (window.__lastLoopTime === now && g.loop) {
-            for (let i = 0; i < 20; i++) g.loop.step(performance.now() + i * 16.7);
-        }
-        window.__lastLoopTime = now;
-        const active = g.scene.getScenes(true).map((s) => s.scene.key);
-        return active.includes("PhaserGameScene") ? "PhaserGameScene" : active.join(",") || "none";
-    }), { timeout: 210_000, intervals: [1000] }).toBe("PhaserGameScene");
+    await bootGameScene(gamePage, "/phaser-game.html?editorPlay=1&stage=0&lowmode=1");
 
     const resolved = await gamePage.evaluate((keys) => {
         const s = window.__PHASER_4_GAME__.scene.getScene("PhaserGameScene");

@@ -1,6 +1,7 @@
 "use strict";
 const path = require("path");
 const { test, expect } = require("@playwright/test");
+const { bootGameScene, waitForStageStart } = require("../helpers/phaser-game");
 
 // The editor side of the DAIOH import is covered by sav-import-daioh.spec.js.
 // This one proves the runtime actually plays what the importer now emits: a
@@ -9,21 +10,6 @@ const { test, expect } = require("@playwright/test");
 const DAIOH = path.resolve(__dirname, "..", "..", "..", "dev-fixtures", "Dezaemon 2 (DAIOH).sav");
 const SLOT = 1;        // the 2nd save — nine stages
 const LAST_STAGE = 8;
-
-async function bootGameScene(gamePage, url) {
-    await gamePage.goto(url);
-    await expect.poll(() => gamePage.evaluate(() => {
-        const g = window.__PHASER_4_GAME__;
-        if (!g) return "booting";
-        const now = g.loop ? g.loop.time : 0;
-        if (window.__lastLoopTime === now && g.loop) {
-            for (let i = 0; i < 20; i++) g.loop.step(performance.now() + i * 16.7);
-        }
-        window.__lastLoopTime = now;
-        const active = g.scene.getScenes(true).map((s) => s.scene.key);
-        return active.includes("PhaserGameScene") ? "PhaserGameScene" : active.join(",") || "none";
-    }), { timeout: 210_000, intervals: [1000] }).toBe("PhaserGameScene");
-}
 
 test("the ninth stage of an imported save plays, with its own wide-grid enemies", async ({ page, context }) => {
     page.on("dialog", (d) => d.accept());
@@ -95,11 +81,7 @@ test("the ninth stage of an imported save plays, with its own wide-grid enemies"
 
     // Wait out the stage intro (the final stage plays the "new challenger"
     // sting first), or the sampling window can open before the first wave.
-    await expect.poll(() => gamePage.evaluate(() => {
-        const g = window.__PHASER_4_GAME__;
-        for (let i = 0; i < 40; i++) g.loop.step(performance.now() + i * 16.7);
-        return g.scene.getScene("PhaserGameScene").gameStarted;
-    }), { timeout: 60_000 }).toBe(true);
+    await waitForStageStart(gamePage);
 
     // Run it: enemies spawn from the save's art, spread across the full grid
     // width rather than the leftmost eight columns.
@@ -176,6 +158,10 @@ test("stage 0 plays the save's scenery and decoded behaviors", async ({ page, co
     expect(scenery.mapHeight).toBe(768 * 16);
     expect(scenery.strips).toBe(6);       // 768 rows in 128-row strips
     expect(scenery.stockHidden).toBe(true);
+
+    // The world clock only starts once the stage intro hands over to play, and
+    // the intro cannot finish inside a stepping burst — see helpers/phaser-game.
+    await waitForStageStart(gamePage);
 
     // Run the stage: the clock ticks, the map scrolls, and the decoded
     // channels actually transform sprites on screen.
