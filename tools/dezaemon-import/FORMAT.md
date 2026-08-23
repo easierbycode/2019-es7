@@ -191,7 +191,7 @@ assembly, 音まろ music, ポリ吉 3D):
 |---------|---------|--------|
 | sec0–3  | **CG art pages 1–4**: each a headerless **128×512** 8bpp bitmap stored as 256 consecutive 16×16-px cells of 256 B (cell t at t·256; in-cell offset = y·16+x; **8 cells per row**). Pixel byte = `(palette<<4) \| colorIndex` — the high nibble *is* the palette selector, so no external sprite-attribute table exists. Byte 0x00 = background; empty cells are zero-filled. | confirmed |
 | sec4    | **Palette bank**: 16 palettes × 16 colors, u16be RGB555 (R bits 0–4, G 5–9, B 10–14, bit15 = CRAM RGB-mode flag). Rows 0–11 (0x000–0x17F) = 12 preset ramps, byte-identical across all games, bit15 clear; rows 12–15 (0x180–0x1FF) = the 4 user palettes (= the editor's "192 system + 64 user colors"), stored `0x8000\|color`, 0x0000 empty. u16[0] varies per game (meaning open). | confirmed |
-| sec5    | **Game assembly data** (組み子さん) — see the sec5 region map below. Regions are proven from engine-code multiplications and tile exactly; the **background tilemap** (`+0x00000`) is fully decoded, other regions' record fields are open. | partial |
+| sec5    | **Game assembly data** (組み子さん) — see the sec5 region map below. Regions are proven from engine-code multiplications and tile exactly; the background tilemap, placement grid, enemy records, boss record and sprite composition banks are decoded, the scroll curve's field meaning and parts of the settings block remain open. | mostly decoded |
 | sec6    | **BGM**: 24 song slots × 4,228 B (disc `M_DATA*` presets match verbatim). Song = 4-byte header + **32 measures × 132 B**, each measure = 4 control bytes + **4 parts × 32 steps**, part-major. Step: 0x00 empty, 0x01–0x3B note (~5 octaves), 0x80–0x88 sustain. | confirmed |
 | sec7    | **3D models** (ポリ吉): u32be magic `0x12345678` (absent = never opened the 3D editor; section then all-zero or residual RAM — ELFI's "custom" sec7 is just uninitialized garbage), then 16 model slots × 328 B (u16be part count 0–9, u16be model color, 9 part records × 36 B: u16 shape descriptor, s32be 16.16 X/Y/Z position, s16be rotations (65536=360°), s32be signed 16.16 scales, negative = mirror), then 576 residual bytes. POLYKITI.bin literal pools confirm (HWRAM working base `0x06097E90`, stride 0x148, end 0x1484). | confirmed |
 
@@ -206,17 +206,49 @@ literal pools; they tile the 396,640 bytes exactly, with no gaps:
 | `+0x34800` | 10 × `0xC0` | **Per-stage scroll curve**: 192 bytes, one per 4 map rows (64 px of scroll). Values move in long runs and ramp down through the stage; the non-zero extent tracks the stage's used rows (`lastNonZero ≈ lastUsedRow/4`, always slightly short of it). Not a record array — no stride shows column specialisation. | decoded (shape), field meaning open |
 | `+0x34F80` | 10 × `0x3C00` | **Object placement grid**: 20 columns × 768 rows of *bytes* over the 320-px screen (the 224-px playfield sits at columns 3–16), sharing the background's rows and 48-part division. See the id table below. | **decoded** |
 | `+0x5A780` | `0x60` | **Global settings** — see the byte map below | mostly decoded |
-| `+0x5A7E0` | 10 × `0x478` | **Per-stage enemy definitions**: 60 records × 18 B (`0x438`) + a `0x40` trailer the engine indexes separately. Record N defines the Nth zako id. | **located**; internal fields partly characterised |
+| `+0x5A7E0` | 10 × `0x478` | **Per-stage enemy definitions**: 60 records × 18 B (`0x438`) + the `0x40` **boss record** trailer. Record N defines the Nth zako id — see "Enemy record" and "Boss record" below. | **decoded** |
 | `+0x5D490` | `0x1D0` | **Global sprite composition bank**: 232 u16be cell refs (player ship frames, bullets, item icons, explosions, the drawn title logo, credit glyphs) | decoded (structure) |
-| `+0x5D660` | 10 × `0x580` | **Per-stage sprite composition**: 704 u16be cell refs = 11 character slots × 64. The slots are the 7 zako classes (placement id high nibble `0x8`–`0xE`) then the 4 boss classes. A class's 64 refs split evenly among its ids, four animation frames each; a frame's cells form a rectangle read row-major, its shape given by page adjacency (`+1` = wider, `+8` = taller). | **decoded** |
+| `+0x5D660` | 10 × `0x580` | **Per-stage sprite composition**: 704 u16be cell refs — the flat bank GAME.CMP's stage-art VRAM upload walks slot by slot. Records 0–59 map onto seven art bands, the last 64 refs (`+0x500`) are the boss core; layout below. | **engine-traced** |
 
-Per-class geometry, from the id counts:
+The bank layout is engine-traced (2026-08-22), replacing an earlier geometry
+guessed from the placement-id counts. GAME.bin's stage-art VRAM upload
+routine (file `+0x4000`; engine addr = `0x06064000` + file offset throughout)
+walks a flat char-slot table at `0x0608C070` (file `+0x28070`; entries =
+u16 geometry index, u16 bank byte offset), taking each slot's pixel size from
+a geometry table at `0x06089CFC` (file `+0x25CFC`, 8-byte entries
+`(w, h, vramOff, words)`). Slots 0–211 — every zako frame — upload
+unconditionally; slots 212–220 are the boss core, selected through a
+per-class `(start, end)` pair table (file `+0x20528`:
+`[[0,4],[4,6],[6,8],[8,9]]` over base 212). Those tables pin the whole
+`0x580` bank (decoder: `lib/decode/decode-sprites.js`):
 
-| class | `0x8` | `0x9` | `0xA` | `0xB` | `0xC` | `0xD` | `0xE` |
-|-------|------|------|------|------|------|------|------|
-| ids | 16 | 8 | 8 | 16 | 4 | 4 | 4 |
-| refs/id | 4 | 8 | 8 | 4 | 16 | 16 | 16 |
-| cells/frame | 1 | 2 | 2 | 1 | 4 | 4 | 4 |
+| records | frames | frame size | bank bytes |
+|---------|--------|------------|------------|
+| 0–15    | 4 | 16×16 | `0x000`–`0x07F` |
+| 16–23   | 4 | 32×16 | `0x080`–`0x0FF` |
+| 24–31   | 4 | 16×32 | `0x100`–`0x17F` |
+| 32–47   | 4 | 32×32 | `0x180`–`0x37F` |
+| 48–51   | 2 | 64×32 | `0x380`–`0x3FF` |
+| 52–55   | 2 | 32×64 | `0x400`–`0x47F` |
+| 56–59   | 1 | 64×64 | `0x480`–`0x4FF` |
+| boss core | per class | see below | `0x500`–`0x57F` |
+
+Slot-count check: 64+32+32+64+8+8+4 = 212 = the upload loop's bound = the
+boss-slot base, so the map accounts for every ref. The superseded "11
+character slots × 64 refs" model was wrong past `0x180`: records 32–47 are
+32×32 4-cell frames (not 16×16 1-cell), records 48–59 are large 2- and
+1-frame sprites (not 4-frame 2×2), and its "boss art at the (7+class)th
+64-ref slot" read the wrong region entirely. The "eight" 64×32 and 32×64
+pieces are really 4 parts × 2 animation frames each (sprite stride 2).
+
+**Boss core**: the placement id's size class (`0xF0`–`0xF3`) picks the
+geometry — F0 = four 64×64 frames, F1 = two 128×64, F2 = two 64×128, F3 =
+one 128×128 — and all four classes read the SAME 64 refs at `+0x500`. Core
+frames wider than 4 cells store their refs as 4×4-cell (64×64 px) sub-blocks
+in reading order (class 1: [left][right]; class 3: four quadrants), cells
+row-major inside each block. Corpus stats (262 saves, 1,664 placed bosses):
+classes F0–F3 occur 804/258/209/393 times, with painted cores in
+63.6%/95.0%/94.3%/95.7% of placements.
 
 Unused slots point every ref at the CG editor's unpainted-cell placeholder
 (the most-referenced cell in the bank by an order of magnitude), so extraction
@@ -225,8 +257,15 @@ places the same enemy. On DAIOH this resolves 204 of 215 placed ids directly
 and the rest via fallback, yielding its aircraft, jets and capsules with their
 4-frame animations.
 
-Composition words use the same encoding as the background map: `0xFFFF` =
-empty, else bit15/bit14 = flips and bits 0–9 = CG cell index. The two banks
+Composition words: `0xFFFF` = empty, else bits 0–9 = CG cell index and
+**bit14 = H-flip, bit15 = V-flip** — the OPPOSITE of the background tilemap's
+bit15 H / bit14 V (sprites go through VDP1 draw commands, the map through
+VDP2 pattern names). An earlier revision claimed the banks used "the same
+encoding as the background map"; that was inherited by analogy, never
+validated, and is wrong. Evidence: a corpus render sweep — every mirror-pair
+composition (pervasive in boss and large art) composes only under bit14 = H,
+a 4-fold-symmetric core in Mucha Kucha Fighter exercises both bits at once,
+and there are zero counter-examples across the 262 saves. The two banks
 close the section exactly (`0x5D490 + 232·2 = 0x5D660`; `0x5D660 + 10·1408 =
 0x60D60`), and both bases are SH-2 literals in the engine.
 
@@ -431,6 +470,52 @@ Background-map occupancy recovers each game's stage count, cross-checked by
 the disc's per-stage `DEMO_?N.BIN` recordings: Ramsie 5 stages (31/29/46/32/12
 parts used), Gust 6, DAIOH 5 + a 12-part stage 6, Devil Blade 2 up to 10.
 
+### Boss record — the 0x40 trailer (decoded 2026-08-22)
+
+The `0x40` trailer after each stage's 60 enemy records IS the boss record.
+Traced from GAME.CMP's boss routines — spawn init `+0x1AC20`, pattern
+activation `+0x1A878`, HP-stage advance `+0x1ABD4`, per-frame dispatcher
+`+0x1BDCC`, death init `+0x1B330`, fire executor `+0x19FF4` (GAME.bin file
+offsets; the engine reaches the trailer through the pointer global
+`0x0609890C`) — and cross-checked against KUMITATE's boss editor (file
+`+0x10F00`–`+0x14B00`), whose field writers confirm every mask. Decoder:
+`lib/decode/decode-boss.js`.
+
+| Byte | Field |
+|------|-------|
+| 0 | bits0-1 core **size class** (placement id `0xF0`–`0xF3`); bits4-5 **HP-stage count** − 1; bit6 rotate-in-place; bit7 death-FX spin variant |
+| 1 | bits0-2 **hp** index → u32 `[1024000, 1536000, 2304000, 3328000, 4608000, 6144000, 7936000, 9984000]` (`+0x21F40`); bit3 option flag, stored **inverted** by the editor; bits4-6 **score** index → `[5000, 10000, 20000, 50000, 100000, 200000, 500000, 1000000]` (`+0x21F00`) |
+| 2–5 | **pattern playlist**: byte 2+k = HP stage k's loop of four 2-bit pattern ids, consumed LSB-first. HP stages split the HP bar into equal bands; a band change advances to the next byte — the editor's "16-entry phase loop" is these 4 bytes × 4 entries |
+| 6 / 7 | **arrival / death** behavior selectors (velocity presets and scroll-stop position); carried raw |
+| 8–63 | 4 **pattern records** × 14 B |
+
+Pattern record: byte +0 bits3-7 = **movement script** 0–31 (engine-fixed
+script data at `+0x252D4`–`+0x25A18`, pointer table `+0x25A18`), bits0-2 =
+speed; byte +1 bits0-2 = **fire-tick divider** → frames per fire tick
+`[60,30,15,10,5,3,2,1]` (`+0x21EE8`); then 3 **fire points** of
+`[dx.s8, dy.s8, rate<<4|type, param]`, dx/dy relative to the boss centre.
+Fire point types:
+
+| type | Meaning |
+|------|---------|
+| 0–2 | bullet weapon A/B/C — param bits0-3 = shot function 0–12 (pointer table `+0x22074`), bit4 = aimed at the player, bits5-7 = extra arg |
+| 3 | **respawning mobile part** |
+| 4 | **one-shot static part**/turret, spawned immediately on pattern activation |
+| 5 / 6 | special attacks (**beam** / **flame**; period table `+0x21FA0`) |
+
+Types 3/4 spawn a destructible object at (bossX+dx, bossY+dy) drawing its
+art from param: bits4-6 = art group (0–3 = the four zako bands, 4–6 = the
+64×32 / 32×64 / 64×64 bands), bits0-3 = piece; the engine's spriteIndex =
+charSlot + 67.
+
+Worked example — Ramsie stage 0 (trailer at sec5 `+0x5A7E0 + 0x438`): class
+F2, hp 4,608,000, score 20,000, 4 HP stages, first-band playlist 0,0,1,1.
+Pattern 0 spawns two one-shot turret parts with 32×32 art at (−32,+28) and
+(+30,+28) and runs the type-5 beam at (0,−25); the 64×64 figure pieces only
+appear in patterns 2/3 (HP ≤ 50%). The chamber goddess is background art —
+there is no giant boss sprite, which is why the boss placement row "lands
+exactly on the boss-chamber artwork" (see Placement ids above).
+
 ### Live LWRAM map (from SH-2 disassembly of 0KERNEL/S_OPT/GAME/KUMITATE)
 
 Sections live contiguously at: sec0 `0x00200000`, sec1 `0x00210000`, sec2
@@ -443,7 +528,9 @@ decompresses straight to `0x00200000`). The LZSS decompressor core is at
 save-image builder live in S_OPT.bin (staging `0x002C8A84`, 0x6C header =
 {checksumSum, base, endPtr} + 8 × {byte-sum, absAddr, compSize}; save blocks
 shown = (end−base+32)>>6). Editor overlays load to HWRAM `0x06064000` via 18
-kernel loader stanzas; MDLDT models decompress to scratch `0x002F0000`;
+0x40-byte kernel loader stanzas (GAME's at kernel file `+0x5410`;
+GAME/KUMITATE/S_OPT all target the same base — overlays swap); MDLDT models
+decompress to scratch `0x002F0000`;
 DEMO recordings load raw at `0x002FF000`; sec6 song pointer = songIdx ×
 0x1084 + sec6 base (engine proof of the 24×4,228 grid); the play engine
 fetches CG cells as cellIndex×256 from `0x00200000` into VDP1 VRAM.
@@ -451,7 +538,8 @@ fetches CG cells as cellIndex×256 from `0x00200000` into VDP1 VRAM.
 Known editor facts to guide the sec5 field map (GameFAQs editor FAQ +
 Dezaemon DB): up to 10 stages × 48 map screens with spatial enemy placement;
 7 zako size classes (16×16 up to 128×128, 1–6 anim frames); 4 boss classes
-with 4 patterns × 3 fire points and 16-entry phase loops; 3 global bullet
+with 4 patterns × 3 fire points and 16-entry phase loops (both now decoded —
+see the bank layout and "Boss record" above); 3 global bullet
 types + 2 blast anims; weapons 7 main / 7 sub / 7 bomb / 3 charge; 8 item
 slots; titles are **drawn** (TITLE 1/2 tile compositions + 15-slot entrance
 effect sequencer) — which is why no title text exists anywhere in the data.

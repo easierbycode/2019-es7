@@ -1,89 +1,149 @@
 // Dezaemon 2 enemy sprite extraction.
 //
 // Each stage's sprite composition bank (sec5 + 0x5D660 + stage*0x580) holds
-// 704 u16be cell refs = 11 slots x 64. The slots are the game's 11 character
-// classes: seven zako classes (placement id high nibble 0x8..0xE) followed by
-// the four boss size classes.
+// 704 u16be cell refs. The layout is engine-traced, not guessed: GAME.CMP's
+// stage-art upload routine (file +0x4000, loads at 0x06068000) walks a flat
+// 221-entry char-slot table (0x0608C070) of (geometry index, bank byte
+// offset) pairs, with per-slot pixel sizes in a geometry table (0x06089CFC).
+// Those tables pin the whole bank:
 //
-// A class's 64 refs are split evenly among that class's ids, and each id gets
-// four animation frames:
+//   records  frames  frame size  bank bytes
+//   0-15     4       16x16       0x000-0x07F
+//   16-23    4       32x16       0x080-0x0FF
+//   24-31    4       16x32       0x100-0x17F
+//   32-47    4       32x32       0x180-0x37F
+//   48-51    2       64x32       0x380-0x3FF
+//   52-55    2       32x64       0x400-0x47F
+//   56-59    1       64x64       0x480-0x4FF
+//   boss     (class) see below   0x500-0x57F
 //
-//   class  0x8  0x9  0xA  0xB  0xC  0xD  0xE
-//   ids     16    8    8   16    4    4    4
-//   refs/id  4    8    8    4   16   16   16
-//   cells/frame  1    2    2    1    4    4    4
+// The last 64 refs are the boss core, and the placement id's size class
+// (0xF0-0xF3) picks its geometry via the engine's (start,end) pair table
+// (slots 212-220): F0 = four 64x64 frames, F1 = two 128x64, F2 = two 64x128,
+// F3 = one 128x128. A frame's cells are read row-major at its fixed width.
 //
-// A frame's cells are laid out as a rectangle read row-major. Its shape comes
-// from the page geometry rather than a table: the CG page is 8 cells wide, so
-// a second cell at +1 means the frame is two cells wide and one at +8 means it
-// is two cells tall; four cells are always 2x2. Rendering DAIOH this way
-// yields its recognisable aircraft, jets and capsules animating over 4 frames.
+// Composition words: bits 0-9 = CG cell index, bit14 = H-flip, bit15 =
+// V-flip, 0xFFFF = empty. Note the flip bits are the OPPOSITE of the
+// background tilemap's (bit15 H / bit14 V) — sprites go through VDP1 draw
+// commands, the map through VDP2 pattern names. Verified by rendering: the
+// sprite banks' pervasive mirror pairs only compose under bit14 = H.
 //
 // Environment-neutral ESM (Node + browser).
 
-import { cellIndexed, indexedToRgba, CG_CELL_DIM, CG_CELLS_PER_ROW } from "./decode-cg.js";
-import { SEC5_REGIONS, ZAKO_GROUPS } from "./decode-stage.js";
+import { cellIndexed, indexedToRgba, CG_CELL_DIM } from "./decode-cg.js";
+import { SEC5_REGIONS } from "./decode-stage.js";
 
-export const SPRITE_CLASSES = 11;
-export const REFS_PER_CLASS = 64;
-export const FRAMES_PER_ENEMY = 4;
-// ids per zako class, indexed by (placement id high nibble - 8)
-export const IDS_PER_CLASS = [16, 8, 8, 16, 4, 4, 4];
+// Per-record art bands: `first` record, id `count`, animation `frames`, and
+// frame size in cells. Byte offsets follow from the running total.
+export const RECORD_ART = [
+    { first: 0, count: 16, frames: 4, w: 1, h: 1, base: 0x000 },
+    { first: 16, count: 8, frames: 4, w: 2, h: 1, base: 0x080 },
+    { first: 24, count: 8, frames: 4, w: 1, h: 2, base: 0x100 },
+    { first: 32, count: 16, frames: 4, w: 2, h: 2, base: 0x180 },
+    { first: 48, count: 4, frames: 2, w: 4, h: 2, base: 0x380 },
+    { first: 52, count: 4, frames: 2, w: 2, h: 4, base: 0x400 },
+    { first: 56, count: 4, frames: 1, w: 4, h: 4, base: 0x480 },
+];
+
+// Boss core geometry per placement size class (0xF0 + class).
+export const BOSS_CORE_OFFSET = 0x500;
+export const BOSS_CORE_GEOM = [
+    { frames: 4, w: 4, h: 4 }, // F0: four 64x64
+    { frames: 2, w: 8, h: 4 }, // F1: two 128x64
+    { frames: 2, w: 4, h: 8 }, // F2: two 64x128
+    { frames: 1, w: 8, h: 8 }, // F3: one 128x128
+];
+
 export const EMPTY_REF = 0xffff;
 
-// Record index -> {class, slot} using the same ordering as ZAKO_GROUPS.
-export function recordToClassSlot(record) {
-    let base = 0;
-    for (let cls = 0; cls < IDS_PER_CLASS.length; cls++) {
-        const n = IDS_PER_CLASS[cls];
-        if (record < base + n) return { cls, slot: record - base };
-        base += n;
+// Record index -> its art band, or null past the 60 zako records.
+export function recordArt(record) {
+    for (const band of RECORD_ART) {
+        if (record >= band.first && record < band.first + band.count) return band;
     }
     return null;
 }
 
-// Read one enemy's frames out of a stage's composition bank.
-// Returns null when the class holds no art for that slot.
-export function readEnemyFrames(sec5, stage, record) {
-    const pos = recordToClassSlot(record);
-    if (!pos) return null;
-    const { offset, stride } = SEC5_REGIONS.spriteStages;
-    const base = offset + stage * stride;
-    const refsPerId = REFS_PER_CLASS / IDS_PER_CLASS[pos.cls];
-    const cellsPerFrame = refsPerId / FRAMES_PER_ENEMY;
-    const start = pos.cls * REFS_PER_CLASS + pos.slot * refsPerId;
+// Kept for callers that still think in (class, slot): the class is the art
+// band index, the slot the record's position inside it.
+export function recordToClassSlot(record) {
+    const band = recordArt(record);
+    if (!band) return null;
+    return { cls: RECORD_ART.indexOf(band), slot: record - band.first };
+}
 
+function decodeWord(word) {
+    return {
+        empty: word === EMPTY_REF,
+        cell: word & 0x3ff,
+        hflip: (word & 0x4000) !== 0,
+        vflip: (word & 0x8000) !== 0,
+    };
+}
+
+function readWords(sec5, stage, byteOffset, count) {
+    const { offset, stride } = SEC5_REGIONS.spriteStages;
+    const base = offset + stage * stride + byteOffset;
     const words = [];
-    for (let k = 0; k < refsPerId; k++) {
-        const at = base + (start + k) * 2;
+    for (let k = 0; k < count; k++) {
+        const at = base + k * 2;
         words.push((sec5[at] << 8) | sec5[at + 1]);
     }
+    return words;
+}
+
+// Read one enemy's frames out of a stage's composition bank.
+// Returns null when the record holds no art there.
+export function readEnemyFrames(sec5, stage, record) {
+    const band = recordArt(record);
+    if (!band) return null;
+    const cellsPerFrame = band.w * band.h;
+    const byteOffset = band.base + (record - band.first) * band.frames * cellsPerFrame * 2;
+    const words = readWords(sec5, stage, byteOffset, band.frames * cellsPerFrame);
     if (words.every((w) => w === EMPTY_REF)) return null;
 
-    // Frame shape from page adjacency (page is CG_CELLS_PER_ROW cells wide).
-    let w = 1;
-    let h = 1;
-    if (cellsPerFrame === 2) {
-        const a = words[0] & 0x3ff;
-        const b = words[1] & 0x3ff;
-        if (b === a + 1) { w = 2; h = 1; } else { w = 1; h = 2; }
-    } else if (cellsPerFrame === 4) {
-        w = 2;
-        h = 2;
-    }
-
     const frames = [];
-    for (let f = 0; f < FRAMES_PER_ENEMY; f++) {
-        const cells = words.slice(f * cellsPerFrame, (f + 1) * cellsPerFrame).map((word) => ({
-            empty: word === EMPTY_REF,
-            cell: word & 0x3ff,
-            hflip: (word & 0x8000) !== 0,
-            vflip: (word & 0x4000) !== 0,
-        }));
+    for (let f = 0; f < band.frames; f++) {
+        const cells = words.slice(f * cellsPerFrame, (f + 1) * cellsPerFrame).map(decodeWord);
         if (cells.every((c) => c.empty)) continue;
-        frames.push({ w, h, cells });
+        frames.push({ w: band.w, h: band.h, cells });
     }
-    return frames.length ? { record, cls: pos.cls, slot: pos.slot, w, h, frames } : null;
+    return frames.length ? { record, w: band.w, h: band.h, frames } : null;
+}
+
+// A core frame's refs are stored as 4x4-cell (64x64 px) sub-blocks in
+// reading order, cells row-major inside each block — for class 1 a frame is
+// [left block][right block], for class 3 the four quadrants. Classes 0 and 2
+// are one block wide, where block order coincides with plain row-major
+// (which is why single-save evidence never exposed the difference; the
+// corpus's class 1/3 cores only compose this way).
+export function coreCellOrder(w, h) {
+    const order = [];
+    const blocksPerRow = w / 4;
+    for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+            const block = (y >> 2) * blocksPerRow + (x >> 2);
+            order.push(block * 16 + (y & 3) * 4 + (x & 3));
+        }
+    }
+    return order;
+}
+
+// Read one stage's boss core for a given size class, or null when unpainted.
+export function readBossCore(sec5, stage, sizeClass) {
+    const geom = BOSS_CORE_GEOM[sizeClass & 3];
+    const cellsPerFrame = geom.w * geom.h;
+    const words = readWords(sec5, stage, BOSS_CORE_OFFSET, geom.frames * cellsPerFrame);
+    if (words.every((w) => w === EMPTY_REF)) return null;
+    const order = coreCellOrder(geom.w, geom.h);
+    const frames = [];
+    for (let f = 0; f < geom.frames; f++) {
+        const frameWords = words.slice(f * cellsPerFrame, (f + 1) * cellsPerFrame);
+        const cells = order.map((i) => decodeWord(frameWords[i]));
+        if (cells.every((c) => c.empty)) continue;
+        frames.push({ w: geom.w, h: geom.h, cells });
+    }
+    return frames.length ? { stage, sizeClass, w: geom.w, h: geom.h, frames } : null;
 }
 
 // Rasterise one frame to RGBA using the CG pages and palette bank.
@@ -206,7 +266,8 @@ export function extractEnemySprites(sec5, sections, palettes, enemies, stagesPla
 // DISTINCT cell any used stage references, and (b) a compact per-stage grid of
 // words that index that list (bits 0-9 ordinal, bit15 hflip, bit14 vflip,
 // 0xFFFF empty). Flips stay in the grid, so a cell mirrored both ways still
-// costs one sprite.
+// costs one sprite. (The map keeps the VDP2 bit order — bit15 = H — unlike
+// the sprite banks above.)
 //
 // Returns {cells: [{key,w,h,rgba}], stages: [{rows, words: Uint16Array}|null]}
 // where words is rows*14 long and `rows` is trimmed to the last non-empty row.
@@ -249,61 +310,95 @@ export function extractBackgroundCells(backgrounds, sections, palettes, stageCou
 }
 
 // --- Bosses -----------------------------------------------------------
-//
-// The composition bank's last four slots are the four boss size classes. Each
-// gets the full 64 refs, so a boss frame is 16 cells — a 4x4 rectangle of
-// 16x16 cells, 64x64 px — and there are four of them, same as a zako.
 
-export const BOSS_CLASS_BASE = 7;
-export const BOSS_CELLS_PER_FRAME = REFS_PER_CLASS / FRAMES_PER_ENEMY; // 16
-export const BOSS_FRAME_CELLS = 4; // 4x4
-
-// Read one stage's boss art for a given size class, or null when unpainted.
-export function readBossFrames(sec5, stage, sizeClass) {
-    const { offset, stride } = SEC5_REGIONS.spriteStages;
-    const base = offset + stage * stride;
-    const start = (BOSS_CLASS_BASE + sizeClass) * REFS_PER_CLASS;
-    const words = [];
-    for (let k = 0; k < REFS_PER_CLASS; k++) {
-        const at = base + (start + k) * 2;
-        words.push((sec5[at] << 8) | sec5[at + 1]);
-    }
-    if (words.every((w) => w === EMPTY_REF)) return null;
-    const frames = [];
-    for (let f = 0; f < FRAMES_PER_ENEMY; f++) {
-        const cells = words
-            .slice(f * BOSS_CELLS_PER_FRAME, (f + 1) * BOSS_CELLS_PER_FRAME)
-            .map((word) => ({
-                empty: word === EMPTY_REF,
-                cell: word & 0x3ff,
-                hflip: (word & 0x8000) !== 0,
-                vflip: (word & 0x4000) !== 0,
-            }));
-        if (cells.every((c) => c.empty)) continue;
-        frames.push({ w: BOSS_FRAME_CELLS, h: BOSS_FRAME_CELLS, cells });
-    }
-    return frames.length ? { stage, sizeClass, w: BOSS_FRAME_CELLS, h: BOSS_FRAME_CELLS, frames } : null;
-}
-
-// Sprites for every stage that places a boss.
+// Sprites for every stage that places a boss: the class-sized core frames.
+// A stage whose author left the core unpainted (Ramsie stage 0) fights with
+// trailer-attached parts over the chamber scenery instead; the runtime's boss
+// is a single sprite, so such a stage falls back to its 64x64 figure pieces
+// (records 56-59) — the boss's own late-phase forms — one frame per piece,
+// capped at two so the sprite doesn't cycle through unrelated parts.
 // `bosses` is [{stage, sizeClass}]; returns {sprites, spriteKeysByStage}.
 export function extractBossSprites(sec5, sections, palettes, bosses) {
     const sprites = [];
     const spriteKeysByStage = new Map();
     const placeholder = findPlaceholderCell(sec5).cell;
-    for (const { stage, sizeClass } of bosses) {
-        const art = readBossFrames(sec5, stage, sizeClass);
-        if (!art || isUnpainted(art, placeholder)) continue;
+    const emit = (stage, frames, core) => {
         const keys = [];
-        art.frames.forEach((frame, i) => {
+        frames.forEach((frame) => {
             const { w, h, rgba } = renderFrame(sections, palettes, frame);
             let opaque = false;
             for (let p = 3; p < rgba.length; p += 4) if (rgba[p]) { opaque = true; break; }
             if (!opaque) return;
             keys.push(sprites.length);
-            sprites.push({ key: `dezaBoss${stage}_${i}`, w, h, rgba });
+            sprites.push({ key: `dezaBoss${stage}_${keys.length - 1}`, w, h, rgba });
         });
-        if (keys.length) spriteKeysByStage.set(stage, keys);
+        if (keys.length) spriteKeysByStage.set(stage, { keys, core });
+    };
+    for (const { stage, sizeClass } of bosses) {
+        const core = readBossCore(sec5, stage, sizeClass);
+        if (core && !isUnpainted(core, placeholder)) {
+            emit(stage, core.frames, true);
+            continue;
+        }
+        const pieces = [];
+        for (let record = 56; record <= 59 && pieces.length < 2; record++) {
+            const art = readEnemyFrames(sec5, stage, record);
+            if (!art || isUnpainted(art, placeholder)) continue;
+            pieces.push(art.frames[0]);
+        }
+        emit(stage, pieces, false);
     }
     return { sprites, spriteKeysByStage };
+}
+
+// Art for the parts a boss's fire points spawn (trailer types 3/4). A part
+// names its art as (group, piece) — a (stage, record) pair that reaches the
+// atlas only when that piece also happens to be placed as a zako. Pieces the
+// enemy roster already extracted are referenced by their existing indices;
+// the rest are rendered here from the boss's own stage bank. `baseIndex` is
+// where this function's sprites land in the caller's shared list, so every
+// returned key is an absolute index into it.
+// Returns {sprites, partKeysByStage: Map<stage, {record: keys[]}>}.
+export function extractBossPartSprites(sec5, sections, palettes, bosses, enemies, baseIndex) {
+    const sprites = [];
+    const partKeysByStage = new Map();
+    const placeholder = findPlaceholderCell(sec5).cell;
+    const byPair = new Map();
+    for (const e of enemies || []) {
+        if (e.spriteKeys && e.spriteKeys.length) byPair.set(`${e.stage}:${e.record}`, e.spriteKeys);
+    }
+    const bySignature = new Map(); // CG cells are global, so parts dedupe across stages too
+    for (const boss of bosses) {
+        if (!boss.behavior) continue;
+        const records = new Set();
+        for (const pattern of boss.behavior.patterns) {
+            for (const fp of pattern.firePoints) {
+                if (fp.spawn && fp.spawn.record != null) records.add(fp.spawn.record);
+            }
+        }
+        const art = {};
+        for (const record of records) {
+            const existing = byPair.get(`${boss.stage}:${record}`);
+            if (existing) { art[record] = existing; continue; }
+            const a = readEnemyFrames(sec5, boss.stage, record);
+            if (!a || isUnpainted(a, placeholder)) continue;
+            const sig = artSignature(a);
+            const shared = bySignature.get(sig);
+            if (shared) { art[record] = shared; continue; }
+            const keys = [];
+            a.frames.forEach((frame, i) => {
+                const { w, h, rgba } = renderFrame(sections, palettes, frame);
+                let opaque = false;
+                for (let p = 3; p < rgba.length; p += 4) if (rgba[p]) { opaque = true; break; }
+                if (!opaque) return;
+                keys.push(baseIndex + sprites.length);
+                sprites.push({ key: `dezaPart${boss.stage}_${record}_${i}`, w, h, rgba });
+            });
+            if (!keys.length) continue;
+            bySignature.set(sig, keys);
+            art[record] = keys;
+        }
+        if (Object.keys(art).length) partKeysByStage.set(boss.stage, art);
+    }
+    return { sprites, partKeysByStage };
 }

@@ -44,9 +44,14 @@ function decodeBase64(str) {
 // scrolls with worldTime. Map row 0 (the stage start) sits at the bottom;
 // scrolling reveals later rows from the top, ending at the boss chamber.
 //
-// Returns a controller {container, mapHeight, maxScroll, setScroll, destroy}
-// or null when the stage carries no background.
-export function buildStageBackground(scene, stageData, recipe) {
+// `bossRow` is the stage's boss placement row when the save defines one; the
+// scroll then stops with that row held at the boss's rest quarter of the
+// screen — the Saturn parks the map on the boss chamber rather than playing
+// it out to the last row.
+//
+// Returns a controller {container, mapHeight, maxScroll, stopScroll,
+// setScroll, destroy} or null when the stage carries no background.
+export function buildStageBackground(scene, stageData, recipe, bossRow) {
     var bg = stageData && stageData.background;
     var cells = recipe && recipe.backgroundCells;
     if (!bg || !Array.isArray(cells) || !cells.length) return null;
@@ -109,14 +114,20 @@ export function buildStageBackground(scene, stageData, recipe) {
     container.x = Math.floor((GW - bg.cols * TILE) / 2);
 
     var maxScroll = Math.max(0, mapHeight - GH);
+    var stopScroll = maxScroll;
+    if (typeof bossRow === "number") {
+        stopScroll = Math.max(0, Math.min(maxScroll,
+            (bossRow + 1) * TILE - GH + Math.floor(GH / 4)));
+    }
     var controller = {
         container: container,
         mapHeight: mapHeight,
         maxScroll: maxScroll,
+        stopScroll: stopScroll,
         lastDelta: 0,
         _scroll: -1,
         setScroll: function (px) {
-            var clamped = Math.max(0, Math.min(maxScroll, px));
+            var clamped = Math.max(0, Math.min(stopScroll, px));
             this.lastDelta = this._scroll < 0 ? 0 : clamped - this._scroll;
             this._scroll = clamped;
             // scroll 0: map bottom at screen bottom; scroll max: map top at 0.
@@ -286,6 +297,418 @@ export function updateEnemyFire(scene, enemy, shootFn) {
         shootFn(scene, enemy, Math.sin(base), -Math.cos(base));
     }
     return true;
+}
+
+// =====================================================================
+// Boss behavior — the save's own boss record (the 0x40 trailer,
+// tools/dezaemon-import/lib/decode/decode-boss.js), carried on
+// bossData.bossN.dezaemon.boss.
+//
+// The record is 4 patterns of (movement, fire tick, 3 fire points) plus an
+// HP-stage playlist: the HP bar splits into `hpStages` equal bands, each band
+// cycling four 2-bit pattern ids. Fire point types: 0-2 fire bullet weapon
+// A/B/C from (bossX+dx, bossY+dy); 3/4 spawn a destructible part there whose
+// art is a zako/large record (dezaemon.partArt maps record -> atlas frames,
+// with the enemy roster as fallback for older imports); 5/6 are the beam and
+// flame specials. The boss core stays the scene's single bossSprite — parts
+// are extra sprites in scene.enemies, so the existing collision, damage and
+// death handling covers them. Movement scripts 0-31 are engine ROM the save
+// does not carry, so the boss sways at the pattern's speed instead.
+// =====================================================================
+
+// Frames each playlist entry runs before the loop advances. The engine's
+// phase pacing is untraced; ~6s keeps a 4-entry loop visible inside a 99s
+// boss timer.
+var BOSS_ENTRY_FRAMES = 360;
+var BEAM_WARN_FRAMES = 45;   // thin warning shaft before the beam goes live
+var BEAM_ON_FRAMES = 100;    // frames the beam stays live
+var BEAM_WIDTH = 22;
+// Bullet record used when the boss data carries no weapon of its own (a
+// Dezaemon import's boss bulletData is empty — global bullet art is not
+// decoded). The frames ship in the stock atlas, which an import merges into.
+var DEZA_BOSS_BULLET = {
+    speed: 2.5, damage: 1, hp: 1, score: 0, spgage: 0,
+    texture: ["normalProjectile0.gif", "normalProjectile1.gif", "normalProjectile2.gif"],
+};
+
+function fpKey(fp) {
+    var rec = fp.spawn ? fp.spawn.record : null;
+    return fp.type + ":" + rec + ":" + fp.dx + ":" + fp.dy;
+}
+
+function playlistPattern(boss, band, entry) {
+    var row = (boss.playlist && boss.playlist[band]) || [0, 0, 0, 0];
+    return row[entry & 3] & 3;
+}
+
+// Arm the deza driver for the boss bossAdd just built. Inactive until
+// startDezaBoss — the stock entry tween still flies the boss in.
+export function initDezaBoss(scene, bossData) {
+    var deza = bossData && bossData.dezaemon;
+    // an explicit editor attackPattern outranks the imported record
+    if (!deza || !deza.boss || bossData.attackPattern) return false;
+    scene.dezaBossState = {
+        boss: deza.boss,
+        partArt: deza.partArt || null,
+        frameCache: {},
+        active: false,
+        age: 0,
+        bandIdx: 0,
+        entryIdx: 0,
+        entryAge: 0,
+        patternId: -1,
+        pattern: null,
+        tickCnt: 0,
+        tickIdx: 0,
+        parts: [],
+        beams: [],
+        partRespawn: {},
+    };
+    return true;
+}
+
+// Kick the fight off (called where the stock patterns would start).
+export function startDezaBoss(scene) {
+    var st = scene.dezaBossState;
+    if (!st || st.active) return false;
+    st.active = true;
+    activatePattern(scene, st, playlistPattern(st.boss, 0, 0));
+    return true;
+}
+
+// Part art: the import's own extraction first, then any roster enemy that
+// shares the (stage, record) pair — older imports carry only the latter.
+function partFrames(scene, st, record) {
+    if (record == null) return null;
+    if (st.frameCache[record] !== undefined) return st.frameCache[record];
+    var frames = null;
+    var art = st.partArt && st.partArt[record];
+    if (art && art.length) frames = art;
+    if (!frames) {
+        var data = (scene.recipe && scene.recipe.enemyData) || {};
+        for (var k in data) {
+            var d = data[k];
+            if (d && d.dezaemon && d.dezaemon.stage === scene.bossStageId &&
+                d.dezaemon.record === record && d.texture && d.texture.length) {
+                frames = d.texture;
+                break;
+            }
+        }
+    }
+    if (frames) {
+        var atlas = scene.textures.get("game_asset");
+        frames = frames.filter(function (f) { return atlas && atlas.has(f); });
+        if (!frames.length) frames = null;
+    }
+    st.frameCache[record] = frames;
+    return frames;
+}
+
+function spawnDezaPart(scene, st, fp) {
+    var boss = scene.bossSprite;
+    if (!boss || !boss.active || !fp.spawn) return null;
+    var frames = partFrames(scene, st, fp.spawn.record);
+    if (!frames) return null;
+    var large = fp.spawn.record >= 48;
+    var part = scene.add.sprite(boss.x + fp.dx, boss.y + fp.dy, "game_asset", frames[0]);
+    part.setOrigin(0.5);
+    part.setDepth(46); // attachments sit over the core (45)
+    part.setData("type", "enemy");
+    part.setData("name", "dezaPart");
+    // Part durability is untraced; sized so a turret takes a few seconds of
+    // focused fire, the big figure pieces about twice that.
+    part.setData("hp", large ? 32 : 16);
+    part.setData("maxHp", large ? 32 : 16);
+    part.setData("score", large ? 2000 : 800);
+    part.setData("spgage", large ? 4 : 2);
+    part.setData("interval", -1);
+    part.setData("shootCnt", 0);
+    part.setData("itemName", null);
+    part.setData("frames", frames);
+    part.setData("animIdx", 0);
+    part.setData("animTimer", 0);
+    part.setData("projData", null);
+    part.setData("dezaBossPart", {
+        dx: fp.dx,
+        dy: fp.dy,
+        key: fpKey(fp),
+        mobile: !fp.spawn.oneShot,
+        phase: Math.random() * 125,
+    });
+    scene.enemies.push(part);
+    st.parts.push(part);
+    return part;
+}
+
+// Silent removal — a part swapped out by a pattern change was not destroyed
+// by the player, so no score, no explosion.
+function removeDezaPart(scene, part) {
+    var idx = scene.enemies.indexOf(part);
+    if (idx >= 0) scene.enemies.splice(idx, 1);
+    part.destroy();
+}
+
+function clearBeams(st) {
+    for (var i = 0; i < st.beams.length; i++) {
+        if (st.beams[i].sprite) st.beams[i].sprite.destroy();
+    }
+    st.beams = [];
+}
+
+// Enter a pattern: retire parts the new pattern does not spawn, keep the ones
+// it does (their damage persists), spawn what is missing, reset the fire
+// clock. Re-activating the same pattern re-arms its destroyed one-shots —
+// that is the trailer's own respawn path for type 4.
+function activatePattern(scene, st, patternId) {
+    st.patternId = patternId;
+    st.pattern = (st.boss.patterns || [])[patternId] || null;
+    st.tickCnt = 0;
+    st.tickIdx = 0;
+    st.partRespawn = {};
+    clearBeams(st);
+    if (!st.pattern) return;
+    var wanted = {};
+    st.pattern.firePoints.forEach(function (fp) {
+        if ((fp.type === 3 || fp.type === 4) && fp.spawn) wanted[fpKey(fp)] = fp;
+    });
+    for (var i = st.parts.length - 1; i >= 0; i--) {
+        var part = st.parts[i];
+        if (!part || !part.active) { st.parts.splice(i, 1); continue; }
+        var key = part.getData("dezaBossPart").key;
+        if (wanted[key]) {
+            delete wanted[key]; // carried over
+        } else {
+            removeDezaPart(scene, part);
+            st.parts.splice(i, 1);
+        }
+    }
+    for (var k in wanted) spawnDezaPart(scene, st, wanted[k]);
+}
+
+function findLiveDezaPart(st, key) {
+    for (var i = 0; i < st.parts.length; i++) {
+        var p = st.parts[i];
+        if (p && p.active && p.getData("dezaBossPart").key === key) return p;
+    }
+    return null;
+}
+
+function bossWeapon(scene, weapon) {
+    var pd = weapon === 1 ? scene.bossProjDataB
+        : weapon === 2 ? scene.bossProjDataC
+            : scene.bossProjDataA;
+    return pd && pd.texture && pd.texture.length ? pd : DEZA_BOSS_BULLET;
+}
+
+function spawnDezaBossBullet(scene, x, y, dirX, dirY, projData, tint) {
+    var frames = projData.texture || [];
+    var bullet = scene.add.sprite(x, y, "game_asset", frames[0] || "normalProjectile0.gif");
+    bullet.setOrigin(0.5);
+    bullet.setDepth(47);
+    bullet.setData("speed", projData.speed || DEZA_BOSS_BULLET.speed);
+    bullet.setData("damage", projData.damage || 1);
+    bullet.setData("hp", projData.hp || 1);
+    bullet.setData("score", projData.score || 0);
+    bullet.setData("spgage", projData.spgage || 0);
+    bullet.setData("rotX", dirX);
+    bullet.setData("rotY", dirY);
+    if (frames.length > 1) {
+        bullet.setData("frames", frames);
+        bullet.setData("animIdx", 0);
+        bullet.setData("animTimer", 0);
+        if (projData.frameRate) bullet.setData("frameRate", projData.frameRate);
+    }
+    if (tint) bullet.setTint(tint);
+    scene.enemyBullets.push(bullet);
+    return bullet;
+}
+
+// Types 0-2: one shot from the fire point, aimed when the record says so.
+function fireDezaBullet(scene, fp) {
+    var boss = scene.bossSprite;
+    var x = boss.x + fp.dx;
+    var y = boss.y + fp.dy;
+    var dirX = 0;
+    var dirY = 1;
+    if (fp.shot && fp.shot.aimed && scene.playerSprite) {
+        var dx = scene.playerSprite.x - x;
+        var dy = scene.playerSprite.y - y;
+        var d = Math.sqrt(dx * dx + dy * dy) || 1;
+        dirX = dx / d;
+        dirY = dy / d;
+    }
+    spawnDezaBossBullet(scene, x, y, dirX, dirY, bossWeapon(scene, fp.shot ? fp.shot.weapon : 0), 0);
+}
+
+// Type 6: a slow fan of tinted shots below the fire point.
+function fireDezaFlame(scene, fp) {
+    var boss = scene.bossSprite;
+    var x = boss.x + fp.dx;
+    var y = boss.y + fp.dy;
+    for (var i = 0; i < 5; i++) {
+        var a = (-40 + 20 * i) * Math.PI / 180; // fan around straight down
+        var speed = 1.1 + Math.random() * 0.7;
+        var b = spawnDezaBossBullet(
+            scene, x, y,
+            Math.sin(a), Math.cos(a),
+            DEZA_BOSS_BULLET, 0xff9944
+        );
+        b.setData("speed", speed);
+        b.setScale(1 + Math.random() * 0.5);
+    }
+}
+
+// Type 5: a full-height beam shaft — warn thin, then live. Not a bullet: the
+// player cannot shoot it down, and it checks the player itself.
+function startDezaBeam(scene, st, fp) {
+    var key = fpKey(fp);
+    for (var i = 0; i < st.beams.length; i++) {
+        if (st.beams[i].key === key) return; // already running
+    }
+    var boss = scene.bossSprite;
+    var GH = scene.scale ? scene.scale.height : 480;
+    var topY = boss.y + fp.dy;
+    var h = Math.max(1, GH - topY);
+    var rect = scene.add.rectangle(boss.x + fp.dx, topY + h / 2, BEAM_WIDTH, h, 0x99ddff, 0.25);
+    rect.setDepth(44); // under the boss core, over the parts' playfield
+    rect.setScale(0.25, 1);
+    st.beams.push({ key: key, fp: fp, sprite: rect, topY: topY, age: 0, cooldown: 0 });
+}
+
+function updateDezaBeams(scene, st) {
+    var boss = scene.bossSprite;
+    for (var i = st.beams.length - 1; i >= 0; i--) {
+        var beam = st.beams[i];
+        beam.age++;
+        beam.sprite.x = boss.x + beam.fp.dx; // ride the boss sway
+        if (beam.age <= BEAM_WARN_FRAMES) {
+            beam.sprite.setAlpha(0.2 + 0.15 * Math.sin(beam.age * 0.5));
+        } else if (beam.age <= BEAM_WARN_FRAMES + BEAM_ON_FRAMES) {
+            beam.sprite.setScale(1, 1);
+            beam.sprite.setAlpha(0.65 + 0.15 * Math.sin(beam.age * 0.6));
+            if (beam.cooldown > 0) beam.cooldown--;
+            var player = scene.playerSprite;
+            if (player && beam.cooldown <= 0 && !scene.barrierActive &&
+                player.y > beam.topY &&
+                Math.abs(player.x - beam.sprite.x) < BEAM_WIDTH / 2 + 8) {
+                beam.cooldown = 60;
+                scene.playerDamage(1);
+            }
+        } else {
+            beam.sprite.destroy();
+            st.beams.splice(i, 1);
+        }
+    }
+}
+
+// Per-frame driver, called from the scene's boss branch while the fight is
+// live (the time-stop and death freezes gate the caller).
+export function updateDezaBoss(scene) {
+    var st = scene.dezaBossState;
+    if (!st || !st.active) return;
+    var boss = scene.bossSprite;
+    if (!boss || !boss.active) {
+        clearDezaBoss(scene);
+        return;
+    }
+    var b = st.boss;
+    st.age++;
+
+    // HP bands are equal slices of the bar; dropping into a lower band
+    // advances the playlist to that band's byte and re-arms its pattern.
+    var stages = Math.max(1, Math.min(4, b.hpStages || 1));
+    var frac = scene.bossMaxHp > 0 ? scene.bossHp / scene.bossMaxHp : 1;
+    var band = Math.min(stages - 1, Math.max(0, Math.floor((1 - frac) * stages)));
+    if (band > st.bandIdx) {
+        st.bandIdx = band;
+        st.entryIdx = 0;
+        st.entryAge = 0;
+        activatePattern(scene, st, playlistPattern(b, band, 0));
+    } else {
+        st.entryAge++;
+        if (st.entryAge >= BOSS_ENTRY_FRAMES) {
+            st.entryAge = 0;
+            st.entryIdx = (st.entryIdx + 1) & 3;
+            activatePattern(scene, st, playlistPattern(b, st.bandIdx, st.entryIdx));
+        }
+    }
+
+    var pattern = st.pattern;
+    // The movement scripts are engine ROM the save does not carry; sway at
+    // the pattern's speed so a moving pattern reads as one.
+    if (pattern && pattern.moveSpeed > 0 && !scene.bossEntering) {
+        var GW = scene.scale ? scene.scale.width : 256;
+        var amp = Math.min(10 + pattern.moveSpeed * 8, (GW - boss.width) / 2);
+        boss.x = GW / 2 + Math.sin(st.age * (0.006 + pattern.moveSpeed * 0.002)) * amp;
+    }
+    if (b.rotate) boss.rotation += 0.02;
+
+    updateDezaBeams(scene, st);
+
+    if (!pattern) return;
+    st.tickCnt++;
+    if (st.tickCnt < (pattern.fireTickFrames || 60)) return;
+    st.tickCnt = 0;
+    st.tickIdx++;
+    for (var i = 0; i < pattern.firePoints.length; i++) {
+        var fp = pattern.firePoints[i];
+        var due = st.tickIdx % ((fp.rate || 0) + 1) === 0;
+        if (fp.type <= 2) {
+            if (due) fireDezaBullet(scene, fp);
+        } else if (fp.type === 3) {
+            // respawning mobile part: re-arm after a rate-scaled pause
+            var key = fpKey(fp);
+            if (!findLiveDezaPart(st, key)) {
+                var wait = st.partRespawn[key];
+                if (wait === undefined) {
+                    st.partRespawn[key] = (fp.rate || 0) + 2;
+                } else if (wait <= 1) {
+                    delete st.partRespawn[key];
+                    spawnDezaPart(scene, st, fp);
+                } else {
+                    st.partRespawn[key] = wait - 1;
+                }
+            }
+        } else if (fp.type === 5) {
+            if (due) startDezaBeam(scene, st, fp);
+        } else if (fp.type === 6) {
+            if (due) fireDezaFlame(scene, fp);
+        }
+        // type 4 spawns on pattern activation only
+    }
+}
+
+// Per-frame part positioning: parts ride the boss at their fire-point offset
+// (type 3 drifts around its anchor). Returns true when `sprite` is a part —
+// the caller then skips the regular enemy movement entirely.
+export function updateDezaBossPart(scene, part) {
+    var pd = part.getData("dezaBossPart");
+    if (!pd) return false;
+    var boss = scene.bossSprite;
+    if (!boss || !boss.active) {
+        removeDezaPart(scene, part);
+        return true;
+    }
+    var dx = pd.dx;
+    if (pd.mobile) {
+        dx += Math.sin((scene.worldTime + pd.phase) * 0.05) * 6;
+    }
+    part.x = boss.x + dx;
+    part.y = boss.y + pd.dy;
+    return true;
+}
+
+// Tear the fight down (boss death or scene cleanup).
+export function clearDezaBoss(scene) {
+    var st = scene.dezaBossState;
+    if (!st) return;
+    for (var i = 0; i < st.parts.length; i++) {
+        var part = st.parts[i];
+        if (part && part.active) removeDezaPart(scene, part);
+    }
+    st.parts = [];
+    clearBeams(st);
+    scene.dezaBossState = null;
 }
 
 // =====================================================================

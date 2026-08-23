@@ -6,7 +6,7 @@ import { gameState, saveHighScore } from "../gameState.js";
 import { PLAYER_STATES } from "../enums/player-boss-states.js";
 import { triggerHaptic } from "../haptics.js";
 import { assetStageId, lastStageId } from "./stages.js";
-import { buildStageBackground, SCROLL_PX_PER_FRAME, startDezaemonBgm, stopDezaemonBgm, playDezaemonSfx } from "./dezaemon-runtime.js";
+import { buildStageBackground, SCROLL_PX_PER_FRAME, startDezaemonBgm, stopDezaemonBgm, playDezaemonSfx, updateDezaBoss } from "./dezaemon-runtime.js";
 
 // Stock sound keys that an imported save's SFX bank replaces.
 var DEZA_SFX_MAP = {
@@ -206,8 +206,13 @@ export class PhaserGameScene extends Phaser.Scene {
         // scroll and, through it, the map-aligned wave timing below.
         this.worldTime = 0;
         // A Dezaemon import ships the save's scenery; when present it replaces
-        // the stock scrolling backdrop entirely.
-        this.dezaBg = buildStageBackground(this, stageData, this.recipe);
+        // the stock scrolling backdrop entirely. The boss placement row (when
+        // the save defines one) parks the scroll on the boss chamber.
+        var dezaBossRec = this.recipe && this.recipe.bossData &&
+            this.recipe.bossData["boss" + stageId];
+        var dezaBossRow = dezaBossRec && dezaBossRec.dezaemon &&
+            typeof dezaBossRec.dezaemon.row === "number" ? dezaBossRec.dezaemon.row : null;
+        this.dezaBg = buildStageBackground(this, stageData, this.recipe, dezaBossRow);
         if (this.dezaBg) {
             this.stageBg.setVisible(false);
             if (this.stageBgOverlay) this.stageBgOverlay.setVisible(false);
@@ -228,6 +233,11 @@ export class PhaserGameScene extends Phaser.Scene {
                     : (row - firstRow) * perRow;
             });
         }
+        // The boss is due when the scroll parks on its chamber, not merely
+        // one beat after the last wave.
+        this.bossDueTick = this.dezaBg && dezaBossRow !== null
+            ? Math.ceil(this.dezaBg.stopScroll / SCROLL_PX_PER_FRAME)
+            : null;
 
         // Second parallax layer, for the custom-enemy space background only: the
         // corridor sits over the starfield at partial alpha and scrolls faster,
@@ -272,6 +282,7 @@ export class PhaserGameScene extends Phaser.Scene {
         this.bossStageId = stageId;
         this.bossProjCnt = 0;
         this.bossDangerShown = false;
+        this.dezaBossState = null;
 
         this.showTitle();
 
@@ -1052,6 +1063,8 @@ export class PhaserGameScene extends Phaser.Scene {
                     continue;
                 }
                 syncBossVisuals(this);
+                // Dezaemon boss record: playlist, parts and fire points
+                updateDezaBoss(this);
             }
 
             animateEnemy(enemy, step);
@@ -1333,11 +1346,12 @@ export class PhaserGameScene extends Phaser.Scene {
                 ) {
                     _enemyWave(this);
                 }
-                // Past the last wave the boss is due after one more beat.
-                if (
-                    this.waveCount >= this.stageEnemyPositionList.length &&
-                    waveClock >= this.waveDueTicks[this.waveDueTicks.length - 1] + this.waveInterval
-                ) {
+                // Past the last wave the boss is due at its own chamber row
+                // (the scroll stop), or one more beat when the save gave none.
+                var bossDue = this.bossDueTick !== null
+                    ? waveClock >= this.bossDueTick
+                    : waveClock >= this.waveDueTicks[this.waveDueTicks.length - 1] + this.waveInterval;
+                if (this.waveCount >= this.stageEnemyPositionList.length && bossDue) {
                     _enemyWave(this);
                 }
             } else if (this.enemyWaveFrameCounter >= this.waveInterval) {

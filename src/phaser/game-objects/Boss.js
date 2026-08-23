@@ -8,6 +8,7 @@ import { triggerHaptic } from "../../haptics.js";
 import { assetStageId } from "../stages.js";
 import { createShadow, updateShadowPosition } from "./Shadow.js";
 import { showBossExplosion, showHitImpact } from "../effects/Explosions.js";
+import { initDezaBoss, startDezaBoss, clearDezaBoss } from "../dezaemon-runtime.js";
 import {
     bossPatternBison,
     bossPatternBarlog,
@@ -132,6 +133,11 @@ export function bossAdd(scene) {
     }
 
     scene.enemies.push(scene.bossSprite);
+
+    // A Dezaemon import's decoded boss record (parts, HP-stage playlist,
+    // fire points) arms its own driver; bossShootStart starts it in place
+    // of the stock patterns.
+    initDezaBoss(scene, bossData);
 
     var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
     var voiceKey = "boss_" + (bossNames[assetStageId(stageId)] || "bison") + "_voice_add";
@@ -373,6 +379,12 @@ export function bossShootStart(scene) {
         if (scene.theWorldFlg && _bossAlive(scene)) {
             scene.time.delayedCall(500, function () { bossShootStart(scene); });
         }
+        return;
+    }
+    // A Dezaemon boss plays its decoded record (dezaemon-runtime.js), not
+    // the stock patterns.
+    if (scene.dezaBossState) {
+        startDezaBoss(scene);
         return;
     }
     var seed = Math.random();
@@ -759,6 +771,7 @@ export function bossDie(scene, boss) {
     var idx = scene.enemies.indexOf(boss);
     if (idx >= 0) scene.enemies.splice(idx, 1);
 
+    clearDezaBoss(scene);
     scene.bossSprite = null;
     scene.bossActive = false;
     scene.bossDangerShown = false;

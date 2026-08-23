@@ -15,8 +15,9 @@ sprites and fonts baked into a save are Athena's copyright.
 | Payload section table (8 sections, byte-sum checksums) | **done** (`lib/payload-table.js`) |
 | Differential analysis tooling | **done** (`dev/diff-saves.js`) |
 | Section decompression (Okumura LZSS) | **done** (`lib/decompress.js`) — all 16 fixture sections decode to exact region sizes |
-| Payload region decoders (CG pages, palettes, backgrounds, placement, sprite composition, BGM) | **done** (`lib/decode/`) |
+| Payload region decoders (CG pages, palettes, backgrounds, placement, sprite composition, BGM) | **done** (`lib/decode/`) — the sprite composition bank layout is now engine-traced from GAME.CMP's VRAM-upload tables (was heuristic), and the sprite flip bits are corrected: bit14 H / bit15 V, the opposite of the background map |
 | Enemy *attribute* fields inside the 18-byte record | **done** (`lib/decode/decode-enemy.js`) — traced from GAME.CMP's spawn routine: hp, score, speed, fire config, and the four change channels (speed/rotation/scale/direction) |
+| Boss record (the `0x40` trailer: hp/score, HP-stage playlist, movement scripts, fire points, parts) | **done** (`lib/decode/decode-boss.js`) — traced from GAME.CMP's boss routines and confirmed against KUMITATE's boss-editor field writers |
 | game.json + atlas emit | **done** — lossless (see below) |
 | BGM | decoded (`lib/decode/decode-song.js`); not converted to audio yet |
 
@@ -40,7 +41,7 @@ stages, 3,497 placements — the emitted game carries all of it:
 | Spawns | all of them. The grid is the save's own 20 placement columns, so no two spawns are ever binned onto one cell |
 | Pacing | each wave records the scroll row it came from (`stage.waveRows`), so the gaps between waves — 1 to 177 rows — survive |
 | Art | each enemy is drawn with the art **its own stage** defines; identical compositions share atlas frames |
-| Bosses | every stage that places one gets its own 4-frame boss art and size class |
+| Bosses | every stage that places one gets core art at its true class geometry (F0 = four 64×64 frames, F1 = two 128×64, F2 = two 64×128, F3 = one 128×128) plus its decoded record on `bossData.bossN.dezaemon.boss` — hp and score land on the runtime record, and the Phaser runtime plays the rest (`src/phaser/dezaemon-runtime.js`): the HP-stage playlist advances at each equal HP band, fire-point types 3/4 spawn destructible part sprites at their (dx, dy) offsets, types 0-2 fire bullet weapons A/B/C and 5/6 run the beam/flame specials. Part art is `dezaemon.partArt` (record → atlas frames): pieces already extracted as zako are referenced in place, the rest are rendered from the boss's own stage bank. A stage whose core is unpainted (it fights with parts over scenery, like Ramsie stage 0) falls back to its 64×64 figure pieces — the boss's own idle/attack forms |
 | Attributes | **decoded**: hp/score/speed/interval land on the fields the runtime reads, and the full record — fire type/count/rate/direction plus the speed-change, rotation, scale and direction channels — rides on `enemyData.*.dezaemon.behavior`. The raw 18 bytes still travel on `.attributes` for auditability |
 | Backgrounds | each stage's 14x768 tile map is exported as `stage.background` (base64 grid) over `backgroundCells` (one atlas sprite per distinct tile); the runtime composes and scrolls it in place of the stock backdrop, on the scene's worldTime clock |
 
@@ -103,7 +104,7 @@ lib/
   bup-parse.js           Saturn BUP directory + payload extraction
   decompress.js          Okumura LZSS
   payload-table.js       8-section table + checksums
-  decode/                section decoders (CG, stages, placement, sprites, BGM)
+  decode/                section decoders (CG, stages, placement, sprites, bosses, BGM)
   map-to-game.js         decoded save -> level-editor game.json
   game-schema.js         executable schema for that game.json
 dev/

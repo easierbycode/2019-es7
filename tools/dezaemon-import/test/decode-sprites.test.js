@@ -9,12 +9,14 @@ import * as bup from "../lib/bup-parse.js";
 import { decodeSave } from "../lib/decode/index.js";
 import {
     recordToClassSlot,
+    recordArt,
     readEnemyFrames,
+    readBossCore,
+    coreCellOrder,
     findPlaceholderCell,
-    IDS_PER_CLASS,
-    REFS_PER_CLASS,
-    FRAMES_PER_ENEMY,
-    SPRITE_CLASSES,
+    RECORD_ART,
+    BOSS_CORE_GEOM,
+    BOSS_CORE_OFFSET,
 } from "../lib/decode/decode-sprites.js";
 import { SEC5_REGIONS } from "../lib/decode/decode-stage.js";
 
@@ -26,11 +28,32 @@ async function decodedFixture(name) {
     return decodeSave(save.payload.buffer);
 }
 
-test("the 11 composition slots account for the whole per-stage bank", () => {
-    assert.equal(SPRITE_CLASSES * REFS_PER_CLASS * 2, SEC5_REGIONS.spriteStages.stride);
-    // seven zako classes hold the 60 enemy records between them
-    assert.equal(IDS_PER_CLASS.reduce((a, b) => a + b, 0), 60);
-    assert.equal(IDS_PER_CLASS.length + 4, SPRITE_CLASSES); // + 4 boss classes
+test("the record art bands + boss core tile the whole per-stage bank", () => {
+    // engine-traced: refs are contiguous from 0x000 through the boss core
+    let expect = 0;
+    for (const band of RECORD_ART) {
+        assert.equal(band.base, expect, `band at record ${band.first} starts where the last ended`);
+        expect += band.count * band.frames * band.w * band.h * 2;
+    }
+    assert.equal(expect, BOSS_CORE_OFFSET);
+    // seven bands hold the 60 enemy records between them
+    assert.equal(RECORD_ART.reduce((a, b) => a + b.count, 0), 60);
+    // every boss class reads the same 64 core refs, closing the bank exactly
+    for (const g of BOSS_CORE_GEOM) assert.equal(g.frames * g.w * g.h, 64);
+    assert.equal(BOSS_CORE_OFFSET + 64 * 2, SEC5_REGIONS.spriteStages.stride);
+});
+
+test("core frames read as 4x4-cell blocks in reading order", () => {
+    // one block wide: block order IS row-major
+    assert.deepEqual(coreCellOrder(4, 4), [...Array(16).keys()]);
+    // two blocks side by side (class 1): row 0 = block0 row 0, block1 row 0
+    const wide = coreCellOrder(8, 4);
+    assert.deepEqual(wide.slice(0, 8), [0, 1, 2, 3, 16, 17, 18, 19]);
+    // four quadrants (class 3): row 4 starts on block 2 (bottom-left)
+    const quad = coreCellOrder(8, 8);
+    assert.deepEqual(quad.slice(32, 40), [32, 33, 34, 35, 48, 49, 50, 51]);
+    // every ref used exactly once
+    assert.deepEqual([...quad].sort((a, b) => a - b), [...Array(64).keys()]);
 });
 
 test("record index maps onto (class, slot) in enemy-record order", () => {
@@ -39,11 +62,22 @@ test("record index maps onto (class, slot) in enemy-record order", () => {
     assert.deepEqual(recordToClassSlot(16), { cls: 1, slot: 0 });
     assert.deepEqual(recordToClassSlot(59), { cls: 6, slot: 3 });
     assert.equal(recordToClassSlot(60), null);
-    // every record lands in exactly one slot of its class
+    // every record lands in exactly one slot of its band
     for (let r = 0; r < 60; r++) {
         const p = recordToClassSlot(r);
-        assert.ok(p.slot < IDS_PER_CLASS[p.cls]);
+        assert.ok(p.slot < RECORD_ART[p.cls].count);
     }
+});
+
+test("frame geometry is the engine's, fixed per record band", () => {
+    // records 32-47 are 32x32 (not 16x16), the large records 2 or 1 frames
+    assert.deepEqual(
+        RECORD_ART.map((b) => [b.frames, b.w, b.h]),
+        [[4, 1, 1], [4, 2, 1], [4, 1, 2], [4, 2, 2], [2, 4, 2], [2, 2, 4], [1, 4, 4]],
+    );
+    assert.equal(recordArt(32).w * 16, 32);
+    assert.equal(recordArt(48).frames, 2);
+    assert.equal(recordArt(56).frames, 1);
 });
 
 test("ramsie extracts real enemy art wired to the roster", async () => {
@@ -63,24 +97,86 @@ test("ramsie extracts real enemy art wired to the roster", async () => {
     const withArt = decoded.enemies.filter((e) => e.spriteKeys);
     assert.ok(withArt.length > decoded.enemies.length * 0.8);
     for (const e of withArt) {
-        assert.ok(e.spriteKeys.length >= 1 && e.spriteKeys.length <= FRAMES_PER_ENEMY);
+        assert.ok(e.spriteKeys.length >= 1 && e.spriteKeys.length <= 4);
         for (const k of e.spriteKeys) assert.ok(decoded.sprites[k], "sprite key resolves");
     }
 });
 
-test("frames come out as a rectangle of cells, never larger than 2x2", async () => {
+test("frames come out at their band's size with full cell rectangles", async () => {
     const decoded = await decodedFixture("ramsie.sav");
     const sec5 = decoded.sections[5].decompressed;
     let seen = 0;
+    let large = 0;
     for (let record = 0; record < 60; record++) {
         const art = readEnemyFrames(sec5, 0, record);
         if (!art) continue;
         seen++;
-        assert.ok(art.w >= 1 && art.w <= 2);
-        assert.ok(art.h >= 1 && art.h <= 2);
+        const band = recordArt(record);
+        assert.equal(art.w, band.w);
+        assert.equal(art.h, band.h);
+        assert.ok(art.frames.length <= band.frames);
         for (const f of art.frames) assert.equal(f.cells.length, art.w * art.h);
+        if (band.w * band.h >= 8) large++;
     }
     assert.ok(seen > 10, "stage 0 defines a decent number of enemies");
+    assert.ok(large >= 1, "ramsie stage 0 paints large-class art (drapes/statues/figures)");
+});
+
+test("sprite flips are bit14=H bit15=V — mirror pairs compose, not stack", async () => {
+    // Ramsie stage 0, record 56 (64x64 band): the bank is full of exact
+    // horizontal mirror pairs; under the correct bit order the mirrored
+    // cell of a pair must carry hflip, never vflip.
+    const decoded = await decodedFixture("ramsie.sav");
+    const sec5 = decoded.sections[5].decompressed;
+    const art = readEnemyFrames(sec5, 0, 56);
+    assert.ok(art, "ramsie paints the first 64x64 record");
+    const flipped = art.frames.flatMap((f) => f.cells).filter((c) => !c.empty && (c.hflip || c.vflip));
+    assert.ok(flipped.length > 0, "the composition uses mirrored cells");
+    assert.ok(flipped.every((c) => c.hflip && !c.vflip), "mirrors are horizontal");
+});
+
+test("the boss core reads at the placed class's geometry", async () => {
+    const decoded = await decodedFixture("ramsie.sav");
+    const sec5 = decoded.sections[5].decompressed;
+    // Ramsie stages 1-3 paint two-frame 64x128 class-2 cores; stages 0 and 4
+    // leave theirs unpainted — those fights are the chamber scenery plus
+    // trailer-attached parts.
+    const placeholder = findPlaceholderCell(sec5).cell;
+    for (const b of decoded.bosses) {
+        const core = readBossCore(sec5, b.stage, b.sizeClass);
+        if (b.stage >= 1 && b.stage <= 3) {
+            // class 2: two 64x128 frames
+            assert.ok(core, `stage ${b.stage} paints its core`);
+            assert.equal(core.w, 4);
+            assert.equal(core.h, 8);
+            assert.equal(core.frames.length, 2);
+        } else if (b.stage === 4) {
+            // class 0: four 64x64 frames
+            assert.equal(core.w, 4);
+            assert.equal(core.h, 4);
+            assert.equal(core.frames.length, 4);
+        } else {
+            // stage 0: empty or placeholder-filled — no real core art; that
+            // fight is the chamber scenery plus trailer-attached parts
+            const painted = core && core.frames.some((f) =>
+                f.cells.some((c) => !c.empty && c.cell !== placeholder));
+            assert.ok(!painted, `stage ${b.stage} core is unpainted`);
+        }
+    }
+    // emitted boss sprites: painted cores at their class sizes, and stage 0
+    // (unpainted core) falls back to its two 64x64 figure pieces
+    const bossSprites = decoded.sprites.filter((s) => s.key.startsWith("dezaBoss"));
+    assert.deepEqual(
+        bossSprites.map((s) => `${s.key} ${s.w}x${s.h}`),
+        [
+            "dezaBoss0_0 64x64", "dezaBoss0_1 64x64",
+            "dezaBoss1_0 64x128", "dezaBoss1_1 64x128",
+            "dezaBoss2_0 64x128", "dezaBoss2_1 64x128",
+            "dezaBoss3_0 64x128", "dezaBoss3_1 64x128",
+            "dezaBoss4_0 64x64", "dezaBoss4_1 64x64",
+            "dezaBoss4_2 64x64", "dezaBoss4_3 64x64",
+        ],
+    );
 });
 
 test("the unpainted-cell placeholder is found and skipped", async () => {
@@ -91,4 +187,34 @@ test("the unpainted-cell placeholder is found and skipped", async () => {
     assert.ok(count > 200, `placeholder referenced ${count} times`);
     // no emitted sprite is the placeholder repeated across all four frames
     assert.ok(decoded.sprites.length > 0);
+});
+
+test("boss part art resolves every spawn fire point the trailer names", async () => {
+    const decoded = await decodedFixture("ramsie.sav");
+    const b0 = decoded.bosses.find((b) => b.stage === 0);
+    assert.ok(b0.partArt, "stage 0 boss carries part art");
+    // pattern 0's two one-shot turrets reference 32x32 pieces 13/14
+    for (const record of [45, 46]) {
+        const keys = b0.partArt[record];
+        assert.ok(keys && keys.length, `record ${record} resolved`);
+        for (const k of keys) {
+            const s = decoded.sprites[k];
+            assert.ok(s, `sprite ${k} exists`);
+            assert.equal(`${s.w}x${s.h}`, "32x32");
+        }
+    }
+    // every extracted part sprite is a real image at its band's geometry
+    for (const [stage, art] of Object.entries(
+        Object.fromEntries(decoded.bosses.filter((b) => b.partArt).map((b) => [b.stage, b.partArt])),
+    )) {
+        for (const [record, keys] of Object.entries(art)) {
+            const band = recordArt(Number(record));
+            for (const k of keys) {
+                const s = decoded.sprites[k];
+                assert.ok(s, `stage ${stage} record ${record} key ${k} resolves`);
+                assert.equal(s.w, band.w * 16);
+                assert.equal(s.h, band.h * 16);
+            }
+        }
+    }
 });

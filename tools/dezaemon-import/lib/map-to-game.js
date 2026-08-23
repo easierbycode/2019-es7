@@ -358,13 +358,44 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
         const decodedBoss = bossByStage.get(s);
         if (decodedBoss) {
             rec.dezaemon = { sizeClass: decodedBoss.sizeClass, row: decodedBoss.row, col: decodedBoss.col };
+            if (decodedBoss.behavior) {
+                // The save's own boss record (decode-boss.js): HP and score
+                // land on the fields the runtime reads, and the full record
+                // (HP-stage playlist, patterns, fire points, part spawns)
+                // rides on dezaemon.boss for a future parts-aware runtime.
+                // Boss HP sits in a different damage regime than the zako
+                // (millions of units; how player shots scale against it is
+                // untraced), so /1024 normalizes the 8-step ladder onto hit
+                // counts around the stock bosses' 100-500 — still scaled by
+                // the save's own weapon like the zako are.
+                rec.dezaemon.boss = decodedBoss.behavior;
+                rec.hp = Math.max(1, Math.ceil(decodedBoss.behavior.hp / (shotDamage * 1024)));
+                rec.score = decodedBoss.behavior.score;
+            }
+            if (decodedBoss.partArt) {
+                // Fire-point part art (types 3/4): record -> atlas frame
+                // names, so the runtime can dress the destructible parts the
+                // boss record spawns.
+                const partArt = {};
+                for (const [record, keys] of Object.entries(decodedBoss.partArt)) {
+                    const frames = keys.map((i) => spriteKeyByIndex[i]).filter(Boolean);
+                    if (frames.length) partArt[record] = frames;
+                }
+                if (Object.keys(partArt).length) rec.dezaemon.partArt = partArt;
+            }
             if (Array.isArray(decodedBoss.spriteKeys) && decodedBoss.spriteKeys.length) {
                 const frames = decodedBoss.spriteKeys
                     .map((idx) => spriteKeyByIndex[idx])
                     .filter(Boolean);
                 if (frames.length) {
                     rec.name = `dezaBoss${s}`;
-                    rec.anim = { idle: frames, attack: frames.slice(0, Math.max(1, frames.length - 1)) };
+                    // Core frames are the boss's real animation loop. Fallback
+                    // figure pieces (unpainted core) are separate forms, so
+                    // idle holds only the first and attack the second — they
+                    // must not flicker through as one animation.
+                    rec.anim = decodedBoss.coreArt
+                        ? { idle: frames, attack: frames }
+                        : { idle: [frames[0]], attack: [frames[1] || frames[0]] };
                 }
             }
         }

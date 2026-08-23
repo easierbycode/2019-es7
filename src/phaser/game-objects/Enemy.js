@@ -7,7 +7,7 @@ import { gameState } from "../../gameState.js";
 import { PLAYER_STATES } from "../../enums/player-boss-states.js";
 import { createShadow, updateShadowPosition } from "./Shadow.js";
 import { triggerHaptic } from "../../haptics.js";
-import { initEnemyBehavior, updateEnemyBehavior, updateEnemyFire } from "../dezaemon-runtime.js";
+import { initEnemyBehavior, updateEnemyBehavior, updateEnemyFire, updateDezaBossPart } from "../dezaemon-runtime.js";
 
 var GW = GAME_DIMENSIONS.WIDTH;
 var GH = GAME_DIMENSIONS.HEIGHT;
@@ -270,6 +270,10 @@ export function enemyDie(scene, enemy, isSp) {
  * @param {number} step – logical step time in ms
  */
 export function updateEnemy(scene, enemy, step) {
+    // A Dezaemon boss part rides the boss at its fire-point offset — the
+    // boss record's driver owns it, not the legacy movement or shooting.
+    if (updateDezaBossPart(scene, enemy)) return;
+
     // Dezaemon behavior: decoded movement/transform channels + fire pattern
     // replace the legacy per-name movement and the fixed-interval shooting.
     if (updateEnemyBehavior(scene, enemy)) {

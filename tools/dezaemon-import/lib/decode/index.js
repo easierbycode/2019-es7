@@ -20,7 +20,8 @@ import { decodeCg } from "./decode-cg.js";
 import { decodeStages, sec5Regions, projectForEditor } from "./decode-stage.js";
 import { decodeSongs } from "./decode-song.js";
 import { decodeSettings } from "./decode-settings.js";
-import { extractEnemySprites, extractBossSprites, extractBackgroundCells } from "./decode-sprites.js";
+import { extractEnemySprites, extractBossSprites, extractBossPartSprites, extractBackgroundCells } from "./decode-sprites.js";
+import { readBossTrailer } from "./decode-boss.js";
 
 export function decodeSave(payload) {
     const result = {
@@ -110,8 +111,18 @@ export function decodeSave(payload) {
                 const projected = projectForEditor(stages.slice(0, stageCount));
                 result.enemies = projected.enemies;
                 result.stages = projected.stages;
+                // Each boss carries its decoded 64-byte record (decode-boss
+                // .js — HP, score, HP-stage playlist, patterns with fire
+                // points and part spawns), traced from the play engine's
+                // boss routines.
                 result.bosses = projected.stages
-                    .map((st, stage) => (st.boss ? { stage, sizeClass: st.boss.sizeClass, row: st.boss.row, col: st.boss.col } : null))
+                    .map((st, stage) => (st.boss ? {
+                        stage,
+                        sizeClass: st.boss.sizeClass,
+                        row: st.boss.row,
+                        col: st.boss.col,
+                        behavior: readBossTrailer(assembly.decompressed, stage),
+                    } : null))
                     .filter(Boolean);
                 result.confidence.enemies = "confirmed";
                 result.confidence.attributes = "confirmed";
@@ -141,11 +152,33 @@ export function decodeSave(payload) {
                         );
                         // Boss frames are appended, so their indices shift past
                         // the enemy sprites they follow in the shared list.
+                        // `core` says whether the frames are the boss's own
+                        // animated core or fallback figure pieces (which must
+                        // not be played as one animation).
                         for (const b of result.bosses) {
-                            const keys = boss.spriteKeysByStage.get(b.stage);
-                            if (keys) b.spriteKeys = keys.map((i) => i + sprites.length);
+                            const entry = boss.spriteKeysByStage.get(b.stage);
+                            if (entry) {
+                                b.spriteKeys = entry.keys.map((i) => i + sprites.length);
+                                b.coreArt = entry.core;
+                            }
                         }
-                        result.sprites = sprites.concat(boss.sprites);
+                        // Part art for the trailer's type-3/4 fire points:
+                        // pieces the roster already extracted are referenced
+                        // in place, the rest render from the boss's own stage
+                        // bank and append after the boss frames.
+                        const parts = extractBossPartSprites(
+                            assembly.decompressed,
+                            cgPages,
+                            result.cg.palettes,
+                            result.bosses,
+                            result.enemies,
+                            sprites.length + boss.sprites.length,
+                        );
+                        for (const b of result.bosses) {
+                            const partArt = parts.partKeysByStage.get(b.stage);
+                            if (partArt) b.partArt = partArt;
+                        }
+                        result.sprites = sprites.concat(boss.sprites, parts.sprites);
                         if (result.sprites.length) result.confidence.sprites = "heuristic";
                         // Stage backgrounds as art: one sprite per distinct
                         // tile plus a compact per-stage grid, so the game can

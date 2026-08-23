@@ -191,12 +191,46 @@ test("a stage's own boss art and placement are carried over", () => {
         { key: "dezaBoss0_1", w: 8, h: 8, rgba: new Uint8ClampedArray(256) },
     ];
     decoded.stages = [{ rows: [new Array(GRID_COLS).fill(null)] }, { rows: [new Array(GRID_COLS).fill(null)] }];
-    decoded.bosses = [{ stage: 0, sizeClass: 2, row: 479, col: 8, spriteKeys: [0, 1] }];
+    decoded.bosses = [{ stage: 0, sizeClass: 2, row: 479, col: 8, spriteKeys: [0, 1], coreArt: true }];
     const { gameJson } = mapSaveToGame(decoded);
     assert.deepStrictEqual(gameJson.bossData.boss0.anim.idle, ["dezaBoss0_0.gif", "dezaBoss0_1.gif"]);
     assert.deepStrictEqual(gameJson.bossData.boss0.dezaemon, { sizeClass: 2, row: 479, col: 8 });
     // a stage the save gave no boss still ends, on the default one
     assert.strictEqual(gameJson.bossData.boss1.name, BUILTIN_DEFAULTS.starterBoss.name);
+    assert.ok(validateGameJson(gameJson).ok);
+});
+
+test("boss part art maps sprite indices to atlas frame names", () => {
+    const decoded = emptyDecoded();
+    decoded.sprites = [
+        { key: "dezaPart0_45_0", w: 32, h: 32, rgba: new Uint8ClampedArray(4096) },
+        { key: "dezaPart0_46_0", w: 32, h: 32, rgba: new Uint8ClampedArray(4096) },
+    ];
+    decoded.stages = [{ rows: [new Array(GRID_COLS).fill(null)] }];
+    decoded.bosses = [{
+        stage: 0, sizeClass: 2, row: 479, col: 8,
+        partArt: { 45: [0], 46: [1, 99] }, // 99: an index that resolved to nothing
+    }];
+    const { gameJson } = mapSaveToGame(decoded);
+    assert.deepStrictEqual(gameJson.bossData.boss0.dezaemon.partArt, {
+        45: ["dezaPart0_45_0.gif"],
+        46: ["dezaPart0_46_0.gif"],
+    });
+    assert.ok(validateGameJson(gameJson).ok);
+});
+
+test("fallback boss pieces become idle/attack forms, not an animation", () => {
+    const decoded = emptyDecoded();
+    decoded.sprites = [
+        { key: "dezaBoss0_0", w: 8, h: 8, rgba: new Uint8ClampedArray(256) },
+        { key: "dezaBoss0_1", w: 8, h: 8, rgba: new Uint8ClampedArray(256) },
+    ];
+    decoded.stages = [{ rows: [new Array(GRID_COLS).fill(null)] }];
+    // no coreArt: the save painted no core, so the frames are figure pieces
+    decoded.bosses = [{ stage: 0, sizeClass: 2, row: 479, col: 8, spriteKeys: [0, 1] }];
+    const { gameJson } = mapSaveToGame(decoded);
+    assert.deepStrictEqual(gameJson.bossData.boss0.anim.idle, ["dezaBoss0_0.gif"]);
+    assert.deepStrictEqual(gameJson.bossData.boss0.anim.attack, ["dezaBoss0_1.gif"]);
     assert.ok(validateGameJson(gameJson).ok);
 });
 
