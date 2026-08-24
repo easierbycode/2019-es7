@@ -8,16 +8,22 @@
 // Phaser, plus the stage background tilemap the import ships as
 // stage.background + recipe.backgroundCells.
 //
-// Time base: everything here ticks on the scene's worldTime — one unit per
-// fixedUpdate step while the stage runs, frozen during the time-stop — so
-// the map scroll, wave pacing (8 frames/row) and channel interpolators stay
-// on the one clock the Saturn game used.
+// Time base: the record's units are SATURN FRAMES (1/60s) — speeds in
+// px/frame, fire reloads in frames, 8 frames per 16px map row — but the
+// scene's fixedUpdate steps at 8.33ms (120 Hz), twice per Saturn frame.
+// Every rate in this module therefore advances once per SATURN_TICKS_PER_FRAME
+// fixedUpdates (the scroll spreads its 2px across both ticks so it stays
+// smooth). Before this conversion the whole import — scroll, waves, enemy
+// speed, fire cadence — played at exactly double the capture's pace.
 
 import { gameState } from "../gameState.js";
 
 var TILE = 16;
-// px of map per worldTime tick: 16px rows at 8 frames/row (see
-// FRAMES_PER_SOURCE_ROW in the importer).
+// fixedUpdate steps per Saturn frame (8.33ms steps vs the Saturn's 60 fps).
+export var SATURN_TICKS_PER_FRAME = 2;
+// px of map per SATURN FRAME: 16px rows at 8 frames/row (see
+// FRAMES_PER_SOURCE_ROW in the importer). Per fixedUpdate tick the scroll
+// moves SCROLL_PX_PER_FRAME / SATURN_TICKS_PER_FRAME.
 export var SCROLL_PX_PER_FRAME = 2;
 // The scroll runs this much past the plain boss-row park, so the chamber
 // artwork (and the boss standing on it) clears the HUD bar instead of being
@@ -191,12 +197,36 @@ function stepChannel(st) {
     return st.value;
 }
 
+// The capture never shows a zako reloading faster than the slowest table
+// entry: records that decode to 3-11 frame intervals (Ramsie's moths and
+// butterflies) fire sparse single rings on hardware, not streams. Until the
+// fast-interval semantics are traced (FORMAT.md), the runtime floors every
+// zako reload at the mode-0 default so cadence matches the capture (~2s).
+var MIN_ZAKO_RELOAD_FRAMES = 119;
+
+function zakoReload(fire) {
+    return Math.max(fire.interval, MIN_ZAKO_RELOAD_FRAMES) +
+        Math.floor(Math.random() * (fire.window || 1));
+}
+
+// Movement patterns that ride the map (b2's packed mode+flag byte, decoded
+// as movePattern): mode 0 with the flag (statues, pillars, domes) and mode 2
+// either way (the depth-illusion rocks and drifting butterflies). In the
+// Saturn capture these stay glued to their scenery — pixel-locked to ledges
+// for their whole run — while mode-0-flagless enemies (the hovering roc,
+// swooping moths) move in SCREEN space and ignore the scroll entirely.
+function ridesTheMap(movePattern) {
+    return movePattern === 4 || (movePattern & 3) === 2;
+}
+
 // Attach runtime channel state for a spawned enemy. `behavior` is the decoded
 // record from enemyData.*.dezaemon.behavior.
 export function initEnemyBehavior(enemy, behavior) {
     enemy.setData("deza", {
         behavior: behavior,
         age: 0,
+        tick: 0,
+        pinned: ridesTheMap(behavior.movePattern),
         speedCh: makeChannel(behavior.speedChange, null),
         rotationCh: makeChannel(behavior.rotation, {
             wrap: true,
@@ -205,10 +235,19 @@ export function initEnemyBehavior(enemy, behavior) {
             spin: behavior.rotation.mode >= 3,
         }),
         scaleCh: makeChannel(behavior.scale, null),
-        directionCh: makeChannel(behavior.direction, { wrap: true }),
-        // stagger the first volley inside the engine's randomization window
-        reload: behavior.fire.enabled
-            ? behavior.fire.interval + Math.floor(Math.random() * (behavior.fire.window || 1))
+        // No wrap: a flat direction channel (from == to) HOLDS its heading.
+        // Spun as a circle it sent Ramsie's roc riding the scroll to the
+        // screen bottom; held at 0 (up-map, fighting the scroll) the roc
+        // hangs near the top of the screen like the capture shows.
+        directionCh: makeChannel(behavior.direction, null),
+        // Special fire patterns (b5 = 10/11/12) are the three untraced
+        // engine handlers. Ramsie's statues carry pattern 11 and emit
+        // NOTHING in 55s of capture — played as aimed volleys they were the
+        // bullet spam the import was known for. Silent until traced.
+        // Otherwise: stagger the first volley inside the engine's
+        // randomization window.
+        reload: behavior.fire.enabled && behavior.fire.pattern == null
+            ? zakoReload(behavior.fire)
             : -1,
     });
     if (behavior.ground) {
@@ -224,19 +263,43 @@ export function updateEnemyBehavior(scene, enemy) {
     var st = enemy.getData("deza");
     if (!st) return false;
     var b = st.behavior;
-    st.age++;
 
-    // Ride the map: everything drifts down with the scroll (frozen once the
-    // map has reached the boss chamber), plus the enemy's own motion.
+    // Everything rides the map: the whole roster drifts down with the scroll
+    // (frozen once the map has reached the boss chamber), every engine tick
+    // so scenery stays pixel-locked to its ledge.
     var scroll = scene.dezaBg
         ? scene.dezaBg.lastDelta
-        : (scene.bossActive || scene.bossReached ? 0 : SCROLL_PX_PER_FRAME);
+        : (scene.bossActive || scene.bossReached
+            ? 0 : SCROLL_PX_PER_FRAME / SATURN_TICKS_PER_FRAME);
+    enemy.y += scroll;
+
+    // The record's rates are per Saturn frame (60 fps); the fixed step runs
+    // twice that, so the rest of the driver advances every other tick.
+    st.tick++;
+    if (st.tick % SATURN_TICKS_PER_FRAME) return true;
+    st.age++;
+
+    // An enemy's own velocity FIGHTS the scroll: heading 0 = map-forward
+    // (up-screen). The capture pins both ends of this: the max-speed roc
+    // (1.56 px/f, no channels) hangs near the top of the screen for ten
+    // seconds — its speed nearly cancelling the 2 px/f scroll — while the
+    // slow bats sweep briskly down-screen with the map. Played the old way
+    // (heading 0 = down, speed ADDING to the scroll) the statues slid off
+    // their pedestals, which is the "statues move" bug.
+    //
+    // Scenery records — movement mode 0 with the pattern flag (statues,
+    // pillars, the glass domes) or mode 2 (depth rocks, drifting
+    // butterflies) — ignore their own speed entirely and stay fixed on the
+    // map as it scrolls past; their channels still animate the visual
+    // transforms below.
     var mult = st.speedCh ? stepChannel(st.speedCh) : 1;
-    var dirDeg = st.directionCh ? stepChannel(st.directionCh) : 180;
+    var dirDeg = st.directionCh ? stepChannel(st.directionCh) : 0;
     var speed = b.speed * mult;
-    var rad = dirDeg * Math.PI / 180;
-    enemy.x += Math.sin(rad) * speed;
-    enemy.y += -Math.cos(rad) * speed + scroll;
+    if (!st.pinned) {
+        var rad = dirDeg * Math.PI / 180;
+        enemy.x += Math.sin(rad) * speed;
+        enemy.y += -Math.cos(rad) * speed;
+    }
 
     if (st.rotationCh) {
         enemy.rotation = stepChannel(st.rotationCh) * Math.PI / 180;
@@ -264,61 +327,94 @@ export function updateEnemyBehavior(scene, enemy) {
             else if (f < 0.45) a = Math.max(0.3, f / 0.45);
             enemy.setAlpha(a);
             enemy.setData("dezaNoContact", f > 1.5 || f < 0.45);
+            // A finished one-shot arc that ended out of the playfield plane
+            // is a rock that fell through the floor or rose past the camera:
+            // its story is over. Free enemies no longer ride the scroll off
+            // the screen, so retire it here or its ghost hangs around.
+            if (st.scaleCh.done && (f > 1.5 || f < 0.45)) {
+                enemy.setData("dezaGone", true);
+            }
         }
     }
     return true;
 }
 
+// Zako bullets in the capture are small cyan rings drifting at ~1.35 px per
+// Saturn frame — the save's real bullet art and speed bank are not decoded
+// (FORMAT.md), so every zako fires this stand-in instead of the stock purple
+// projectile the imports used to spray.
+var ZAKO_BULLET_KEY = "dezaZakoBullet";
+export var ZAKO_BULLET_SPEED = 1.35; // px per Saturn frame, from the capture
+
+function ensureZakoBulletTexture(scene) {
+    if (scene.textures.exists(ZAKO_BULLET_KEY)) return;
+    var tex = scene.textures.createCanvas(ZAKO_BULLET_KEY, 12, 12);
+    var ctx = tex.getContext();
+    ctx.strokeStyle = "#8ff6ff";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(6, 6, 4, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillStyle = "rgba(220,255,255,0.9)";
+    ctx.fillRect(5, 3, 2, 2); // glint
+    tex.refresh();
+}
+
 // Fire the decoded pattern. Returns true when it handled shooting (the caller
 // then skips the legacy interval logic).
 // Volley patterns (b2 bits 6-7): 0 straight, 1 spread of `count`, 2 aimed,
-// 3 fixed — all four fire when the appearance allows it. The base angle
-// comes from byte 5; its exact engine mapping is the heuristic left here.
+// 3 fixed. Byte 5's angle parameter is untraced — read literally it aimed
+// half the roster sideways or backwards — so straight/fixed volleys fire
+// down-screen, which is where every attributable shot in the capture goes.
 export function updateEnemyFire(scene, enemy, shootFn) {
     var st = enemy.getData("deza");
     if (!st) return false;
     var fire = st.behavior.fire;
     // The appearance decides whether an enemy shoots at all (the engine's
-    // dispatcher gate); reload < 0 marks it silent for its whole life.
+    // dispatcher gate); reload < 0 marks it silent for its whole life —
+    // no-fire appearances and the untraced special patterns (init).
     if (!fire.enabled || st.reload < 0) return true;
+    // Reloads count Saturn frames, not engine ticks.
+    if (st.tick % SATURN_TICKS_PER_FRAME) return true;
     st.reload -= 1;
     if (st.reload > 0) return true;
-    st.reload = fire.interval + Math.floor(Math.random() * (fire.window || 1));
+    st.reload = zakoReload(fire);
     // The engine only lets an enemy fire inside a band near the top of the
     // screen — it shoots as it comes on, and goes quiet once it has passed.
-    // That band, not the reload, is what keeps a dense stage readable.
+    // That band, not the reload, is what keeps a dense stage readable: a
+    // scenery record crosses it in fewer frames than one reload, so statues
+    // and pillars mostly never get a shot off, exactly like the capture.
     var GH = scene.scale ? scene.scale.height : 480;
     if (!scene.playerSprite) return true;
     if (enemy.y < 16 || enemy.y > GH * 0.4) return true;
 
     var base;
-    if (fire.pattern !== null && fire.pattern !== undefined) {
-        // b5 & 0xF of 10/11/12 routes to one of the engine's three special
-        // pattern handlers rather than the angle path. Their shapes are not
-        // decoded, so these aim at the player instead of firing at the angle
-        // those values would have meant — which pointed them sideways.
-        var pdx = scene.playerSprite.x - enemy.x;
-        var pdy = scene.playerSprite.y - enemy.y;
-        base = Math.atan2(pdx, -pdy);
-    } else if (fire.direction) {
-        base = fire.direction * (360 / 32) * Math.PI / 180; // 0 = up, cw
-    } else if (fire.type === 0 || fire.type === 3) {
-        base = Math.PI; // straight down
-    } else {
+    if (fire.type === 2) {
         var dx = scene.playerSprite.x - enemy.x;
         var dy = scene.playerSprite.y - enemy.y;
         base = Math.atan2(dx, -dy); // aim at the player
+    } else {
+        base = Math.PI; // straight down
     }
 
+    ensureZakoBulletTexture(scene);
+    var fireOne = function (a) {
+        var bullet = shootFn(scene, enemy, Math.sin(a), -Math.cos(a));
+        if (!bullet) return;
+        bullet.setTexture(ZAKO_BULLET_KEY);
+        bullet.setData("frames", null);
+        // px per engine tick; the shared bullet loop steps every tick.
+        bullet.setData("speed", ZAKO_BULLET_SPEED / SATURN_TICKS_PER_FRAME);
+    };
     if (fire.type === 1) {
         var n = Math.max(1, fire.count);
         var spread = (fire.wide ? 90 : 40) * Math.PI / 180;
         for (var i = 0; i < n; i++) {
             var a = n === 1 ? base : base - spread / 2 + (spread * i) / (n - 1);
-            shootFn(scene, enemy, Math.sin(a), -Math.cos(a));
+            fireOne(a);
         }
     } else {
-        shootFn(scene, enemy, Math.sin(base), -Math.cos(base));
+        fireOne(base);
     }
     return true;
 }
@@ -564,7 +660,9 @@ function spawnDezaBossBullet(scene, x, y, dirX, dirY, projData, tint) {
     var bullet = scene.add.sprite(x, y, "game_asset", frames[0] || "normalProjectile0.gif");
     bullet.setOrigin(0.5);
     bullet.setDepth(47);
-    bullet.setData("speed", projData.speed || DEZA_BOSS_BULLET.speed);
+    // Authored speeds are px per Saturn frame; the bullet loop steps per tick.
+    bullet.setData("speed",
+        (projData.speed || DEZA_BOSS_BULLET.speed) / SATURN_TICKS_PER_FRAME);
     bullet.setData("damage", projData.damage || 1);
     bullet.setData("hp", projData.hp || 1);
     bullet.setData("score", projData.score || 0);
@@ -616,7 +714,7 @@ function fireDezaFlame(scene, fp) {
             Math.sin(a), Math.cos(a),
             DEZA_BOSS_BULLET, 0xff9944
         );
-        b.setData("speed", speed);
+        b.setData("speed", speed / SATURN_TICKS_PER_FRAME);
         b.setScale(1 + Math.random() * 0.5);
     }
 }
@@ -685,6 +783,10 @@ export function updateDezaBoss(scene) {
         return;
     }
     var b = st.boss;
+    // Pattern pacing, beam keyframes and sway are authored in Saturn frames;
+    // advance them every other engine tick (same conversion as the zako).
+    st.tick = (st.tick || 0) + 1;
+    if (st.tick % SATURN_TICKS_PER_FRAME) return;
     st.age++;
 
     // HP bands are equal slices of the bar; dropping into a lower band
@@ -771,7 +873,8 @@ export function updateDezaBossPart(scene, part) {
     }
     var dx = pd.dx;
     if (pd.mobile) {
-        dx += Math.sin((scene.worldTime + pd.phase) * 0.05) * 6;
+        // worldTime counts engine ticks; the drift was authored per frame.
+        dx += Math.sin((scene.worldTime / SATURN_TICKS_PER_FRAME + pd.phase) * 0.05) * 6;
     }
     part.x = boss.x + dx;
     part.y = boss.y + pd.dy;

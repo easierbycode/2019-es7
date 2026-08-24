@@ -12,6 +12,14 @@ import { initEnemyBehavior, updateEnemyBehavior, updateEnemyFire, updateDezaBoss
 var GW = GAME_DIMENSIONS.WIDTH;
 var GH = GAME_DIMENSIONS.HEIGHT;
 
+// The Saturn engine keeps its zako in a fixed object pool: when every slot
+// is live, a wave's extra spawns are simply skipped. Ramsie's butterfly
+// finale places ~100 enemies inside 20 scroll rows, and the capture never
+// shows more than about two dozen at once — without this cap the swarm
+// quadruples. Dezaemon imports only (their waves are dense enough to hit
+// it); the legacy 8-wide levels never come close.
+var DEZA_MAX_LIVE_ZAKO = 32;
+
 /**
  * Creates a single enemy sprite with all required data keys.
  *
@@ -104,10 +112,20 @@ export function enemyWave(scene) {
 
     var row = scene.stageEnemyPositionList[scene.waveCount] || [];
     // The grid is as wide as the level says. Eight columns is the historical
-    // width; a Dezaemon 2 import is fourteen, matching the Saturn playfield it
-    // came from, so its formations keep their spacing instead of being binned.
+    // width; a Dezaemon 2 import is twenty, the Saturn's own placement grid.
     var cols = row.length || 8;
     var cellW = GW / cols;
+
+    // A Dezaemon import's placement grid is 16px columns spanning 320px,
+    // CENTERED over the 224px playfield (3 columns of margin each side, so
+    // enemies can enter from beyond the walls). Squeezing it into GW/cols
+    // cells shifted every off-center placement — the glass domes sat beside
+    // their pedestals instead of on them. Rows likewise: a scenery record
+    // must land exactly on its own map row, so the spawn Y comes from the
+    // scroll, not a fixed lip above the screen.
+    var deza = scene.dezaBg && scene.stageWaveRows;
+    var dezaRow = deza ? scene.stageWaveRows[scene.waveCount] : 0;
+    var gridLeft = (GW - cols * 16) / 2;
 
     for (var i = 0; i < row.length; i++) {
         var code = String(row[i]);
@@ -130,7 +148,28 @@ export function enemyWave(scene) {
         case "9": itemName = PLAYER_STATES.BARRIER; break;
         }
 
-        createEnemy(scene, enemyData, cellW * i + cellW / 2, -16, itemName);
+        // Pool-full behavior matches the hardware: the spawn is dropped, not
+        // queued. Only Dezaemon-driven enemies count against or honor the cap.
+        if (enemyData.dezaemon && enemyData.dezaemon.behavior &&
+            scene.enemies.length >= DEZA_MAX_LIVE_ZAKO) {
+            continue;
+        }
+
+        var ex, ey;
+        if (deza) {
+            // Anchors calibrated against the scenery the save draws under
+            // its own placements (Ramsie's glass domes cap the hooded-pod
+            // artwork of the stage background, dome tip peeking above the
+            // bulb): a placement centers one tile right of its grid
+            // column's left edge and a tile and a half into its map row.
+            ex = gridLeft + i * 16 + 16;
+            ey = GH + scene.dezaBg._scroll - (dezaRow * 16 + 24);
+            if (ey > -16) ey = -16; // boss-rush flushes spawn off-screen
+        } else {
+            ex = cellW * i + cellW / 2;
+            ey = -16;
+        }
+        createEnemy(scene, enemyData, ex, ey, itemName);
     }
 
     scene.waveCount++;

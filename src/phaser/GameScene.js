@@ -6,7 +6,7 @@ import { gameState, saveHighScore } from "../gameState.js";
 import { PLAYER_STATES } from "../enums/player-boss-states.js";
 import { triggerHaptic } from "../haptics.js";
 import { assetStageId, lastStageId } from "./stages.js";
-import { buildStageBackground, SCROLL_PX_PER_FRAME, startDezaemonBgm, stopDezaemonBgm, playDezaemonSfx, updateDezaBoss } from "./dezaemon-runtime.js";
+import { buildStageBackground, SCROLL_PX_PER_FRAME, SATURN_TICKS_PER_FRAME, startDezaemonBgm, stopDezaemonBgm, playDezaemonSfx, updateDezaBoss } from "./dezaemon-runtime.js";
 
 // Stock sound keys that an imported save's SFX bank replaces.
 var DEZA_SFX_MAP = {
@@ -227,16 +227,22 @@ export class PhaserGameScene extends Phaser.Scene {
             var firstRow = rowsAsc[0] || 0;
             var perRow = this.waveInterval || 8;
             var self0 = this;
+            // waveInterval is Saturn frames per row; worldTime counts engine
+            // ticks at SATURN_TICKS_PER_FRAME per frame, so map-absolute due
+            // times scale up by that factor. The 256-frame lead fires the
+            // wave while its map row is still 40px above the screen — the
+            // spawn then lands each enemy exactly on that row (enemyWave),
+            // so scenery materializes off-screen yet on its pedestal.
             this.waveDueTicks = rowsAsc.map(function (row) {
                 return self0.dezaBg
-                    ? Math.max(0, row * perRow - 232)
+                    ? Math.max(0, (row * perRow - 256) * SATURN_TICKS_PER_FRAME)
                     : (row - firstRow) * perRow;
             });
         }
         // The boss is due when the scroll parks on its chamber, not merely
         // one beat after the last wave.
         this.bossDueTick = this.dezaBg && dezaBossRow !== null
-            ? Math.ceil(this.dezaBg.stopScroll / SCROLL_PX_PER_FRAME)
+            ? Math.ceil(this.dezaBg.stopScroll * SATURN_TICKS_PER_FRAME / SCROLL_PX_PER_FRAME)
             : null;
         // Boss rush (shortFlg) already emptied the waves; with an imported
         // map the boss is ALSO gated on the scroll reaching its chamber, so
@@ -1008,7 +1014,8 @@ export class PhaserGameScene extends Phaser.Scene {
             this.worldTime += 1;
         }
         if (this.dezaBg) {
-            this.dezaBg.setScroll(this.worldTime * SCROLL_PX_PER_FRAME);
+            // worldTime is engine ticks; the scroll rate is per Saturn frame.
+            this.dezaBg.setScroll(this.worldTime * SCROLL_PX_PER_FRAME / SATURN_TICKS_PER_FRAME);
         } else if (this.stageBg && !this.playerDead && !this.stageCleared) {
             if (!this.bossActive && !this.bossReached) {
                 var bgMove = this.gameStarted ? (this.stageBgAmountMove || 0.7) : 0.7;
@@ -1093,7 +1100,8 @@ export class PhaserGameScene extends Phaser.Scene {
             // blocks also skips the loop's off-screen cleanup, so do that
             // here or an untouchable drifter leaks forever.
             if (enemy.getData("dezaNoContact")) {
-                if (enemy.y > GH + 20 || enemy.x < -40 || enemy.x > GW + 40) {
+                if (enemy.getData("dezaGone") ||
+                    enemy.y > GH + 20 || enemy.x < -40 || enemy.x > GW + 40) {
                     this.enemies.splice(e, 1);
                     var ncShadow = enemy.getData("shadow");
                     if (ncShadow && ncShadow.active) ncShadow.destroy();
