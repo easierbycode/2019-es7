@@ -491,3 +491,29 @@ test("stage backgrounds emit a valid tile grid over packed cells", () => {
     assert.strictEqual((bin[2] << 8) | bin[3], 0x8001);
     assert.strictEqual((bin[4] << 8) | bin[5], 0xffff);
 });
+
+test("an import skips the story scenes by default, and its title art maps to frames", () => {
+    const decoded = emptyDecoded();
+    decoded.sprites = [
+        { key: "dezaTitle1", w: 106, h: 30, rgba: new Uint8ClampedArray(106 * 30 * 4) },
+        { key: "dezaTitle2", w: 128, h: 64, rgba: new Uint8ClampedArray(128 * 64 * 4) },
+        { key: "dezaCredit", w: 57, h: 13, rgba: new Uint8ClampedArray(57 * 13 * 4) },
+    ];
+    decoded.titleArt = { title1: 0, title2: 1, credit: 2 };
+    const { gameJson } = mapSaveToGame(decoded);
+    // The Saturn has no adventure interludes — AdvScene is skipped unless the
+    // author flips the editor's NO STORY toggle back off.
+    assert.strictEqual(gameJson.noStory, true);
+    assert.deepStrictEqual(gameJson.dezaemonTitle, {
+        title1: "dezaTitle1.gif",
+        title2: "dezaTitle2.gif",
+        credit: "dezaCredit.gif",
+    });
+    assert.ok(validateGameJson(gameJson).ok);
+});
+
+test("a save with no painted title carries no dezaemonTitle at all", () => {
+    const { gameJson } = mapSaveToGame(emptyDecoded());
+    assert.strictEqual(gameJson.noStory, true);
+    assert.strictEqual(gameJson.dezaemonTitle, undefined);
+});

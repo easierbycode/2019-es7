@@ -810,6 +810,9 @@ export class PhaserGameScene extends Phaser.Scene {
                 if (en && en.active) {
                     var ex = en.x, ey = en.y, ew = en.width || 0;
                     if (ex < -ew / 2 || ex > GW || ey < 20 || ey > GH) continue;
+                    // out-of-plane depth enemies are untouchable by the SP
+                    // sweep too — shots of every kind pass through them
+                    if (en.getData("dezaNoContact")) continue;
                     var isBoss = en.getData("type") === "boss";
                     if (isBoss) {
                         var ehp = en.getData("hp") - spDamage;
@@ -1081,6 +1084,23 @@ export class PhaserGameScene extends Phaser.Scene {
             animateEnemy(enemy, step);
 
             var eRect = { x: enemy.x - enemy.width / 2, y: enemy.y - enemy.height / 2, w: enemy.width, h: enemy.height };
+
+            // A depth-scaled Dezaemon enemy far out of the playfield plane
+            // (a rock high overhead, or one fallen through the floor) can
+            // neither be shot nor touch the player — shots pass through it
+            // on hardware. The flag tracks the scale band each frame
+            // (dezaemon-runtime updateEnemyBehavior). Skipping the collision
+            // blocks also skips the loop's off-screen cleanup, so do that
+            // here or an untouchable drifter leaks forever.
+            if (enemy.getData("dezaNoContact")) {
+                if (enemy.y > GH + 20 || enemy.x < -40 || enemy.x > GW + 40) {
+                    this.enemies.splice(e, 1);
+                    var ncShadow = enemy.getData("shadow");
+                    if (ncShadow && ncShadow.active) ncShadow.destroy();
+                    enemy.destroy();
+                }
+                continue;
+            }
 
             // Bullet-enemy collision
             for (var bb = this.playerBullets.length - 1; bb >= 0; bb--) {

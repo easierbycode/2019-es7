@@ -13,6 +13,8 @@
 // the map scroll, wave pacing (8 frames/row) and channel interpolators stay
 // on the one clock the Saturn game used.
 
+import { gameState } from "../gameState.js";
+
 var TILE = 16;
 // px of map per worldTime tick: 16px rows at 8 frames/row (see
 // FRAMES_PER_SOURCE_ROW in the importer).
@@ -246,6 +248,23 @@ export function updateEnemyBehavior(scene, enemy) {
             axes.indexOf("x") >= 0 ? f : enemy.scaleX,
             axes.indexOf("y") >= 0 ? f : enemy.scaleY
         );
+        // A both-axis scale arc is the Saturn's DEPTH illusion — rocks that
+        // fall from above the playfield down through it (Ramsie stage 4:
+        // 3->0), or debris rising past the camera (0->3). Sell it the way the
+        // hardware does: fully solid through the playfield band, going
+        // mesh-transparent as it leaves the plane. Out of plane it neither
+        // touches the player nor takes shots — the capture shows shots
+        // passing straight through the ghosts — and the transparency ramp
+        // starts at the SAME thresholds the contact gate uses, so an
+        // intangible enemy always reads as one (GameScene checks
+        // dezaNoContact).
+        if (axes === "xy") {
+            var a = 1;
+            if (f > 1.5) a = Math.max(0.45, 1 - (f - 1.5) * 0.45);
+            else if (f < 0.45) a = Math.max(0.3, f / 0.45);
+            enemy.setAlpha(a);
+            enemy.setData("dezaNoContact", f > 1.5 || f < 0.45);
+        }
     }
     return true;
 }
@@ -908,16 +927,23 @@ function makeNoiseBuffer(ctx) {
     return buf;
 }
 
-// Start (or switch) the imported soundtrack for a scene. `which` is "main"
-// or "boss"; the assignment comes from the save's own BGM table.
+// Start (or switch) the imported soundtrack for a scene. `which` is "main",
+// "boss" or "title"; the assignment comes from the save's own BGM table —
+// per-stage (main, boss) pairs, and the first special track for the title
+// screen. Scenes without a recipe property fall back to the shared handle.
 export function startDezaemonBgm(scene, which) {
-    var bgm = scene.recipe && scene.recipe.dezaemonBgm;
+    var bgm = (scene.recipe || gameState._phaserRecipe || {}).dezaemonBgm;
     if (!bgm) return false;
     var ctx = audioCtx(scene);
     if (!ctx) return false;
-    var stageId = typeof scene.bossStageId === "number" ? scene.bossStageId : 0;
-    var pair = (bgm.stages && bgm.stages[stageId]) || null;
-    var idx = pair ? (which === "boss" ? pair[1] : pair[0]) : null;
+    var idx;
+    if (which === "title") {
+        idx = bgm.special ? bgm.special[0] : null;
+    } else {
+        var stageId = typeof scene.bossStageId === "number" ? scene.bossStageId : 0;
+        var pair = (bgm.stages && bgm.stages[stageId]) || null;
+        idx = pair ? (which === "boss" ? pair[1] : pair[0]) : null;
+    }
     if (idx == null || !bgm.songs || bgm.songs[idx] == null) return false;
 
     stopDezaemonBgm(scene);

@@ -20,7 +20,7 @@ import { decodeCg } from "./decode-cg.js";
 import { decodeStages, sec5Regions, projectForEditor } from "./decode-stage.js";
 import { decodeSongs } from "./decode-song.js";
 import { decodeSettings } from "./decode-settings.js";
-import { extractEnemySprites, extractBossSprites, extractBossPartSprites, extractBackgroundCells } from "./decode-sprites.js";
+import { extractEnemySprites, extractBossSprites, extractBossPartSprites, extractBackgroundCells, extractTitleArt } from "./decode-sprites.js";
 import { readBossTrailer } from "./decode-boss.js";
 
 export function decodeSave(payload) {
@@ -178,7 +178,19 @@ export function decodeSave(payload) {
                             const partArt = parts.partKeysByStage.get(b.stage);
                             if (partArt) b.partArt = partArt;
                         }
-                        result.sprites = sprites.concat(boss.sprites, parts.sprites);
+                        // The drawn title screen (TITLE 1/2 compositions and
+                        // the credit strips from the global sprite bank),
+                        // appended after the parts.
+                        const titleArt = extractTitleArt(
+                            assembly.decompressed,
+                            cgPages,
+                            result.cg.palettes,
+                            sprites.length + boss.sprites.length + parts.sprites.length,
+                        );
+                        if (Object.keys(titleArt.roles).length) {
+                            result.titleArt = titleArt.roles;
+                        }
+                        result.sprites = sprites.concat(boss.sprites, parts.sprites, titleArt.sprites);
                         if (result.sprites.length) result.confidence.sprites = "heuristic";
                         // Stage backgrounds as art: one sprite per distinct
                         // tile plus a compact per-stage grid, so the game can

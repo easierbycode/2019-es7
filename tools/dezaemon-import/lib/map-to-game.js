@@ -409,6 +409,22 @@ export function mapSaveToGame(decoded, { defaults = BUILTIN_DEFAULTS, sourceEntr
         bossData[`boss${s}`] = rec;
     }
 
+    // A Dezaemon game has no adventure interludes — the Saturn goes straight
+    // from stage to stage — so imports default to skipping AdvScene. The
+    // editor's NO STORY toggle can flip it back.
+    gameJson.noStory = true;
+
+    // The save's own DRAWN title screen (TITLE 1/2 + credit strips from the
+    // global sprite bank): atlas frame names for the runtime's title scene.
+    if (decoded.titleArt) {
+        const dezaemonTitle = {};
+        for (const [role, idx] of Object.entries(decoded.titleArt)) {
+            const key = spriteKeyByIndex[idx];
+            if (key) dezaemonTitle[role] = key;
+        }
+        if (Object.keys(dezaemonTitle).length) gameJson.dezaemonTitle = dezaemonTitle;
+    }
+
     // Player + bullets always come from the Duke character, never from
     // `defaults`. The editor derives `defaults` from whatever game is currently
     // open, and its player may be a custom one whose frames live only in that

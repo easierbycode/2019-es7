@@ -102,6 +102,23 @@ function addPixiPositionedText(scene, x, y, value, style) {
     return text;
 }
 
+// The game is over once the stage just cleared was the recipe's last — stage
+// 4 for the shipped game, stage 8 for a nine-stage import. The shipped game
+// hides its stage 4 behind the akebono condition — but that secret belongs to
+// the stock game, not to a no-story import that happens to be five stages
+// (Ramsie is): the Saturn plays every stage it has, so noStory recipes skip
+// the gate entirely.
+function decideEnding(recipe) {
+    var finalStage = recipe ? lastStageId(recipe) : 4;
+    if (gameState.stageId > finalStage) return true;
+    if (gameState.stageId === finalStage &&
+        finalStage === 4 && !(recipe && recipe.noStory) &&
+        !(gameState.akebonoCnt >= 4 && gameState.continueCnt === 0)) {
+        return true;
+    }
+    return false;
+}
+
 export class PhaserAdvScene extends Phaser.Scene {
     constructor() {
         super({ key: "PhaserAdvScene" });
@@ -109,6 +126,23 @@ export class PhaserAdvScene extends Phaser.Scene {
 
     create() {
         var recipe = gameState._phaserRecipe;
+        // "No story": the recipe skips the adventure interludes entirely —
+        // Dezaemon imports default to this, the Saturn goes straight from
+        // stage to stage. The scene still owns the ending-vs-next-stage
+        // routing, so decide that and pass through without rendering a frame.
+        // An attached adv scene script outranks the skip (__advSceneScripted,
+        // set by the cmg boot entry's ScriptedAdvScene) — the author routed
+        // here to preview it.
+        if (recipe && recipe.noStory && !this.__advSceneScripted) {
+            this.endingFlg = decideEnding(recipe);
+            var nextScene = this.endingFlg ? "PhaserEndingScene" : "PhaserGameScene";
+            var game = this.game;
+            setTimeout(function () {
+                game.scene.stop("PhaserAdvScene");
+                game.scene.start(nextScene);
+            }, 50);
+            return;
+        }
         if (recipe && recipe.storyData) {
             this.scenario = recipe.storyData;
         } else {
@@ -130,20 +164,9 @@ export class PhaserAdvScene extends Phaser.Scene {
         this.partTextComp = false;
         this.textTimer = 0;
 
-        // The game is over once the stage just cleared was the recipe's last —
-        // stage 4 for the shipped game, stage 8 for a nine-stage import.
-        var finalStage = recipe ? lastStageId(recipe) : 4;
-        this.endingFlg = false;
-        if (gameState.stageId > finalStage) {
-            this.endingFlg = true;
-        } else if (gameState.stageId === finalStage) {
+        this.endingFlg = decideEnding(recipe);
+        if (gameState.stageId === (recipe ? lastStageId(recipe) : 4)) {
             this.playSound("voice_thankyou", 0.7);
-            // The shipped game hides its stage 4 behind the akebono condition.
-            // A level pack of a different length has no such secret — its last
-            // stage is simply its last stage.
-            if (finalStage === 4 && !(gameState.akebonoCnt >= 4 && gameState.continueCnt === 0)) {
-                this.endingFlg = true;
-            }
         }
 
         if (!gameState.bgmContinuityActive) {

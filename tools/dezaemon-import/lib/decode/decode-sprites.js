@@ -309,6 +309,114 @@ export function extractBackgroundCells(backgrounds, sections, palettes, stageCou
     return { cells, stages };
 }
 
+// --- Title art --------------------------------------------------------
+//
+// The KUMITATE editor's TITLE page: a save's title screen is DRAWN — no
+// title text exists anywhere in the data (FORMAT.md). The compositions live
+// in the tail of the global sprite bank (+0x5D490, 232 u16be refs), laid out
+// row-major at 8 cells wide. Verified by rendering: Ramsie's script + winged
+// emblem and DEVIL BLADE 2's logo pieces compose cleanly at these slots:
+//
+//   refs 144-167   TITLE 1, 8x3 cells (128x48 px)
+//   refs 168-207   TITLE 2, 8x5 cells (128x80 px)
+//   refs 208-231   3 credit strips, 8x1 cells (128x16 px) each
+export const TITLE_SLOTS = {
+    title1: { first: 144, w: 8, h: 3 },
+    title2: { first: 168, w: 8, h: 5 },
+    credits: [{ first: 208, w: 8, h: 1 }, { first: 216, w: 8, h: 1 }, { first: 224, w: 8, h: 1 }],
+};
+
+function readBankComposition(sec5, slot) {
+    const { offset } = SEC5_REGIONS.spriteBank;
+    const cells = [];
+    for (let i = 0; i < slot.w * slot.h; i++) {
+        const at = offset + (slot.first + i) * 2;
+        cells.push(decodeWord((sec5[at] << 8) | sec5[at + 1]));
+    }
+    if (cells.every((c) => c.empty)) return null;
+    return { w: slot.w, h: slot.h, cells };
+}
+
+// Crop a rendered RGBA to its opaque bounding box so a logo drawn in a
+// corner of its slot still centers cleanly on the title screen.
+function trimRgba(img) {
+    let minX = img.w, minY = img.h, maxX = -1, maxY = -1;
+    for (let y = 0; y < img.h; y++) {
+        for (let x = 0; x < img.w; x++) {
+            if (img.rgba[(y * img.w + x) * 4 + 3]) {
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+            }
+        }
+    }
+    if (maxX < 0) return null;
+    const w = maxX - minX + 1;
+    const h = maxY - minY + 1;
+    const rgba = new Uint8ClampedArray(w * h * 4);
+    for (let y = 0; y < h; y++) {
+        const src = ((minY + y) * img.w + minX) * 4;
+        rgba.set(img.rgba.subarray(src, src + w * 4), y * w * 4);
+    }
+    return { w, h, rgba };
+}
+
+// Extract the drawn title compositions. Returns {sprites, roles} where roles
+// maps title1/title2/credit onto indices into `sprites` (absolute once the
+// caller adds `baseIndex`). The credit is the save's distinct non-empty
+// credit strips stacked vertically (Ramsie repeats one author line three
+// times; stacking distinct lines keeps a multi-line staff block intact).
+export function extractTitleArt(sec5, sections, palettes, baseIndex) {
+    const sprites = [];
+    const roles = {};
+    const placeholder = findPlaceholderCell(sec5).cell;
+    const renderSlot = (slot) => {
+        const comp = readBankComposition(sec5, slot);
+        if (!comp || isUnpainted({ frames: [comp] }, placeholder)) return null;
+        return trimRgba(renderFrame(sections, palettes, comp));
+    };
+    const title1 = renderSlot(TITLE_SLOTS.title1);
+    if (title1) {
+        roles.title1 = baseIndex + sprites.length;
+        sprites.push({ key: "dezaTitle1", ...title1 });
+    }
+    const title2 = renderSlot(TITLE_SLOTS.title2);
+    if (title2) {
+        roles.title2 = baseIndex + sprites.length;
+        sprites.push({ key: "dezaTitle2", ...title2 });
+    }
+    const lines = [];
+    const seen = new Set();
+    for (const slot of TITLE_SLOTS.credits) {
+        const line = renderSlot(slot);
+        if (!line) continue;
+        const sig = line.rgba.join();
+        if (seen.has(sig)) continue;
+        seen.add(sig);
+        lines.push(line);
+    }
+    if (lines.length) {
+        const w = Math.max(...lines.map((l) => l.w));
+        const h = lines.reduce((sum, l) => sum + l.h, 0);
+        const rgba = new Uint8ClampedArray(w * h * 4);
+        let y = 0;
+        for (const line of lines) {
+            const x0 = (w - line.w) >> 1;
+            for (let ly = 0; ly < line.h; ly++) {
+                rgba.set(
+                    line.rgba.subarray(ly * line.w * 4, (ly + 1) * line.w * 4),
+                    ((y + ly) * w + x0) * 4
+                );
+            }
+            y += line.h;
+        }
+        roles.credit = baseIndex + sprites.length;
+        sprites.push({ key: "dezaCredit", w, h, rgba });
+    }
+    return { sprites, roles };
+}
+
 // --- Bosses -----------------------------------------------------------
 
 // Sprites for every stage that places a boss: the class-sized core frames.

@@ -8,6 +8,7 @@ import {
 } from "../highScoreUi.js";
 import { StaffRollPanel } from "./StaffRollPanel.js";
 import { pollGamepads } from "./GamepadInput.js";
+import { startDezaemonBgm, stopDezaemonBgm } from "./dezaemon-runtime.js";
 
 export class PhaserTitleScene extends Phaser.Scene {
     constructor() {
@@ -19,35 +20,70 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.transitioning = false;
         this.staffRollPanel = null;
 
+        // A Dezaemon import ships its own DRAWN title screen (TITLE 1/2
+        // compositions and a credit strip, extracted into the atlas by the
+        // importer). When the recipe carries one, the save's art replaces the
+        // stock logo pieces and rides the same entrance tweens; the Saturn's
+        // title plays over black, so the stock backdrop stays off.
+        var recipe = gameState._phaserRecipe;
+        var atlas = this.textures.get("game_asset");
+        var deza = recipe && recipe.dezaemonTitle && atlas ? recipe.dezaemonTitle : null;
+        var dezaFrame = (role) => deza && deza[role] && atlas.has(deza[role]) ? deza[role] : null;
+        // Any drawn piece makes this an import's title — even a credit-only
+        // save must not fall back to the stock 2028.Ai logo screen.
+        this.dezaTitle = !!(dezaFrame("title1") || dezaFrame("title2") || dezaFrame("credit"));
+        var dezaLogo = dezaFrame("title1") || dezaFrame("title2");
+
         this.bg = this.add.tileSprite(
             0, 0,
             GAME_DIMENSIONS.WIDTH, GAME_DIMENSIONS.HEIGHT,
             "title_bg"
         );
         this.bg.setOrigin(0, 0);
+        if (this.dezaTitle) this.bg.setVisible(false);
 
         this.titleG = this.add.sprite(0, 0, "game_ui", "titleG.gif");
         this.titleG.setOrigin(0, 0);
         this.titleG.setPosition(GAME_DIMENSIONS.WIDTH, 100);
+        if (this.dezaTitle) this.titleG.setVisible(false);
 
-        if (this.textures.exists("custom_logo")) {
+        if (this.dezaTitle && dezaLogo) {
+            // TITLE1 leads; a save with only TITLE2 lets it take the slot
+            this.logo = this.add.sprite(0, 0, "game_asset", dezaLogo);
+        } else if (!this.dezaTitle && this.textures.exists("custom_logo")) {
             this.logo = this.add.sprite(0, 0, "custom_logo");
         } else {
             this.logo = this.add.sprite(0, 0, "game_ui", "logo.gif");
         }
         this.logo.setOrigin(0.5);
-        this.logo.setPosition(this.logo.width / 2, -this.logo.height / 2);
+        // Deza art is trimmed small, so the stock -height/2 start would leave
+        // its pre-tween scaled body peeking into the screen — start it fully
+        // above the top instead (scale-2 half-height + margin).
+        this.logo.setPosition(
+            this.dezaTitle ? GAME_DIMENSIONS.CENTER_X : this.logo.width / 2,
+            this.dezaTitle ? -this.logo.height - 8 : -this.logo.height / 2
+        );
         this.logo.setScale(2);
+        if (this.dezaTitle && !dezaLogo) this.logo.setVisible(false);
 
-        if (this.textures.exists("custom_subTitle")) {
+        var dezaSub = this.dezaTitle && dezaFrame("title1") ? dezaFrame("title2") : null;
+        if (dezaSub) {
+            this.subTitle = this.add.sprite(0, 0, "game_asset", dezaSub);
+        } else if (!this.dezaTitle && this.textures.exists("custom_subTitle")) {
             this.subTitle = this.add.sprite(0, 0, "custom_subTitle");
         } else {
             var subtitleKey = "subTitle" + (LANG === "ja" ? "" : "En") + ".gif";
             this.subTitle = this.add.sprite(0, 0, "game_ui", subtitleKey);
         }
         this.subTitle.setOrigin(0.5);
-        this.subTitle.setPosition(this.subTitle.width / 2, -this.logo.height / 2);
+        // Same fully-off-screen start for the deza subtitle (scale-3 half-
+        // height + margin) — the stock art relied on the tall stock logo.
+        this.subTitle.setPosition(
+            this.dezaTitle ? GAME_DIMENSIONS.CENTER_X : this.subTitle.width / 2,
+            this.dezaTitle ? -this.subTitle.height * 1.5 - 8 : -this.logo.height / 2
+        );
         this.subTitle.setScale(3);
+        if (this.dezaTitle && !dezaSub) this.subTitle.setVisible(false);
 
         this.belt = this.add.graphics();
         this.belt.fillStyle(0x000000, 1);
@@ -68,8 +104,17 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.startText.setAlpha(0);
         this.startText.setInteractive({ useHandCursor: true });
 
-        this.copyright = this.add.sprite(0, 0, "game_ui", "titleCopyright.gif");
-        this.copyright.setOrigin(0, 0);
+        if (this.dezaTitle && dezaFrame("credit")) {
+            // the save's own credit strip (its author line) replaces the
+            // stock copyright, centered at the same baseline
+            this.copyright = this.add.sprite(0, 0, "game_asset", deza.credit);
+            this.copyright.setOrigin(0.5, 0);
+            this.copyright.x = GAME_DIMENSIONS.CENTER_X;
+        } else {
+            this.copyright = this.add.sprite(0, 0, "game_ui", "titleCopyright.gif");
+            this.copyright.setOrigin(0, 0);
+            if (this.dezaTitle) this.copyright.setVisible(false);
+        }
         this.copyright.y = GAME_DIMENSIONS.HEIGHT - this.copyright.height - 6;
 
         this.scoreTitleImg = this.add.sprite(32, 0, "game_ui", "hiScoreTxt.gif");
@@ -162,6 +207,16 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.staffrollBtn.setScale(1, 0);
         this.staffrollBtn.on("pointerup", this.showStaffroll, this);
 
+        // An import's title screen keeps only the Saturn-appropriate chrome:
+        // no TWEET, no HOW TO PLAY (2028.Ai's tutorial). STAFF ROLL stays —
+        // it shows the save's own title and developer.
+        if (this.dezaTitle) {
+            this.twitterBtn.setVisible(false);
+            this.twitterBtn.disableInteractive();
+            this.howtoBtn.setVisible(false);
+            this.howtoBtn.disableInteractive();
+        }
+
         if (typeof window !== "undefined"
                 && window.cordova
                 && window.cordova.platformId === "android") {
@@ -188,6 +243,11 @@ export class PhaserTitleScene extends Phaser.Scene {
 
         this.playTitleVoice = false;
         this.startIntroAnimation();
+
+        // The save's own title track (the BGM table's first special slot).
+        if (this.dezaTitle && !gameState.lowModeFlg) {
+            startDezaemonBgm(this, "title");
+        }
 
         // Keyboard: Enter or Space to start
         this.enterKey = null;
@@ -245,7 +305,8 @@ export class PhaserTitleScene extends Phaser.Scene {
         });
 
         this.time.delayedCall(1500, function () {
-            self.playVoice("voice_titlecall");
+            // the stock title call is 2028.Ai's own voice — not an import's
+            if (!self.dezaTitle) self.playVoice("voice_titlecall");
         });
 
         this.tweens.add({
@@ -401,6 +462,7 @@ export class PhaserTitleScene extends Phaser.Scene {
     }
 
     goToAdvScene() {
+        stopDezaemonBgm(this);
         var recipe = gameState._phaserRecipe;
         if (recipe && recipe.playerData) {
             gameState.spDamage = recipe.playerData.spDamage;

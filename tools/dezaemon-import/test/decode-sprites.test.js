@@ -84,11 +84,15 @@ test("ramsie extracts real enemy art wired to the roster", async () => {
     const decoded = await decodedFixture("ramsie.sav");
     assert.equal(decoded.confidence.sprites, "heuristic");
     assert.ok(decoded.sprites.length > 100, "a full game yields plenty of frames");
-    // every sprite is a non-empty RGBA image of whole 16px cells
+    // every sprite is a non-empty RGBA image of whole 16px cells — except the
+    // title compositions, which are trimmed to their opaque bounding box so
+    // they center cleanly on the title screen
     for (const s of decoded.sprites) {
         assert.equal(s.rgba.length, s.w * s.h * 4);
-        assert.equal(s.w % 16, 0);
-        assert.equal(s.h % 16, 0);
+        if (!/^deza(Title|Credit)/.test(s.key)) {
+            assert.equal(s.w % 16, 0);
+            assert.equal(s.h % 16, 0);
+        }
         let opaque = false;
         for (let p = 3; p < s.rgba.length; p += 4) if (s.rgba[p]) { opaque = true; break; }
         assert.ok(opaque, `${s.key} should not be fully transparent`);
@@ -217,4 +221,24 @@ test("boss part art resolves every spawn fire point the trailer names", async ()
             }
         }
     }
+});
+
+test("ramsie extracts its drawn title screen from the global bank", async () => {
+    const decoded = await decodedFixture("ramsie.sav");
+    assert.ok(decoded.titleArt, "title art roles present");
+    for (const role of ["title1", "title2", "credit"]) {
+        const idx = decoded.titleArt[role];
+        assert.ok(Number.isInteger(idx), `${role} extracted`);
+        const s = decoded.sprites[idx];
+        assert.ok(s, `${role} points into the sprite list`);
+        assert.match(s.key, /^deza(Title|Credit)/);
+        // trimmed to content: inside the slot's bounds, but not empty
+        assert.ok(s.w > 0 && s.w <= 128, `${role} width ${s.w}`);
+        assert.ok(s.h > 0 && s.h <= 80, `${role} height ${s.h}`);
+    }
+    // TITLE1 is Ramsie's gold script — wide and short; TITLE2 the emblem
+    const t1 = decoded.sprites[decoded.titleArt.title1];
+    const t2 = decoded.sprites[decoded.titleArt.title2];
+    assert.ok(t1.w > t1.h, "title1 reads as a logo line");
+    assert.ok(t2.h > t1.h, "title2 is the taller emblem");
 });
