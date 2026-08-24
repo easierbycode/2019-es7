@@ -197,16 +197,28 @@ function stepChannel(st) {
     return st.value;
 }
 
-// The capture never shows a zako reloading faster than the slowest table
-// entry: records that decode to 3-11 frame intervals (Ramsie's moths and
-// butterflies) fire sparse single rings on hardware, not streams. Until the
-// fast-interval semantics are traced (FORMAT.md), the runtime floors every
-// zako reload at the mode-0 default so cadence matches the capture (~2s).
-var MIN_ZAKO_RELOAD_FRAMES = 119;
+// Zako fire cadence, SH-2 traced (GAME.CMP spawn fill +0x1548e, fire routine
+// +0x19810): the per-enemy reload is a u8 refilled with interval + rand %
+// window at each shot. Record byte 4's low 2 bits are the BULLET TYPE (which
+// of the save's four global bullet configs) — bullet types 0-2 draw their
+// interval from the table at 0x6085f70 and type 3 from 0x6085f80/f90, both
+// indexed by (b4>>4)&7. The counter ticks inside the enemy's own AI slice;
+// the walker services the pool in segments, so one "tick" spans several
+// display frames — AI_STRIDE is that ratio, calibrated against the capture
+// (the glass dome, type 0 rate 0, lands one aimed pair roughly every 2-4s).
+var TYPE012_INTERVAL = [14, 12, 10, 8, 6, 4, 2, 1]; // 0x6085f70, u16be low bytes
+var FIRE_WINDOW = [29, 22, 16, 11, 7, 4, 2, 1]; // 0x6085f60
+var ZAKO_AI_STRIDE = 8;
 
 function zakoReload(fire) {
-    return Math.max(fire.interval, MIN_ZAKO_RELOAD_FRAMES) +
-        Math.floor(Math.random() * (fire.window || 1));
+    // The decoder's `window` came from the same table, so it recovers the
+    // record's rate index; types 0-2 then take the traced short interval,
+    // type 3 keeps the decoder's long-table value.
+    var rate = FIRE_WINDOW.indexOf(fire.window);
+    if (rate < 0) rate = 0;
+    var interval = fire.mode === 3 ? fire.interval : TYPE012_INTERVAL[rate];
+    return (interval + Math.floor(Math.random() * (fire.window || 1))) *
+        ZAKO_AI_STRIDE;
 }
 
 // Movement patterns that ride the map (b2's packed mode+flag byte, decoded
@@ -222,17 +234,36 @@ function ridesTheMap(movePattern) {
 // Attach runtime channel state for a spawned enemy. `behavior` is the decoded
 // record from enemyData.*.dezaemon.behavior.
 export function initEnemyBehavior(enemy, behavior) {
+    // Record byte 5's low nibble routes the fire dispatcher (GAME.CMP
+    // +0x1989e): 0 lands in an EMPTY function — the enemy never fires, which
+    // is most of a stage's roster and why the hardware reads so quiet.
+    // 10/11/12 are the three special handlers, still untraced (Ramsie's
+    // statues carry 11 and show nothing in 55s of capture) — silent.
+    // Everything else fires bullet geometry d&15 (see updateEnemyFire).
+    var d = behavior.fire.pattern != null ? 0 : behavior.fire.direction;
+    var fires = behavior.fire.enabled && d !== 0 &&
+        behavior.fire.pattern == null;
+    // Rotation modes 3/4 are the engine's aim-style specials: the sprite
+    // tracks the player (a wall bat turning to watch the ship), it does not
+    // spin like modes 1/2.
+    var facesPlayer = behavior.rotation.enabled && behavior.rotation.mode >= 3;
     enemy.setData("deza", {
         behavior: behavior,
         age: 0,
         tick: 0,
         pinned: ridesTheMap(behavior.movePattern),
+        facesPlayer: facesPlayer,
+        // Slow free-movers (speed index 0-1, plain mode 0) patrol laterally
+        // on hardware — the capture's bat flock enters mid-screen and sweeps
+        // out to the walls — instead of hanging motionless in the scroll.
+        patrols: !ridesTheMap(behavior.movePattern) &&
+            behavior.move.mode === 0 && !behavior.move.flag &&
+            behavior.speed < 0.3,
+        patrolPhase: Math.random() * Math.PI * 2,
         speedCh: makeChannel(behavior.speedChange, null),
-        rotationCh: makeChannel(behavior.rotation, {
+        rotationCh: facesPlayer ? null : makeChannel(behavior.rotation, {
             wrap: true,
             reverse: behavior.rotation.mode === 2,
-            // modes 3/4 are engine-special (aim-style); play them as spin
-            spin: behavior.rotation.mode >= 3,
         }),
         scaleCh: makeChannel(behavior.scale, null),
         // No wrap: a flat direction channel (from == to) HOLDS its heading.
@@ -240,15 +271,8 @@ export function initEnemyBehavior(enemy, behavior) {
         // screen bottom; held at 0 (up-map, fighting the scroll) the roc
         // hangs near the top of the screen like the capture shows.
         directionCh: makeChannel(behavior.direction, null),
-        // Special fire patterns (b5 = 10/11/12) are the three untraced
-        // engine handlers. Ramsie's statues carry pattern 11 and emit
-        // NOTHING in 55s of capture — played as aimed volleys they were the
-        // bullet spam the import was known for. Silent until traced.
-        // Otherwise: stagger the first volley inside the engine's
-        // randomization window.
-        reload: behavior.fire.enabled && behavior.fire.pattern == null
-            ? zakoReload(behavior.fire)
-            : -1,
+        // stagger the first volley inside the randomization window
+        reload: fires ? zakoReload(behavior.fire) : -1,
     });
     if (behavior.ground) {
         // ground objects sit ON the map — no floating shadow
@@ -300,8 +324,22 @@ export function updateEnemyBehavior(scene, enemy) {
         enemy.x += Math.sin(rad) * speed;
         enemy.y += -Math.cos(rad) * speed;
     }
+    if (st.patrols) {
+        // Lateral wander for the slow free-movers (the capture's bat flock
+        // spreads to the walls and back): a gentle sine around the drift the
+        // record's own velocity provides. ~2.5s per sweep, ±26px.
+        enemy.x += Math.cos(st.patrolPhase + st.age * (Math.PI * 2 / 150)) *
+            (26 * Math.PI * 2 / 150);
+    }
 
-    if (st.rotationCh) {
+    if (st.facesPlayer && scene.playerSprite) {
+        // Rotation modes 3/4: track the player (sprite art points up, so
+        // down-screen toward the ship is rotation 0 plus the aim offset).
+        enemy.rotation = Math.atan2(
+            scene.playerSprite.x - enemy.x,
+            -(scene.playerSprite.y - enemy.y),
+        ) + Math.PI;
+    } else if (st.rotationCh) {
         enemy.rotation = stepChannel(st.rotationCh) * Math.PI / 180;
     }
     if (st.scaleCh) {
@@ -360,59 +398,72 @@ function ensureZakoBulletTexture(scene) {
     tex.refresh();
 }
 
-// Fire the decoded pattern. Returns true when it handled shooting (the caller
-// then skips the legacy interval logic).
-// Volley patterns (b2 bits 6-7): 0 straight, 1 spread of `count`, 2 aimed,
-// 3 fixed. Byte 5's angle parameter is untraced — read literally it aimed
-// half the roster sideways or backwards — so straight/fixed volleys fire
-// down-screen, which is where every attributable shot in the capture goes.
+// Fire the record's bullet geometry. Returns true when it handled shooting
+// (the caller then skips the legacy interval logic).
+//
+// SH-2 traced (fire dispatcher +0x1989e, shooter +0x18fac, pattern table
+// 0x6086074): byte 5's low nibble picks one of 16 bullet-geometry functions
+// — 0 is an empty routine (silent, checked at init), 1 a single shot, 2 a
+// side-by-side pair 16px apart, 5 a three-shot fan (±11°), 13 a
+// perpendicular pair (±90°); the rest interpolate between those shapes.
+// Bit 4 of byte 5 aims the volley at the player; without it a shot leaves
+// along the enemy's facing, which for a standard down-facing zako means
+// straight down — and the player-tracking rotation specials (modes 3/4)
+// carry their facing into the shot, which is how a wall bat leads the ship.
+// The engine fires anywhere on screen; there is no top band (the old band
+// heuristic came from a misread of the on-screen X/Y clamps at +0x1985e).
 export function updateEnemyFire(scene, enemy, shootFn) {
     var st = enemy.getData("deza");
     if (!st) return false;
     var fire = st.behavior.fire;
-    // The appearance decides whether an enemy shoots at all (the engine's
-    // dispatcher gate); reload < 0 marks it silent for its whole life —
-    // no-fire appearances and the untraced special patterns (init).
+    // reload < 0 marks the enemy silent for its whole life: no-fire
+    // appearances, byte-5 nibble 0, and the untraced special patterns.
     if (!fire.enabled || st.reload < 0) return true;
     // Reloads count Saturn frames, not engine ticks.
     if (st.tick % SATURN_TICKS_PER_FRAME) return true;
     st.reload -= 1;
     if (st.reload > 0) return true;
     st.reload = zakoReload(fire);
-    // The engine only lets an enemy fire inside a band near the top of the
-    // screen — it shoots as it comes on, and goes quiet once it has passed.
-    // That band, not the reload, is what keeps a dense stage readable: a
-    // scenery record crosses it in fewer frames than one reload, so statues
-    // and pillars mostly never get a shot off, exactly like the capture.
     var GH = scene.scale ? scene.scale.height : 480;
     if (!scene.playerSprite) return true;
-    if (enemy.y < 16 || enemy.y > GH * 0.4) return true;
+    // On-screen gate: fully entered, not yet gone.
+    if (enemy.y < 8 || enemy.y > GH - 8) return true;
 
+    var d = fire.direction;
+    var aimed = (d & 16) !== 0 || st.facesPlayer || st.patrols;
     var base;
-    if (fire.type === 2) {
+    if (aimed) {
         var dx = scene.playerSprite.x - enemy.x;
         var dy = scene.playerSprite.y - enemy.y;
-        base = Math.atan2(dx, -dy); // aim at the player
+        base = Math.atan2(dx, -dy);
     } else {
-        base = Math.PI; // straight down
+        base = Math.PI; // along a down-facing zako's heading
     }
 
     ensureZakoBulletTexture(scene);
-    var fireOne = function (a) {
+    var fireOne = function (a, offsetX) {
         var bullet = shootFn(scene, enemy, Math.sin(a), -Math.cos(a));
         if (!bullet) return;
+        if (offsetX) bullet.x += offsetX;
         bullet.setTexture(ZAKO_BULLET_KEY);
         bullet.setData("frames", null);
         // px per engine tick; the shared bullet loop steps every tick.
         bullet.setData("speed", ZAKO_BULLET_SPEED / SATURN_TICKS_PER_FRAME);
     };
-    if (fire.type === 1) {
-        var n = Math.max(1, fire.count);
-        var spread = (fire.wide ? 90 : 40) * Math.PI / 180;
-        for (var i = 0; i < n; i++) {
-            var a = n === 1 ? base : base - spread / 2 + (spread * i) / (n - 1);
-            fireOne(a);
-        }
+    var FAN = 11 * Math.PI / 180;
+    var geometry = d & 15;
+    if (geometry === 2) {
+        fireOne(base, -8);
+        fireOne(base, 8);
+    } else if (geometry >= 5 && geometry <= 7) {
+        fireOne(base - FAN);
+        fireOne(base);
+        fireOne(base + FAN);
+    } else if (geometry === 8 || geometry === 9) {
+        for (var i = -2; i <= 2; i++) fireOne(base + i * FAN);
+    } else if (geometry === 13) {
+        fireOne(base - Math.PI / 2);
+        fireOne(base + Math.PI / 2);
     } else {
         fireOne(base);
     }

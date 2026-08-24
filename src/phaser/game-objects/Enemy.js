@@ -158,12 +158,12 @@ export function enemyWave(scene) {
         var ex, ey;
         if (deza) {
             // Anchors calibrated against the scenery the save draws under
-            // its own placements (Ramsie's glass domes cap the hooded-pod
-            // artwork of the stage background, dome tip peeking above the
-            // bulb): a placement centers one tile right of its grid
-            // column's left edge and a tile and a half into its map row.
+            // its own placements (Ramsie's glass domes nest INSIDE the
+            // hooded-pod artwork of the stage background, top edge just
+            // under the bulb's rim): a placement centers one tile right of
+            // its grid column's left edge and half a tile into its map row.
             ex = gridLeft + i * 16 + 16;
-            ey = GH + scene.dezaBg._scroll - (dezaRow * 16 + 24);
+            ey = GH + scene.dezaBg._scroll - (dezaRow * 16 + 8);
             if (ey > -16) ey = -16; // boss-rush flushes spawn off-screen
         } else {
             ex = cellW * i + cellW / 2;

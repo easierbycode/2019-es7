@@ -414,16 +414,39 @@ tap scaled by `header[2]/7`. Not reproduced: the ROM accompaniment patterns
 and the instrument column's timbres (the Saturn's samples are not in the
 save, so each part keeps a fixed synth voice).
 
-**Firing is gated by the appearance, not the record.** The per-frame fire
-dispatcher (GAME.CMP `+0x19870`) skips an enemy when (a) its Y position is
-outside a band near the top of the screen, or (b) bit 4 of its appearance
-definition word is set — the u16 at +8 of the 256-entry pointer table at
-`+0x6088e5c`, loaded per enemy at spawn. 48 of the 256 appearance ids carry
-the no-fire bit (`APPEARANCE_NOFIRE` in `lib/decode/decode-enemy.js`, byte-
-exact). All four `b2` bits6-7 values are volley patterns — the dispatcher
-picks its handler from `b5 & 0xF` (values 10/11/12 special) and every one
-fires; "fire type 0 = silent" was an early misread. Reload = interval +
-rand(window), decremented once per frame while the enemy is active.
+**Zako firing, re-traced 2026-08-24** (fire routine `+0x19810`, dispatcher
+`+0x1989e`, shooter `+0x18fac`, spawn fill `+0x1548e`; supersedes the earlier
+"band near the top" reading — those clamps at `+0x1985e` are on-screen X/Y
+tests in the 320-wide grid space, so an enemy may fire anywhere visible):
+
+- **`b5 & 0xF` picks a bullet-GEOMETRY function** from the 16-pointer table
+  at `0x6086074`: **0 is an empty routine — the enemy never fires** (most of
+  a stage's roster); 1 = single shot, 2 = side-by-side pair (±8px), 5 = a
+  three-shot fan (±8 angle units), 13 = a perpendicular pair (±64 units);
+  10/11/12 route to the three special handlers (`+0x193d0`/`+0x19538`/
+  `+0x196a8`, still untraced). **`b5 & 0x10` aims the volley at the player**
+  (angle computed at fire time via `+0x183d0`); without it the shot leaves
+  relative to the enemy's facing (`0x6094440`), straight down for a standard
+  zako.
+- **`b4 & 3` is the BULLET TYPE**, selecting one of the save's four global
+  bullet configs (settings bytes +37..+40; bullet speed = live base
+  `u16[0x608ef30]` + `[128,256,512,896][(cfg>>4)&3]`). It is not a "fire
+  mode".
+- **Intervals split by bullet type**: types 0-2 load `u8` intervals from
+  `0x6085f70` = [14,12,10,8,6,4,2,1]; type 3 from `0x6085f80` (or `0x6085f90`
+  when a mode global equals 3) = [119,59,29,19,9,5,3,1]; all tables are u16be
+  with the value in the low byte, indexed by `(b4>>4)&7`, randomization
+  window from `0x6085f60` = [29,22,16,11,7,4,2,1]. Reload (u8, `0x6090830`)
+  = interval + rand % window, refilled at each shot, decremented inside the
+  enemy's AI slice — the walker services the pool in segments, so wall-clock
+  cadence runs several display frames per decrement (the runtime calibrates
+  this stride against capture footage).
+- The appearance gate stands: bit 4 of the definition word (u16 at +8 via
+  the 256-entry pointer table at `0x6088e5c`, cached per enemy at spawn)
+  still silences 48 of 256 appearances (`APPEARANCE_NOFIRE`, byte-exact).
+- Rotation channel modes 3/4 ("engine-special") are aim-style: the sprite
+  tracks the player rather than spinning, and its facing carries into
+  facing-relative shots.
 
 **Durability shares one unit space with damage — and the player-weapon
 damage tables are traced.** Objects live in one pool; enemy LIFE decodes in

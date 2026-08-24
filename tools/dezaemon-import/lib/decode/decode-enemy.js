@@ -131,27 +131,31 @@ export function decodeEnemyRecord(bytes) {
             flag: (b[2] & 8) !== 0,         // engine tests &4 of the packed byte
         },
         fire: {
-            // The gate is the appearance, not the record: the engine's
-            // dispatcher fires any enemy whose appearance allows it, on the
-            // reload countdown below. b2 bits 6-7 select the volley/bullet
-            // pattern (all four values fire).
+            // Two gates silence an enemy outright: the appearance's no-fire
+            // bit, and byte 5's low nibble being 0 — the geometry table's
+            // entry 0 is an empty routine (FORMAT.md "Zako firing,
+            // re-traced"). `enabled` carries only the appearance gate; the
+            // runtime combines it with `direction`.
             enabled: appearanceFires(b[0]),
-            type: (b[2] >> 6) & 3,          // volley pattern (0 straight)
-            count: (b[3] & 7) + 1,           // shots per volley (type 1)
-            wide: (b[3] & 8) !== 0,          // wider spread (type 1)
-            param: b[3],                     // raw, for types 2/3
+            type: (b[2] >> 6) & 3,          // b2 bits 6-7 (semantics open)
+            count: (b[3] & 7) + 1,
+            wide: (b[3] & 8) !== 0,
+            param: b[3],                     // raw
+            // b4 & 3 = BULLET TYPE: which of the save's four global bullet
+            // configs this enemy fires (settings +37..+40). Bullet types
+            // 0-2 reload from the short table [14,12,10,8,6,4,2,1]
+            // (0x6085f70); only type 3 uses the long tables kept here — the
+            // runtime substitutes the short table for types 0-2.
             mode: b[4] & 3,
             interval: clampIndex((b[4] >> 4) & 7,
                 (b[4] & 3) === 3 ? FIRE_INTERVAL_TABLE_ALT : FIRE_INTERVAL_TABLE),
             window: FIRE_WINDOW_TABLE[(b[4] >> 4) & 7],
-            // Byte 5 is dual-use, and the engine reads it two ways. The fire
-            // dispatcher (+0x1989e) takes `b5 & 0xF` and routes 10/11/12 to
-            // three special pattern handlers (+0x193d0/+0x19538/+0x196a8 —
-            // three variants of one routine); everything else falls to the
-            // default handler (+0x192d4), which passes `b5 & 0x1F` on as the
-            // shot's angle parameter. So a value of 10-12 is a PATTERN, not a
-            // direction — 6.3% of the corpus's 12,153 enemies use one, and
-            // reading them as angles aimed those enemies sideways.
+            // Byte 5's low nibble picks a bullet-geometry function from the
+            // 16-pointer table at 0x6086074 (0 = silent, 1 = single, 2 =
+            // pair, 5 = 3-fan, 13 = perpendicular pair, ...); values
+            // 10/11/12 route to three special handlers instead (+0x193d0/
+            // +0x19538/+0x196a8, untraced). Bit 4 (0x10) aims the volley at
+            // the player; otherwise shots leave along the enemy's facing.
             pattern: SPECIAL_FIRE_PATTERNS[b[5] & 0x0f] ?? null,
             direction: SPECIAL_FIRE_PATTERNS[b[5] & 0x0f] !== undefined ? 0 : (b[5] & 0x1f),
             directionEx: (b[5] >> 5) & 7,
