@@ -1,6 +1,6 @@
 import { GAME_DIMENSIONS, LANG } from "../constants.js";
 import { pollGamepads } from "./GamepadInput.js";
-import { gameState, saveHighScore } from "../gameState.js";
+import { gameState, isExportedLevelApp, saveHighScore } from "../gameState.js";
 import { submitHighScore } from "../firebaseScores.js";
 import {
     getDisplayedHighScore,
@@ -350,6 +350,13 @@ export class PhaserContinueScene extends Phaser.Scene {
             self.tweetBtn.setFrame("twitterBtn1.gif");
             openUrl(buildTweetUrl());
         });
+
+        // Exported level apps never TWEET (the share text is 2028.Ai's own).
+        // Keep the sprite for the layout below — gotoTitleBtn hangs off its y.
+        if (isExportedLevelApp()) {
+            this.tweetBtn.setVisible(false);
+            this.tweetBtn.disableInteractive();
+        }
 
         // Go To Title button centered below Tweet button
         this.gotoTitleBtn = this.add.sprite(0, 0, "game_ui", "gotoTitleBtn0.gif");

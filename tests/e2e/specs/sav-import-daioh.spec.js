@@ -53,6 +53,15 @@ test("a nine-stage DAIOH save imports whole — every stage, type and spawn", as
     expect(state.enemyKeys.length).toBe(ENEMY_TYPES);
     expect(state.gridCols).toBe(GRID_COLS);
 
+    // Staff-roll credits attach on import (the community table's row when the
+    // title is known there, the cart's own title otherwise). The runtime hides
+    // its STAFF ROLL button when a level carries none, so an import that stops
+    // attaching these silently loses the credits screen.
+    const credits = await page.evaluate(() => gameData.dezaemonCredits);
+    expect(credits && typeof credits.title).toBe("string");
+    expect(credits.title.length).toBeGreaterThan(0);
+    if (credits.genre) expect(typeof credits.genreJa).toBe("string");
+
     const counted = await page.evaluate(() => {
         const stageKeys = Object.keys(gameData).filter((k) => /^stage\d+$/.test(k));
         let spawns = 0;

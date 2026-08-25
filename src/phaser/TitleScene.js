@@ -1,12 +1,12 @@
 import { GAME_DIMENSIONS, LANG } from "../constants.js";
-import { gameState } from "../gameState.js";
+import { gameState, isExportedLevelApp } from "../gameState.js";
 import {
     getDisplayedHighScore,
     getWorldBestLabel,
     getHighScoreSyncText,
     getHighScoreSyncTint,
 } from "../highScoreUi.js";
-import { StaffRollPanel } from "./StaffRollPanel.js";
+import { dezaStaffCredits, StaffRollPanel } from "./StaffRollPanel.js";
 import { pollGamepads } from "./GamepadInput.js";
 import { startDezaemonBgm, stopDezaemonBgm } from "./dezaemon-runtime.js";
 
@@ -217,9 +217,26 @@ export class PhaserTitleScene extends Phaser.Scene {
             this.howtoBtn.disableInteractive();
         }
 
+        // An exported level app is a finished cartridge: never TWEET (the
+        // stock share text is 2028.Ai's, not this game's), and never the
+        // BUILD APK forge below — an export must not re-export itself.
+        if (isExportedLevelApp()) {
+            this.twitterBtn.setVisible(false);
+            this.twitterBtn.disableInteractive();
+        }
+
+        // STAFF ROLL on an import only when there are credits to show —
+        // a save the community table doesn't know, whose cart carries no
+        // title of its own, would open an empty card.
+        if (this.dezaTitle && !dezaStaffCredits(recipe)) {
+            this.staffrollBtn.setVisible(false);
+            this.staffrollBtn.disableInteractive();
+        }
+
         if (typeof window !== "undefined"
                 && window.cordova
-                && window.cordova.platformId === "android") {
+                && window.cordova.platformId === "android"
+                && !isExportedLevelApp()) {
             this.forgeBtn = this.add.text(
                 GAME_DIMENSIONS.WIDTH - 6, GAME_DIMENSIONS.HEIGHT - 22,
                 "BUILD APK",
@@ -358,6 +375,11 @@ export class PhaserTitleScene extends Phaser.Scene {
 
     showStaffroll() {
         if (this.staffRollPanel && this.staffRollPanel.active) {
+            return;
+        }
+        // Mirrors the button's visibility gate (a gamepad/script could still
+        // land here): no credits, no card.
+        if (this.dezaTitle && !dezaStaffCredits(gameState._phaserRecipe)) {
             return;
         }
         this.staffRollPanel = new StaffRollPanel(this);

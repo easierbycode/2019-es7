@@ -11,6 +11,27 @@ function openExternalUrl(url) {
     } catch (e) {}
 }
 
+// The credits an import's staff roll can actually show: the community table's
+// title / developer / genre, each in both languages where known (dezaemonCredits
+// rides the recipe from the level editor), falling back to the title the cart
+// itself carries (meta.sourceTitle). Returns null when none of it is present —
+// TitleScene hides the STAFF ROLL button then, instead of opening an empty card.
+export function dezaStaffCredits(recipe) {
+    var credits = recipe && recipe.dezaemonCredits ? recipe.dezaemonCredits : null;
+    if (!credits && recipe && recipe.dezaemonTitle) {
+        var meta = recipe.meta || {};
+        var sourceTitle = meta.sourceTitle || meta.sourceComment || "";
+        credits = sourceTitle ? { title: sourceTitle } : null;
+    }
+    if (!credits) return null;
+    var fields = ["title", "titleJa", "developer", "developerJa", "genre", "genreJa"];
+    for (var i = 0; i < fields.length; i++) {
+        var v = credits[fields[i]];
+        if (typeof v === "string" && v.trim()) return credits;
+    }
+    return null;
+}
+
 export class StaffRollPanel extends Phaser.GameObjects.Container {
     constructor(scene) {
         super(scene, 0, 0);
@@ -55,20 +76,20 @@ export class StaffRollPanel extends Phaser.GameObjects.Container {
         this.add(this.closeBtn);
 
         // A Dezaemon import's staff roll credits the SAVE's makers, not
-        // 2028.Ai's: the community table's title and developer, both
-        // languages (dezaemonCredits rides the recipe from the editor's
-        // SAVED GAMES picker; a bare import falls back to what the cart
-        // itself carries).
+        // 2028.Ai's: title, developer and genre, each in both languages where
+        // known (see dezaStaffCredits above for where they come from).
         var recipe = gameState._phaserRecipe;
-        var dezaCredits = recipe && recipe.dezaemonCredits;
-        if (!dezaCredits && recipe && recipe.dezaemonTitle) {
-            var meta = recipe.meta || {};
-            dezaCredits = { title: meta.sourceTitle || meta.sourceComment || "" };
-        }
+        var dezaCredits = dezaStaffCredits(recipe);
         this.namePanel = null;
         if (dezaCredits) {
             this.wakingG.setVisible(false);
             this._addDezaCredits(dezaCredits);
+        } else if (recipe && recipe.dezaemonTitle) {
+            // An import with nothing to credit: the button is hidden on the
+            // title screen, so this is only a guard — show the empty card
+            // rather than the stock 2028.Ai staff sheet, which would credit
+            // the wrong game.
+            this.wakingG.setVisible(false);
         } else {
             this.namePanel = scene.add.sprite(15, 90, "game_ui", "staffrollName.gif");
             this.namePanel.setOrigin(0, 0);
@@ -125,9 +146,15 @@ export class StaffRollPanel extends Phaser.GameObjects.Container {
                 addLine(credits.developerJa, { ...base, fontSize: "10px", fill: "#cccccc" });
             }
         }
-        if (credits.genre) {
+        if (credits.genre || credits.genreJa) {
             y += 24;
-            addLine(credits.genre.toUpperCase(), { ...base, fontSize: "8px", fill: "#9be37f" });
+            addLine("GENRE", { ...base, fontSize: "8px", fill: "#ffff00" });
+            if (credits.genre) {
+                addLine(credits.genre.toUpperCase(), { ...base, fontSize: "10px", fill: "#9be37f" });
+            }
+            if (credits.genreJa && credits.genreJa !== credits.genre) {
+                addLine(credits.genreJa, { ...base, fontSize: "9px", fill: "#9be37f" });
+            }
         }
     }
 

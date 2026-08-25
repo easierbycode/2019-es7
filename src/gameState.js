@@ -119,6 +119,15 @@ export function syncRuntimeFlagsFromLocation(state = gameState) {
 
 syncRuntimeFlagsFromLocation(gameState);
 
+// True inside an app produced by the level editor's "Export to APK" pipeline
+// (cmg's tools/build-level bakes the marker into the offline shell). An
+// exported app is a finished cartridge of one level: it hides the chrome that
+// only makes sense in the hosted game or the 2028.Ai app itself — the TWEET
+// buttons and the in-app BUILD APK forge.
+export function isExportedLevelApp() {
+    return typeof window !== "undefined" && !!window.__EXPORTED_LEVEL_APP__;
+}
+
 export function setHighScore(value, source = "merged") {
     const normalized = normalizeScore(value);
 

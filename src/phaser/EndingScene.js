@@ -1,5 +1,5 @@
 import { GAME_DIMENSIONS, LANG } from "../constants.js";
-import { gameState, saveHighScore } from "../gameState.js";
+import { gameState, isExportedLevelApp, saveHighScore } from "../gameState.js";
 import { submitHighScore } from "../firebaseScores.js";
 import {
     getDisplayedHighScore,
@@ -176,6 +176,12 @@ export class PhaserEndingScene extends Phaser.Scene {
         this.tweetBtn.on("pointerup", function () {
             openUrl(buildTweetUrl());
         });
+        // Exported level apps never TWEET (the share text is 2028.Ai's own).
+        // The pop-in tween below only scales it; visibility stays off.
+        if (isExportedLevelApp()) {
+            this.tweetBtn.setVisible(false);
+            this.tweetBtn.disableInteractive();
+        }
 
         // --- Go to Title button (sprite-based) ---
         // PIXI: GotoTitleButton at (GCX - width/2, GH - height - 13)

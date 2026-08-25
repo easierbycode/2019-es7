@@ -2729,6 +2729,89 @@
 
         function dezaClone(o) { return JSON.parse(JSON.stringify(o)); }
 
+        // ---- Staff-roll credits for an imported save --------------------------
+        // The runtime's STAFF ROLL credits the SAVE's makers, not 2028.Ai's, so
+        // an import attaches what the community table knows about it: title,
+        // developer and genre in both languages. TitleScene hides the button
+        // when a level carries none of it (see src/phaser/StaffRollPanel.js
+        // dezaStaffCredits), so attaching this here is what makes the button
+        // appear for a save the table knows.
+        //
+        // PORTED: cmg/static/editor/index.html has the same four helpers (its
+        // SAVED GAMES shelf shares the table) — keep both forks in step.
+        // games-db.json lives beside the importer here and is vendored into cmg
+        // by its `deno task dezaemon:vendor`, which fails CI if they drift.
+        const DEZA_GENRE_JA = {
+            'Vertical Shoot-em-up': '縦スクロールシューティング',
+            'Horizontal Shoot-em-up': '横スクロールシューティング',
+            'Vertical Shoot-em-up / Danmaku': '縦スクロールシューティング／弾幕',
+            'Horizontal Shoot-em-up / Danmaku': '横スクロールシューティング／弾幕',
+            'Vertical Shoot-em-up / Story': '縦スクロールシューティング／ストーリー',
+            'Horizontal Shoot-em-up / Story': '横スクロールシューティング／ストーリー',
+            'Score Attack Vertical Shoot-em-up': 'スコアアタック縦スクロールシューティング',
+            'Score Attack Horizontal Shoot-em-up': 'スコアアタック横スクロールシューティング',
+            'Action - Shoot-em-up': 'アクションシューティング',
+            'Action - Racing': 'アクションレーシング',
+            'Action - Puzzle': 'アクションパズル',
+            'Action': 'アクション',
+            'Tool': 'ツール',
+            'Movie': 'ムービー',
+            'Avant-Garde Art': '前衛アート',
+        };
+
+        function dezaNormTitle(s) {
+            return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+        }
+
+        // The table keyed by normalized title, aliases folded in — fetched once.
+        let dezaGamesDbPromise = null;
+        function loadDezaGamesDbByTitle() {
+            if (!dezaGamesDbPromise) {
+                dezaGamesDbPromise = (async () => {
+                    const resp = await fetch('./tools/dezaemon-import/games-db.json');
+                    const db = resp.ok ? await resp.json() : { games: [] };
+                    const byTitle = new Map();
+                    for (const g of (db.games || [])) {
+                        byTitle.set(dezaNormTitle(g[0]),
+                            { title: g[0], titleJa: g[1], developer: g[2], developerJa: g[3], genre: g[4] });
+                    }
+                    // Filename/title spellings that differ from the table
+                    // (romanization variants, source typos) map onto their entry
+                    // here, so the table stays a faithful transcription.
+                    for (const [from, to] of Object.entries(db.aliases || {})) {
+                        const target = byTitle.get(to);
+                        if (target && !byTitle.has(from)) byTitle.set(from, target);
+                    }
+                    return byTitle;
+                })();
+                // A failed fetch shouldn't poison every later lookup.
+                dezaGamesDbPromise.catch(() => { dezaGamesDbPromise = null; });
+            }
+            return dezaGamesDbPromise;
+        }
+
+        function dezaCreditsFromMeta(meta) {
+            return {
+                title: meta.title, titleJa: meta.titleJa,
+                developer: meta.developer, developerJa: meta.developerJa,
+                genre: meta.genre, genreJa: DEZA_GENRE_JA[meta.genre] || null,
+            };
+        }
+
+        // The table's row for this save when its title is known there, else just
+        // the title the cart itself carries — and null when there is not even
+        // that, which is what hides the runtime's STAFF ROLL button.
+        async function dezaLookupCredits(title) {
+            if (title) {
+                try {
+                    const byTitle = await loadDezaGamesDbByTitle();
+                    const meta = byTitle.get(dezaNormTitle(title));
+                    if (meta) return dezaCreditsFromMeta(meta);
+                } catch (e) { /* table unavailable — fall through to title-only */ }
+            }
+            return title ? { title } : null;
+        }
+
         function snapshotDefaultsOnce() {
             if (defaultGameSnapshot || !gameData) return;
             try {
@@ -3126,6 +3209,11 @@
             enemyData = gameData.enemyData;
             bossData = gameData.bossData;
             playerData = gameData.playerData;
+            // Credits for the runtime's STAFF ROLL ride the game from here on:
+            // the community table's title/developer/genre (both languages) when
+            // this save is known there, else the cart's own title.
+            gameData.dezaemonCredits =
+                await dezaLookupCredits(st.decoded.title || save.comment || '');
             currentStageKey = 'stage0';
             storeBossDataForViewers();
             // Fold the save's sprites into the atlas before the first paint —
@@ -5273,6 +5361,10 @@ function GAME3D_RUNTIME(DATA) {
                 // customAudioURLs to fall back on — so a level saved without it
                 // plays in silence everywhere it is loaded from the cloud.
                 payload.dezaemonBgm = (gameData && gameData.dezaemonBgm) || null;
+                // The community credits ride the level record too: both editors
+                // write the same /levels/<name>, and cmg's level-loader carries
+                // this into the recipe its STAFF ROLL reads.
+                payload.dezaemonCredits = (gameData && gameData.dezaemonCredits) || null;
                 // Save audio URL overrides
                 var urlEntries = {};
                 for (var ak in audioURLs) { if (audioURLs[ak]) urlEntries[ak] = audioURLs[ak]; }
@@ -5442,6 +5534,10 @@ function GAME3D_RUNTIME(DATA) {
                 else delete gameData.backgroundCells;
                 if (d.dezaemonBgm) gameData.dezaemonBgm = d.dezaemonBgm;
                 else delete gameData.dezaemonBgm;
+                // Credits come back with the level, so re-saving it doesn't
+                // quietly drop the staff roll the import attached.
+                if (d.dezaemonCredits) gameData.dezaemonCredits = d.dezaemonCredits;
+                else delete gameData.dezaemonCredits;
                 titleBgDataURL = d.titleBgDataURL || null;
                 logoDataURL = d.logoDataURL || null;
                 subTitleDataURL = d.subTitleDataURL || null;
