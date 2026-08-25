@@ -1,6 +1,6 @@
 import { GAME_DIMENSIONS, LANG } from "../constants.js";
 import { pollGamepads } from "./GamepadInput.js";
-import { gameState, isExportedLevelApp, saveHighScore } from "../gameState.js";
+import { gameState, isExportedLevelApp, saveHighScore, scoreCountsAsRecord } from "../gameState.js";
 import { submitHighScore } from "../firebaseScores.js";
 import {
     getDisplayedHighScore,
@@ -282,8 +282,9 @@ export class PhaserContinueScene extends Phaser.Scene {
     }
 
     showGameOverPanel() {
-        // An invincible (?god=1) run's score is not a record.
-        if (!gameState.godFlg && Number(gameState.score || 0) > Number(gameState.highScore || 0)) {
+        // A hosted ?god=1 run's score is not a record; an exported app's
+        // baked-in god mode still sets the local best.
+        if (scoreCountsAsRecord() && Number(gameState.score || 0) > Number(gameState.highScore || 0)) {
             gameState.highScore = Number(gameState.score || 0);
             saveHighScore();
 

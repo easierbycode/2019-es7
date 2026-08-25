@@ -1,5 +1,5 @@
 import { GAME_DIMENSIONS, LANG } from "../constants.js";
-import { gameState, isExportedLevelApp, saveHighScore } from "../gameState.js";
+import { gameState, isExportedLevelApp, saveHighScore, scoreCountsAsRecord } from "../gameState.js";
 import { submitHighScore } from "../firebaseScores.js";
 import {
     getDisplayedHighScore,
@@ -47,9 +47,10 @@ export class PhaserEndingScene extends Phaser.Scene {
         // Black background
         this.add.rectangle(GCX, GCY, GW, GH, 0x000000);
 
-        // Check new record — an invincible (?god=1) run's score is not one.
+        // Check new record — a hosted ?god=1 run's score is not one, but an
+        // exported app's baked-in god mode still sets the local best.
         this.continueFlg = false;
-        if (!gameState.godFlg && Number(gameState.score || 0) > Number(gameState.highScore || 0)) {
+        if (scoreCountsAsRecord() && Number(gameState.score || 0) > Number(gameState.highScore || 0)) {
             gameState.highScore = Number(gameState.score || 0);
             saveHighScore();
             this.continueFlg = true;

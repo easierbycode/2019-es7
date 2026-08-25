@@ -26,6 +26,16 @@ export function getWorldBestLabel() {
     return "WORLD BEST";
 }
 
+// Today's global best for this game. The leaderboard already keeps it (see
+// getBoardPaths in firebaseScores.js); nothing draws it yet.
+export function getDailyHighScore() {
+    return normalizeScore(gameState.dailyHighScore);
+}
+
+export function getDailyBestLabel() {
+    return "TODAY'S BEST";
+}
+
 export function getHighScoreSyncText() {
     const status = typeof gameState.scoreSyncStatus === "string" ? gameState.scoreSyncStatus : "idle";
     return SYNC_COPY[status] || SYNC_COPY.idle;

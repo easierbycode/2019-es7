@@ -1,6 +1,8 @@
 import { GAME_DIMENSIONS, LANG } from "../constants.js";
 import { gameState, isExportedLevelApp } from "../gameState.js";
 import {
+    getDailyBestLabel,
+    getDailyHighScore,
     getDisplayedHighScore,
     getWorldBestLabel,
     getHighScoreSyncText,
@@ -10,10 +12,37 @@ import { dezaStaffCredits, StaffRollPanel } from "./StaffRollPanel.js";
 import { pollGamepads } from "./GamepadInput.js";
 import { startDezaemonBgm, stopDezaemonBgm } from "./dezaemon-runtime.js";
 
+// How long each leaderboard holds the one score slot before the other takes a
+// turn. Long enough to read, short enough that a player waiting on the title
+// sees both.
+const BOARD_CYCLE_MS = 3000;
+
 export class PhaserTitleScene extends Phaser.Scene {
     constructor() {
         super({ key: "PhaserTitleScene" });
         this.transitioning = false;
+    }
+
+    // The title has room for exactly one score, so the all-time and daily
+    // boards share it. Today's board only takes a turn once it has something on
+    // it — an empty board (nobody has played today, or there is no network)
+    // would otherwise flash a meaningless 0 half the time.
+    _boardOnShow() {
+        return this._showingDaily && getDailyHighScore() > 0 ? "daily" : "allTime";
+    }
+
+    _stepBoardCycle(delta) {
+        if (getDailyHighScore() <= 0) {
+            this._showingDaily = false;
+            this._boardTimer = 0;
+            return;
+        }
+
+        this._boardTimer = (this._boardTimer || 0) + delta;
+        if (this._boardTimer >= BOARD_CYCLE_MS) {
+            this._boardTimer -= BOARD_CYCLE_MS;
+            this._showingDaily = !this._showingDaily;
+        }
     }
 
     create() {
@@ -120,6 +149,10 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.scoreTitleImg = this.add.sprite(32, 0, "game_ui", "hiScoreTxt.gif");
         this.scoreTitleImg.setOrigin(0, 0);
         this.scoreTitleImg.y = this.copyright.y - 58;
+
+        // Which board currently owns the score slot; update() cycles it.
+        this._showingDaily = false;
+        this._boardTimer = 0;
 
         this.worldBestLabel = this.add.text(
             32, this.scoreTitleImg.y - 16,
@@ -522,8 +555,17 @@ export class PhaserTitleScene extends Phaser.Scene {
             }
         }
 
+        // One score slot, two boards taking turns in it. The label above the
+        // number is what says which one is on show, so both move together.
+        this._stepBoardCycle(delta);
+        var daily = this._boardOnShow() === "daily";
+
+        if (this.worldBestLabel) {
+            this.worldBestLabel.setText(daily ? getDailyBestLabel() : getWorldBestLabel());
+        }
+
         if (this.highScoreText) {
-            this.highScoreText.setText(String(getDisplayedHighScore()));
+            this.highScoreText.setText(String(daily ? getDailyHighScore() : getDisplayedHighScore()));
         }
 
         if (this.scoreSyncLabel) {

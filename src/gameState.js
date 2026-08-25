@@ -22,6 +22,10 @@ function ensureScoreState(state) {
     state.localHighScore = normalizeScore(state.localHighScore);
     state.remoteHighScore = normalizeScore(state.remoteHighScore);
     state.highScore = Math.max(state.highScore, state.localHighScore, state.remoteHighScore);
+    // Today's board, read straight from the leaderboard. Deliberately NOT
+    // folded into highScore: that is this player's own best, and a stranger's
+    // run today is not it.
+    state.dailyHighScore = normalizeScore(state.dailyHighScore);
 
     if (typeof state.scoreSyncStatus !== "string" || !state.scoreSyncStatus) {
         state.scoreSyncStatus = "idle";
@@ -128,6 +132,17 @@ export function isExportedLevelApp() {
     return typeof window !== "undefined" && !!window.__EXPORTED_LEVEL_APP__;
 }
 
+// Whether the current run may be kept as a high score. An invincible
+// (?god=1) run normally is not a record — but an exported level app bakes god
+// mode in as an authored property of the cartridge (tools/build-level seeds
+// __GAME_STATE__ from the level record's godMode flag), and ships with no
+// Firebase config, so it has no shared leaderboard to protect. Suppressing the
+// record there only cost the player their own best, which read as "beat the
+// game, HI SCORE still 0". Remote submission stays suppressed either way.
+export function scoreCountsAsRecord(state = gameState) {
+    return !state.godFlg || isExportedLevelApp();
+}
+
 export function setHighScore(value, source = "merged") {
     const normalized = normalizeScore(value);
 
@@ -147,6 +162,11 @@ export function setHighScore(value, source = "merged") {
     );
 
     return gameState.highScore;
+}
+
+export function setDailyHighScore(value) {
+    gameState.dailyHighScore = normalizeScore(value);
+    return gameState.dailyHighScore;
 }
 
 export function setScoreSyncStatus(status, message = "") {
