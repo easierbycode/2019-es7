@@ -1257,14 +1257,24 @@ function character(name, defaults = {}) {
 }
 
 // characters/src/generated.js
+var deza3_47 = character("deza3_47");
+var deza9_34 = character("deza9_34");
+var dezaBoss0 = character("dezaBoss0");
+var dezaBoss1 = character("dezaBoss1");
 var dukeNukem = character("dukeNukem");
 var enemyR = character("enemyR");
 var red_dress_killer = character("red_dress_killer");
+var sakura = character("sakura");
 var weirdo = character("weirdo");
 var CHARACTERS = [
+  "deza3_47",
+  "deza9_34",
+  "dezaBoss0",
+  "dezaBoss1",
   "dukeNukem",
   "enemyR",
   "red_dress_killer",
+  "sakura",
   "weirdo"
 ];
 
@@ -1303,6 +1313,10 @@ export {
   Character,
   Container,
   DEFAULT_DB,
+  deza3_47 as Deza347,
+  deza9_34 as Deza934,
+  dezaBoss0 as DezaBoss0,
+  dezaBoss1 as DezaBoss1,
   dukeNukem as DukeNukem,
   enemyR as EnemyR,
   GAME_CONTEXT_KEY,
@@ -1312,6 +1326,7 @@ export {
   red_dress_killer as RedDressKiller,
   SCENE_CONTEXT_KEY,
   SPAWNER_CONTEXT_KEY,
+  sakura as Sakura,
   Scene,
   Spawner,
   Sprite,
@@ -1334,6 +1349,10 @@ export {
   createScene,
   createSpawner,
   deleteCharacter,
+  deza3_47,
+  deza9_34,
+  dezaBoss0,
+  dezaBoss1,
   dukeNukem,
   enemyR,
   ensureCharacterAssets,
@@ -1355,6 +1374,7 @@ export {
   openCharacterEditor,
   red_dress_killer,
   removeUndefined,
+  sakura,
   saveCharacter,
   syncProps,
   toArray,

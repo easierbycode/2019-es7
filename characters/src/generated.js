@@ -3,18 +3,33 @@
 // Characters added after this build still work via character('<name>').
 import { character } from "./factory.js";
 
+export const deza3_47 = character("deza3_47");
+export { deza3_47 as Deza347 };
+export const deza9_34 = character("deza9_34");
+export { deza9_34 as Deza934 };
+export const dezaBoss0 = character("dezaBoss0");
+export { dezaBoss0 as DezaBoss0 };
+export const dezaBoss1 = character("dezaBoss1");
+export { dezaBoss1 as DezaBoss1 };
 export const dukeNukem = character("dukeNukem");
 export { dukeNukem as DukeNukem };
 export const enemyR = character("enemyR");
 export { enemyR as EnemyR };
 export const red_dress_killer = character("red_dress_killer");
 export { red_dress_killer as RedDressKiller };
+export const sakura = character("sakura");
+export { sakura as Sakura };
 export const weirdo = character("weirdo");
 export { weirdo as Weirdo };
 
 export const CHARACTERS = [
+  "deza3_47",
+  "deza9_34",
+  "dezaBoss0",
+  "dezaBoss1",
   "dukeNukem",
   "enemyR",
   "red_dress_killer",
+  "sakura",
   "weirdo"
 ];
