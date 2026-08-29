@@ -3,6 +3,14 @@
 // Characters added after this build still work via character('<name>').
 import { character } from "./factory.js";
 
+export const akuma = character("akuma");
+export { akuma as Akuma };
+export const deza2_01 = character("deza2_01");
+export { deza2_01 as Deza201 };
+export const deza2_36 = character("deza2_36");
+export { deza2_36 as Deza236 };
+export const deza3_36_konami_chip = character("deza3_36_konami_chip");
+export { deza3_36_konami_chip as Deza336KonamiChip };
 export const deza3_47 = character("deza3_47");
 export { deza3_47 as Deza347 };
 export const deza9_34 = character("deza9_34");
@@ -23,6 +31,10 @@ export const weirdo = character("weirdo");
 export { weirdo as Weirdo };
 
 export const CHARACTERS = [
+  "akuma",
+  "deza2_01",
+  "deza2_36",
+  "deza3_36_konami_chip",
   "deza3_47",
   "deza9_34",
   "dezaBoss0",

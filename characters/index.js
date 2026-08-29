@@ -1257,6 +1257,10 @@ function character(name, defaults = {}) {
 }
 
 // characters/src/generated.js
+var akuma = character("akuma");
+var deza2_01 = character("deza2_01");
+var deza2_36 = character("deza2_36");
+var deza3_36_konami_chip = character("deza3_36_konami_chip");
 var deza3_47 = character("deza3_47");
 var deza9_34 = character("deza9_34");
 var dezaBoss0 = character("dezaBoss0");
@@ -1267,6 +1271,10 @@ var red_dress_killer = character("red_dress_killer");
 var sakura = character("sakura");
 var weirdo = character("weirdo");
 var CHARACTERS = [
+  "akuma",
+  "deza2_01",
+  "deza2_36",
+  "deza3_36_konami_chip",
   "deza3_47",
   "deza9_34",
   "dezaBoss0",
@@ -1306,6 +1314,7 @@ async function openCharacterEditor(opts = {}) {
 }
 export {
   Adopt,
+  akuma as Akuma,
   ArcadeCollider,
   ArcadePhysics,
   CHARACTERS,
@@ -1313,6 +1322,9 @@ export {
   Character,
   Container,
   DEFAULT_DB,
+  deza2_01 as Deza201,
+  deza2_36 as Deza236,
+  deza3_36_konami_chip as Deza336KonamiChip,
   deza3_47 as Deza347,
   deza9_34 as Deza934,
   dezaBoss0 as DezaBoss0,
@@ -1333,6 +1345,7 @@ export {
   Text,
   TileSprite,
   weirdo as Weirdo,
+  akuma,
   animSets,
   applyArcadeBodyProps,
   applyContainerProps,
@@ -1349,6 +1362,9 @@ export {
   createScene,
   createSpawner,
   deleteCharacter,
+  deza2_01,
+  deza2_36,
+  deza3_36_konami_chip,
   deza3_47,
   deza9_34,
   dezaBoss0,
