@@ -1265,6 +1265,7 @@ var deza3_47 = character("deza3_47");
 var deza9_34 = character("deza9_34");
 var dezaBoss0 = character("dezaBoss0");
 var dezaBoss1 = character("dezaBoss1");
+var dezaBoss3 = character("dezaBoss3");
 var dukeNukem = character("dukeNukem");
 var enemyR = character("enemyR");
 var red_dress_killer = character("red_dress_killer");
@@ -1279,6 +1280,7 @@ var CHARACTERS = [
   "deza9_34",
   "dezaBoss0",
   "dezaBoss1",
+  "dezaBoss3",
   "dukeNukem",
   "enemyR",
   "red_dress_killer",
@@ -1329,6 +1331,7 @@ export {
   deza9_34 as Deza934,
   dezaBoss0 as DezaBoss0,
   dezaBoss1 as DezaBoss1,
+  dezaBoss3 as DezaBoss3,
   dukeNukem as DukeNukem,
   enemyR as EnemyR,
   GAME_CONTEXT_KEY,
@@ -1369,6 +1372,7 @@ export {
   deza9_34,
   dezaBoss0,
   dezaBoss1,
+  dezaBoss3,
   dukeNukem,
   enemyR,
   ensureCharacterAssets,

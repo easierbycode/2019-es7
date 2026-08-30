@@ -19,6 +19,8 @@ export const dezaBoss0 = character("dezaBoss0");
 export { dezaBoss0 as DezaBoss0 };
 export const dezaBoss1 = character("dezaBoss1");
 export { dezaBoss1 as DezaBoss1 };
+export const dezaBoss3 = character("dezaBoss3");
+export { dezaBoss3 as DezaBoss3 };
 export const dukeNukem = character("dukeNukem");
 export { dukeNukem as DukeNukem };
 export const enemyR = character("enemyR");
@@ -39,6 +41,7 @@ export const CHARACTERS = [
   "deza9_34",
   "dezaBoss0",
   "dezaBoss1",
+  "dezaBoss3",
   "dukeNukem",
   "enemyR",
   "red_dress_killer",
