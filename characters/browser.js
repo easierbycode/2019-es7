@@ -1259,8 +1259,10 @@ function character(name, defaults = {}) {
 // characters/src/generated.js
 var akuma = character("akuma");
 var deza1_39 = character("deza1_39");
+var deza1_44 = character("deza1_44");
 var deza2_01 = character("deza2_01");
 var deza2_02 = character("deza2_02");
+var deza2_33_greenboost = character("deza2_33_greenboost");
 var deza2_36 = character("deza2_36");
 var deza3_36_konami_chip = character("deza3_36_konami_chip");
 var deza3_47 = character("deza3_47");
@@ -1277,8 +1279,10 @@ var weirdo = character("weirdo");
 var CHARACTERS = [
   "akuma",
   "deza1_39",
+  "deza1_44",
   "deza2_01",
   "deza2_02",
+  "deza2_33_greenboost",
   "deza2_36",
   "deza3_36_konami_chip",
   "deza3_47",
@@ -1331,8 +1335,10 @@ export {
   Container,
   DEFAULT_DB,
   deza1_39 as Deza139,
+  deza1_44 as Deza144,
   deza2_01 as Deza201,
   deza2_02 as Deza202,
+  deza2_33_greenboost as Deza233Greenboost,
   deza2_36 as Deza236,
   deza3_36_konami_chip as Deza336KonamiChip,
   deza3_47 as Deza347,
@@ -1375,8 +1381,10 @@ export {
   createSpawner,
   deleteCharacter,
   deza1_39,
+  deza1_44,
   deza2_01,
   deza2_02,
+  deza2_33_greenboost,
   deza2_36,
   deza3_36_konami_chip,
   deza3_47,

@@ -7,10 +7,14 @@ export const akuma = character("akuma");
 export { akuma as Akuma };
 export const deza1_39 = character("deza1_39");
 export { deza1_39 as Deza139 };
+export const deza1_44 = character("deza1_44");
+export { deza1_44 as Deza144 };
 export const deza2_01 = character("deza2_01");
 export { deza2_01 as Deza201 };
 export const deza2_02 = character("deza2_02");
 export { deza2_02 as Deza202 };
+export const deza2_33_greenboost = character("deza2_33_greenboost");
+export { deza2_33_greenboost as Deza233Greenboost };
 export const deza2_36 = character("deza2_36");
 export { deza2_36 as Deza236 };
 export const deza3_36_konami_chip = character("deza3_36_konami_chip");
@@ -41,8 +45,10 @@ export { weirdo as Weirdo };
 export const CHARACTERS = [
   "akuma",
   "deza1_39",
+  "deza1_44",
   "deza2_01",
   "deza2_02",
+  "deza2_33_greenboost",
   "deza2_36",
   "deza3_36_konami_chip",
   "deza3_47",
