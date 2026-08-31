@@ -1258,7 +1258,9 @@ function character(name, defaults = {}) {
 
 // characters/src/generated.js
 var akuma = character("akuma");
+var deza1_39 = character("deza1_39");
 var deza2_01 = character("deza2_01");
+var deza2_02 = character("deza2_02");
 var deza2_36 = character("deza2_36");
 var deza3_36_konami_chip = character("deza3_36_konami_chip");
 var deza3_47 = character("deza3_47");
@@ -1268,12 +1270,15 @@ var dezaBoss1 = character("dezaBoss1");
 var dezaBoss3 = character("dezaBoss3");
 var dukeNukem = character("dukeNukem");
 var enemyR = character("enemyR");
+var pyramid = character("pyramid");
 var red_dress_killer = character("red_dress_killer");
 var sakura = character("sakura");
 var weirdo = character("weirdo");
 var CHARACTERS = [
   "akuma",
+  "deza1_39",
   "deza2_01",
+  "deza2_02",
   "deza2_36",
   "deza3_36_konami_chip",
   "deza3_47",
@@ -1283,6 +1288,7 @@ var CHARACTERS = [
   "dezaBoss3",
   "dukeNukem",
   "enemyR",
+  "pyramid",
   "red_dress_killer",
   "sakura",
   "weirdo"
@@ -1324,7 +1330,9 @@ export {
   Character,
   Container,
   DEFAULT_DB,
+  deza1_39 as Deza139,
   deza2_01 as Deza201,
+  deza2_02 as Deza202,
   deza2_36 as Deza236,
   deza3_36_konami_chip as Deza336KonamiChip,
   deza3_47 as Deza347,
@@ -1337,6 +1345,7 @@ export {
   GAME_CONTEXT_KEY,
   GAME_OBJECT_CONTEXT_KEY,
   Game,
+  pyramid as Pyramid,
   Rectangle,
   red_dress_killer as RedDressKiller,
   SCENE_CONTEXT_KEY,
@@ -1365,7 +1374,9 @@ export {
   createScene,
   createSpawner,
   deleteCharacter,
+  deza1_39,
   deza2_01,
+  deza2_02,
   deza2_36,
   deza3_36_konami_chip,
   deza3_47,
@@ -1392,6 +1403,7 @@ export {
   onInputEvent,
   onSceneEvent,
   openCharacterEditor,
+  pyramid,
   red_dress_killer,
   removeUndefined,
   sakura,

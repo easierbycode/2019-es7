@@ -5,8 +5,12 @@ import { character } from "./factory.js";
 
 export const akuma = character("akuma");
 export { akuma as Akuma };
+export const deza1_39 = character("deza1_39");
+export { deza1_39 as Deza139 };
 export const deza2_01 = character("deza2_01");
 export { deza2_01 as Deza201 };
+export const deza2_02 = character("deza2_02");
+export { deza2_02 as Deza202 };
 export const deza2_36 = character("deza2_36");
 export { deza2_36 as Deza236 };
 export const deza3_36_konami_chip = character("deza3_36_konami_chip");
@@ -25,6 +29,8 @@ export const dukeNukem = character("dukeNukem");
 export { dukeNukem as DukeNukem };
 export const enemyR = character("enemyR");
 export { enemyR as EnemyR };
+export const pyramid = character("pyramid");
+export { pyramid as Pyramid };
 export const red_dress_killer = character("red_dress_killer");
 export { red_dress_killer as RedDressKiller };
 export const sakura = character("sakura");
@@ -34,7 +40,9 @@ export { weirdo as Weirdo };
 
 export const CHARACTERS = [
   "akuma",
+  "deza1_39",
   "deza2_01",
+  "deza2_02",
   "deza2_36",
   "deza3_36_konami_chip",
   "deza3_47",
@@ -44,6 +52,7 @@ export const CHARACTERS = [
   "dezaBoss3",
   "dukeNukem",
   "enemyR",
+  "pyramid",
   "red_dress_killer",
   "sakura",
   "weirdo"
