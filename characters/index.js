@@ -1258,6 +1258,7 @@ function character(name, defaults = {}) {
 
 // characters/src/generated.js
 var akuma = character("akuma");
+var deza1_09 = character("deza1_09");
 var deza1_39 = character("deza1_39");
 var deza1_44 = character("deza1_44");
 var deza2_01 = character("deza2_01");
@@ -1278,6 +1279,7 @@ var sakura = character("sakura");
 var weirdo = character("weirdo");
 var CHARACTERS = [
   "akuma",
+  "deza1_09",
   "deza1_39",
   "deza1_44",
   "deza2_01",
@@ -1334,6 +1336,7 @@ export {
   Character,
   Container,
   DEFAULT_DB,
+  deza1_09 as Deza109,
   deza1_39 as Deza139,
   deza1_44 as Deza144,
   deza2_01 as Deza201,
@@ -1380,6 +1383,7 @@ export {
   createScene,
   createSpawner,
   deleteCharacter,
+  deza1_09,
   deza1_39,
   deza1_44,
   deza2_01,

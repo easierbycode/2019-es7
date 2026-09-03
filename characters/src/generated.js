@@ -5,6 +5,8 @@ import { character } from "./factory.js";
 
 export const akuma = character("akuma");
 export { akuma as Akuma };
+export const deza1_09 = character("deza1_09");
+export { deza1_09 as Deza109 };
 export const deza1_39 = character("deza1_39");
 export { deza1_39 as Deza139 };
 export const deza1_44 = character("deza1_44");
@@ -44,6 +46,7 @@ export { weirdo as Weirdo };
 
 export const CHARACTERS = [
   "akuma",
+  "deza1_09",
   "deza1_39",
   "deza1_44",
   "deza2_01",
