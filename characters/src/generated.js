@@ -41,6 +41,8 @@ export const red_dress_killer = character("red_dress_killer");
 export { red_dress_killer as RedDressKiller };
 export const sakura = character("sakura");
 export { sakura as Sakura };
+export const uglySister = character("uglySister");
+export { uglySister as UglySister };
 export const weirdo = character("weirdo");
 export { weirdo as Weirdo };
 
@@ -64,5 +66,6 @@ export const CHARACTERS = [
   "pyramid",
   "red_dress_killer",
   "sakura",
+  "uglySister",
   "weirdo"
 ];

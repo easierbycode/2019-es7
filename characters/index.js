@@ -1276,6 +1276,7 @@ var enemyR = character("enemyR");
 var pyramid = character("pyramid");
 var red_dress_killer = character("red_dress_killer");
 var sakura = character("sakura");
+var uglySister = character("uglySister");
 var weirdo = character("weirdo");
 var CHARACTERS = [
   "akuma",
@@ -1297,6 +1298,7 @@ var CHARACTERS = [
   "pyramid",
   "red_dress_killer",
   "sakura",
+  "uglySister",
   "weirdo"
 ];
 
@@ -1365,6 +1367,7 @@ export {
   Sprite,
   Text,
   TileSprite,
+  uglySister as UglySister,
   weirdo as Weirdo,
   akuma,
   animSets,
@@ -1422,6 +1425,7 @@ export {
   saveCharacter,
   syncProps,
   toArray,
+  uglySister,
   useArcadeCollider,
   useArcadePhysics,
   useContainer,
