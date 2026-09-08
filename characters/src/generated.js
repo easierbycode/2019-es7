@@ -35,6 +35,8 @@ export const dukeNukem = character("dukeNukem");
 export { dukeNukem as DukeNukem };
 export const enemyR = character("enemyR");
 export { enemyR as EnemyR };
+export const motorcycle_deza2_32 = character("motorcycle_deza2_32");
+export { motorcycle_deza2_32 as MotorcycleDeza232 };
 export const pyramid = character("pyramid");
 export { pyramid as Pyramid };
 export const red_dress_killer = character("red_dress_killer");
@@ -63,6 +65,7 @@ export const CHARACTERS = [
   "dezaBoss3",
   "dukeNukem",
   "enemyR",
+  "motorcycle_deza2_32",
   "pyramid",
   "red_dress_killer",
   "sakura",

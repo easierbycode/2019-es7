@@ -1273,6 +1273,7 @@ var dezaBoss1 = character("dezaBoss1");
 var dezaBoss3 = character("dezaBoss3");
 var dukeNukem = character("dukeNukem");
 var enemyR = character("enemyR");
+var motorcycle_deza2_32 = character("motorcycle_deza2_32");
 var pyramid = character("pyramid");
 var red_dress_killer = character("red_dress_killer");
 var sakura = character("sakura");
@@ -1295,6 +1296,7 @@ var CHARACTERS = [
   "dezaBoss3",
   "dukeNukem",
   "enemyR",
+  "motorcycle_deza2_32",
   "pyramid",
   "red_dress_killer",
   "sakura",
@@ -1356,6 +1358,7 @@ export {
   GAME_CONTEXT_KEY,
   GAME_OBJECT_CONTEXT_KEY,
   Game,
+  motorcycle_deza2_32 as MotorcycleDeza232,
   pyramid as Pyramid,
   Rectangle,
   red_dress_killer as RedDressKiller,
@@ -1413,6 +1416,7 @@ export {
   isDestroyed,
   listCharacters,
   loadCharacterEditor,
+  motorcycle_deza2_32,
   onArcadePhysicsEvent,
   onGameEvent,
   onInputEvent,
