@@ -31,10 +31,14 @@ export const dezaBoss1 = character("dezaBoss1");
 export { dezaBoss1 as DezaBoss1 };
 export const dezaBoss3 = character("dezaBoss3");
 export { dezaBoss3 as DezaBoss3 };
+export const dezaKissBullet0_0_gif = character("dezaKissBullet0_0_gif");
+export { dezaKissBullet0_0_gif as DezaKissBullet00Gif };
 export const dukeNukem = character("dukeNukem");
 export { dukeNukem as DukeNukem };
 export const enemyR = character("enemyR");
 export { enemyR as EnemyR };
+export const eternal_deza3_56 = character("eternal_deza3_56");
+export { eternal_deza3_56 as EternalDeza356 };
 export const motorcycle_deza2_32 = character("motorcycle_deza2_32");
 export { motorcycle_deza2_32 as MotorcycleDeza232 };
 export const pyramid = character("pyramid");
@@ -43,6 +47,8 @@ export const red_dress_killer = character("red_dress_killer");
 export { red_dress_killer as RedDressKiller };
 export const sakura = character("sakura");
 export { sakura as Sakura };
+export const stage_over_c_png = character("stage_over_c_png");
+export { stage_over_c_png as StageOverCPng };
 export const uglySister = character("uglySister");
 export { uglySister as UglySister };
 export const weirdo = character("weirdo");
@@ -63,12 +69,15 @@ export const CHARACTERS = [
   "dezaBoss0",
   "dezaBoss1",
   "dezaBoss3",
+  "dezaKissBullet0_0_gif",
   "dukeNukem",
   "enemyR",
+  "eternal_deza3_56",
   "motorcycle_deza2_32",
   "pyramid",
   "red_dress_killer",
   "sakura",
+  "stage_over_c_png",
   "uglySister",
   "weirdo"
 ];

@@ -1271,12 +1271,15 @@ var deza9_34 = character("deza9_34");
 var dezaBoss0 = character("dezaBoss0");
 var dezaBoss1 = character("dezaBoss1");
 var dezaBoss3 = character("dezaBoss3");
+var dezaKissBullet0_0_gif = character("dezaKissBullet0_0_gif");
 var dukeNukem = character("dukeNukem");
 var enemyR = character("enemyR");
+var eternal_deza3_56 = character("eternal_deza3_56");
 var motorcycle_deza2_32 = character("motorcycle_deza2_32");
 var pyramid = character("pyramid");
 var red_dress_killer = character("red_dress_killer");
 var sakura = character("sakura");
+var stage_over_c_png = character("stage_over_c_png");
 var uglySister = character("uglySister");
 var weirdo = character("weirdo");
 var CHARACTERS = [
@@ -1294,12 +1297,15 @@ var CHARACTERS = [
   "dezaBoss0",
   "dezaBoss1",
   "dezaBoss3",
+  "dezaKissBullet0_0_gif",
   "dukeNukem",
   "enemyR",
+  "eternal_deza3_56",
   "motorcycle_deza2_32",
   "pyramid",
   "red_dress_killer",
   "sakura",
+  "stage_over_c_png",
   "uglySister",
   "weirdo"
 ];
@@ -1353,8 +1359,10 @@ export {
   dezaBoss0 as DezaBoss0,
   dezaBoss1 as DezaBoss1,
   dezaBoss3 as DezaBoss3,
+  dezaKissBullet0_0_gif as DezaKissBullet00Gif,
   dukeNukem as DukeNukem,
   enemyR as EnemyR,
+  eternal_deza3_56 as EternalDeza356,
   GAME_CONTEXT_KEY,
   GAME_OBJECT_CONTEXT_KEY,
   Game,
@@ -1368,6 +1376,7 @@ export {
   Scene,
   Spawner,
   Sprite,
+  stage_over_c_png as StageOverCPng,
   Text,
   TileSprite,
   uglySister as UglySister,
@@ -1402,9 +1411,11 @@ export {
   dezaBoss0,
   dezaBoss1,
   dezaBoss3,
+  dezaKissBullet0_0_gif,
   dukeNukem,
   enemyR,
   ensureCharacterAssets,
+  eternal_deza3_56,
   fetchAtlas,
   fetchCharacter,
   findGameObjectsByName,
@@ -1427,6 +1438,7 @@ export {
   removeUndefined,
   sakura,
   saveCharacter,
+  stage_over_c_png,
   syncProps,
   toArray,
   uglySister,
