@@ -39,6 +39,8 @@ export const enemyR = character("enemyR");
 export { enemyR as EnemyR };
 export const eternal_deza3_56 = character("eternal_deza3_56");
 export { eternal_deza3_56 as EternalDeza356 };
+export const hadoukenBoss = character("hadoukenBoss");
+export { hadoukenBoss as HadoukenBoss };
 export const motorcycle_deza2_32 = character("motorcycle_deza2_32");
 export { motorcycle_deza2_32 as MotorcycleDeza232 };
 export const pyramid = character("pyramid");
@@ -73,6 +75,7 @@ export const CHARACTERS = [
   "dukeNukem",
   "enemyR",
   "eternal_deza3_56",
+  "hadoukenBoss",
   "motorcycle_deza2_32",
   "pyramid",
   "red_dress_killer",

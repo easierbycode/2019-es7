@@ -1275,6 +1275,7 @@ var dezaKissBullet0_0_gif = character("dezaKissBullet0_0_gif");
 var dukeNukem = character("dukeNukem");
 var enemyR = character("enemyR");
 var eternal_deza3_56 = character("eternal_deza3_56");
+var hadoukenBoss = character("hadoukenBoss");
 var motorcycle_deza2_32 = character("motorcycle_deza2_32");
 var pyramid = character("pyramid");
 var red_dress_killer = character("red_dress_killer");
@@ -1301,6 +1302,7 @@ var CHARACTERS = [
   "dukeNukem",
   "enemyR",
   "eternal_deza3_56",
+  "hadoukenBoss",
   "motorcycle_deza2_32",
   "pyramid",
   "red_dress_killer",
@@ -1366,6 +1368,7 @@ export {
   GAME_CONTEXT_KEY,
   GAME_OBJECT_CONTEXT_KEY,
   Game,
+  hadoukenBoss as HadoukenBoss,
   motorcycle_deza2_32 as MotorcycleDeza232,
   pyramid as Pyramid,
   Rectangle,
@@ -1424,6 +1427,7 @@ export {
   getGameObject,
   getScene,
   getSpawner,
+  hadoukenBoss,
   isDestroyed,
   listCharacters,
   loadCharacterEditor,
