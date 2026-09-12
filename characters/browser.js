@@ -1271,6 +1271,7 @@ var deza9_34 = character("deza9_34");
 var dezaBoss0 = character("dezaBoss0");
 var dezaBoss1 = character("dezaBoss1");
 var dezaBoss3 = character("dezaBoss3");
+var dezaBoss4_ramsie = character("dezaBoss4_ramsie");
 var dezaKissBullet0_0_gif = character("dezaKissBullet0_0_gif");
 var dukeNukem = character("dukeNukem");
 var enemyR = character("enemyR");
@@ -1298,6 +1299,7 @@ var CHARACTERS = [
   "dezaBoss0",
   "dezaBoss1",
   "dezaBoss3",
+  "dezaBoss4_ramsie",
   "dezaKissBullet0_0_gif",
   "dukeNukem",
   "enemyR",
@@ -1361,6 +1363,7 @@ export {
   dezaBoss0 as DezaBoss0,
   dezaBoss1 as DezaBoss1,
   dezaBoss3 as DezaBoss3,
+  dezaBoss4_ramsie as DezaBoss4Ramsie,
   dezaKissBullet0_0_gif as DezaKissBullet00Gif,
   dukeNukem as DukeNukem,
   enemyR as EnemyR,
@@ -1414,6 +1417,7 @@ export {
   dezaBoss0,
   dezaBoss1,
   dezaBoss3,
+  dezaBoss4_ramsie,
   dezaKissBullet0_0_gif,
   dukeNukem,
   enemyR,
