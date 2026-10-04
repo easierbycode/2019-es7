@@ -35,6 +35,8 @@ export const dezaBoss4_ramsie = character("dezaBoss4_ramsie");
 export { dezaBoss4_ramsie as DezaBoss4Ramsie };
 export const dezaKissBullet0_0_gif = character("dezaKissBullet0_0_gif");
 export { dezaKissBullet0_0_gif as DezaKissBullet00Gif };
+export const deza_dragon = character("deza_dragon");
+export { deza_dragon as DezaDragon };
 export const dukeNukem = character("dukeNukem");
 export { dukeNukem as DukeNukem };
 export const enemyR = character("enemyR");
@@ -75,6 +77,7 @@ export const CHARACTERS = [
   "dezaBoss3",
   "dezaBoss4_ramsie",
   "dezaKissBullet0_0_gif",
+  "deza_dragon",
   "dukeNukem",
   "enemyR",
   "eternal_deza3_56",
