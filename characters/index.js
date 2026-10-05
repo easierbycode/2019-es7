@@ -1273,6 +1273,7 @@ var dezaBoss1 = character("dezaBoss1");
 var dezaBoss3 = character("dezaBoss3");
 var dezaBoss4_ramsie = character("dezaBoss4_ramsie");
 var dezaKissBullet0_0_gif = character("dezaKissBullet0_0_gif");
+var dezaShip = character("dezaShip");
 var deza_dragon = character("deza_dragon");
 var dukeNukem = character("dukeNukem");
 var enemyR = character("enemyR");
@@ -1280,6 +1281,7 @@ var eternal_deza3_56 = character("eternal_deza3_56");
 var hadoukenBoss = character("hadoukenBoss");
 var motorcycle_deza2_32 = character("motorcycle_deza2_32");
 var pyramid = character("pyramid");
+var pyramidDefaultProjectile = character("pyramidDefaultProjectile");
 var red_dress_killer = character("red_dress_killer");
 var sakura = character("sakura");
 var stage_over_c_png = character("stage_over_c_png");
@@ -1302,6 +1304,7 @@ var CHARACTERS = [
   "dezaBoss3",
   "dezaBoss4_ramsie",
   "dezaKissBullet0_0_gif",
+  "dezaShip",
   "deza_dragon",
   "dukeNukem",
   "enemyR",
@@ -1309,6 +1312,7 @@ var CHARACTERS = [
   "hadoukenBoss",
   "motorcycle_deza2_32",
   "pyramid",
+  "pyramidDefaultProjectile",
   "red_dress_killer",
   "sakura",
   "stage_over_c_png",
@@ -1368,6 +1372,7 @@ export {
   dezaBoss4_ramsie as DezaBoss4Ramsie,
   deza_dragon as DezaDragon,
   dezaKissBullet0_0_gif as DezaKissBullet00Gif,
+  dezaShip as DezaShip,
   dukeNukem as DukeNukem,
   enemyR as EnemyR,
   eternal_deza3_56 as EternalDeza356,
@@ -1377,6 +1382,7 @@ export {
   hadoukenBoss as HadoukenBoss,
   motorcycle_deza2_32 as MotorcycleDeza232,
   pyramid as Pyramid,
+  pyramidDefaultProjectile as PyramidDefaultProjectile,
   Rectangle,
   red_dress_killer as RedDressKiller,
   SCENE_CONTEXT_KEY,
@@ -1422,6 +1428,7 @@ export {
   dezaBoss3,
   dezaBoss4_ramsie,
   dezaKissBullet0_0_gif,
+  dezaShip,
   deza_dragon,
   dukeNukem,
   enemyR,
@@ -1446,6 +1453,7 @@ export {
   onSceneEvent,
   openCharacterEditor,
   pyramid,
+  pyramidDefaultProjectile,
   red_dress_killer,
   removeUndefined,
   sakura,
