@@ -7,6 +7,8 @@ export const akuma = character("akuma");
 export { akuma as Akuma };
 export const deza1_09 = character("deza1_09");
 export { deza1_09 as Deza109 };
+export const deza1_32_Link = character("deza1_32_Link");
+export { deza1_32_Link as Deza132Link };
 export const deza1_39 = character("deza1_39");
 export { deza1_39 as Deza139 };
 export const deza1_44 = character("deza1_44");
@@ -27,6 +29,8 @@ export const deza9_34 = character("deza9_34");
 export { deza9_34 as Deza934 };
 export const dezaBoss0 = character("dezaBoss0");
 export { dezaBoss0 as DezaBoss0 };
+export const dezaBoss0_Gill = character("dezaBoss0_Gill");
+export { dezaBoss0_Gill as DezaBoss0Gill };
 export const dezaBoss1 = character("dezaBoss1");
 export { dezaBoss1 as DezaBoss1 };
 export const dezaBoss3 = character("dezaBoss3");
@@ -67,6 +71,7 @@ export { weirdo as Weirdo };
 export const CHARACTERS = [
   "akuma",
   "deza1_09",
+  "deza1_32_Link",
   "deza1_39",
   "deza1_44",
   "deza2_01",
@@ -77,6 +82,7 @@ export const CHARACTERS = [
   "deza3_47",
   "deza9_34",
   "dezaBoss0",
+  "dezaBoss0_Gill",
   "dezaBoss1",
   "dezaBoss3",
   "dezaBoss4_ramsie",

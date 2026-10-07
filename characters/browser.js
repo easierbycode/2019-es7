@@ -1259,6 +1259,7 @@ function character(name, defaults = {}) {
 // characters/src/generated.js
 var akuma = character("akuma");
 var deza1_09 = character("deza1_09");
+var deza1_32_Link = character("deza1_32_Link");
 var deza1_39 = character("deza1_39");
 var deza1_44 = character("deza1_44");
 var deza2_01 = character("deza2_01");
@@ -1269,6 +1270,7 @@ var deza3_36_konami_chip = character("deza3_36_konami_chip");
 var deza3_47 = character("deza3_47");
 var deza9_34 = character("deza9_34");
 var dezaBoss0 = character("dezaBoss0");
+var dezaBoss0_Gill = character("dezaBoss0_Gill");
 var dezaBoss1 = character("dezaBoss1");
 var dezaBoss3 = character("dezaBoss3");
 var dezaBoss4_ramsie = character("dezaBoss4_ramsie");
@@ -1290,6 +1292,7 @@ var weirdo = character("weirdo");
 var CHARACTERS = [
   "akuma",
   "deza1_09",
+  "deza1_32_Link",
   "deza1_39",
   "deza1_44",
   "deza2_01",
@@ -1300,6 +1303,7 @@ var CHARACTERS = [
   "deza3_47",
   "deza9_34",
   "dezaBoss0",
+  "dezaBoss0_Gill",
   "dezaBoss1",
   "dezaBoss3",
   "dezaBoss4_ramsie",
@@ -1357,6 +1361,7 @@ export {
   Container,
   DEFAULT_DB,
   deza1_09 as Deza109,
+  deza1_32_Link as Deza132Link,
   deza1_39 as Deza139,
   deza1_44 as Deza144,
   deza2_01 as Deza201,
@@ -1367,6 +1372,7 @@ export {
   deza3_47 as Deza347,
   deza9_34 as Deza934,
   dezaBoss0 as DezaBoss0,
+  dezaBoss0_Gill as DezaBoss0Gill,
   dezaBoss1 as DezaBoss1,
   dezaBoss3 as DezaBoss3,
   dezaBoss4_ramsie as DezaBoss4Ramsie,
@@ -1414,6 +1420,7 @@ export {
   createSpawner,
   deleteCharacter,
   deza1_09,
+  deza1_32_Link,
   deza1_39,
   deza1_44,
   deza2_01,
@@ -1424,6 +1431,7 @@ export {
   deza3_47,
   deza9_34,
   dezaBoss0,
+  dezaBoss0_Gill,
   dezaBoss1,
   dezaBoss3,
   dezaBoss4_ramsie,
