@@ -17,10 +17,14 @@ export const deza2_01 = character("deza2_01");
 export { deza2_01 as Deza201 };
 export const deza2_02 = character("deza2_02");
 export { deza2_02 as Deza202 };
+export const deza2_12_heel_invader = character("deza2_12_heel_invader");
+export { deza2_12_heel_invader as Deza212HeelInvader };
 export const deza2_33_greenboost = character("deza2_33_greenboost");
 export { deza2_33_greenboost as Deza233Greenboost };
 export const deza2_36 = character("deza2_36");
 export { deza2_36 as Deza236 };
+export const deza3_33_whip = character("deza3_33_whip");
+export { deza3_33_whip as Deza333Whip };
 export const deza3_36_konami_chip = character("deza3_36_konami_chip");
 export { deza3_36_konami_chip as Deza336KonamiChip };
 export const deza3_47 = character("deza3_47");
@@ -76,8 +80,10 @@ export const CHARACTERS = [
   "deza1_44",
   "deza2_01",
   "deza2_02",
+  "deza2_12_heel_invader",
   "deza2_33_greenboost",
   "deza2_36",
+  "deza3_33_whip",
   "deza3_36_konami_chip",
   "deza3_47",
   "deza9_34",

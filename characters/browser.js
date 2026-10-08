@@ -1264,8 +1264,10 @@ var deza1_39 = character("deza1_39");
 var deza1_44 = character("deza1_44");
 var deza2_01 = character("deza2_01");
 var deza2_02 = character("deza2_02");
+var deza2_12_heel_invader = character("deza2_12_heel_invader");
 var deza2_33_greenboost = character("deza2_33_greenboost");
 var deza2_36 = character("deza2_36");
+var deza3_33_whip = character("deza3_33_whip");
 var deza3_36_konami_chip = character("deza3_36_konami_chip");
 var deza3_47 = character("deza3_47");
 var deza9_34 = character("deza9_34");
@@ -1297,8 +1299,10 @@ var CHARACTERS = [
   "deza1_44",
   "deza2_01",
   "deza2_02",
+  "deza2_12_heel_invader",
   "deza2_33_greenboost",
   "deza2_36",
+  "deza3_33_whip",
   "deza3_36_konami_chip",
   "deza3_47",
   "deza9_34",
@@ -1366,8 +1370,10 @@ export {
   deza1_44 as Deza144,
   deza2_01 as Deza201,
   deza2_02 as Deza202,
+  deza2_12_heel_invader as Deza212HeelInvader,
   deza2_33_greenboost as Deza233Greenboost,
   deza2_36 as Deza236,
+  deza3_33_whip as Deza333Whip,
   deza3_36_konami_chip as Deza336KonamiChip,
   deza3_47 as Deza347,
   deza9_34 as Deza934,
@@ -1425,8 +1431,10 @@ export {
   deza1_44,
   deza2_01,
   deza2_02,
+  deza2_12_heel_invader,
   deza2_33_greenboost,
   deza2_36,
+  deza3_33_whip,
   deza3_36_konami_chip,
   deza3_47,
   deza9_34,
