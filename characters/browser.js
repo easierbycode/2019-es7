@@ -1282,6 +1282,7 @@ var deza_dragon = character("deza_dragon");
 var dukeNukem = character("dukeNukem");
 var enemyR = character("enemyR");
 var eternal_deza3_56 = character("eternal_deza3_56");
+var flirty_revenge = character("flirty_revenge");
 var hadoukenBoss = character("hadoukenBoss");
 var motorcycle_deza2_32 = character("motorcycle_deza2_32");
 var pyramid = character("pyramid");
@@ -1317,6 +1318,7 @@ var CHARACTERS = [
   "dukeNukem",
   "enemyR",
   "eternal_deza3_56",
+  "flirty_revenge",
   "hadoukenBoss",
   "motorcycle_deza2_32",
   "pyramid",
@@ -1388,6 +1390,7 @@ export {
   dukeNukem as DukeNukem,
   enemyR as EnemyR,
   eternal_deza3_56 as EternalDeza356,
+  flirty_revenge as FlirtyRevenge,
   GAME_CONTEXT_KEY,
   GAME_OBJECT_CONTEXT_KEY,
   Game,
@@ -1453,6 +1456,7 @@ export {
   fetchAtlas,
   fetchCharacter,
   findGameObjectsByName,
+  flirty_revenge,
   getContainer,
   getGame,
   getGameObject,

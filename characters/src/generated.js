@@ -53,6 +53,8 @@ export const enemyR = character("enemyR");
 export { enemyR as EnemyR };
 export const eternal_deza3_56 = character("eternal_deza3_56");
 export { eternal_deza3_56 as EternalDeza356 };
+export const flirty_revenge = character("flirty_revenge");
+export { flirty_revenge as FlirtyRevenge };
 export const hadoukenBoss = character("hadoukenBoss");
 export { hadoukenBoss as HadoukenBoss };
 export const motorcycle_deza2_32 = character("motorcycle_deza2_32");
@@ -98,6 +100,7 @@ export const CHARACTERS = [
   "dukeNukem",
   "enemyR",
   "eternal_deza3_56",
+  "flirty_revenge",
   "hadoukenBoss",
   "motorcycle_deza2_32",
   "pyramid",
