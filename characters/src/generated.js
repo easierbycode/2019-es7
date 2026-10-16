@@ -3,6 +3,8 @@
 // Characters added after this build still work via character('<name>').
 import { character } from "./factory.js";
 
+export const Akuma_2019 = character("Akuma_2019");
+export { Akuma_2019 as Akuma2019 };
 export const akuma = character("akuma");
 export { akuma as Akuma };
 export const deza1_09 = character("deza1_09");
@@ -75,6 +77,7 @@ export const weirdo = character("weirdo");
 export { weirdo as Weirdo };
 
 export const CHARACTERS = [
+  "Akuma_2019",
   "akuma",
   "deza1_09",
   "deza1_32_Link",

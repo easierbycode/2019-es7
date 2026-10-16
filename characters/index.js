@@ -1257,6 +1257,7 @@ function character(name, defaults = {}) {
 }
 
 // characters/src/generated.js
+var Akuma_2019 = character("Akuma_2019");
 var akuma = character("akuma");
 var deza1_09 = character("deza1_09");
 var deza1_32_Link = character("deza1_32_Link");
@@ -1293,6 +1294,7 @@ var stage_over_c_png = character("stage_over_c_png");
 var uglySister = character("uglySister");
 var weirdo = character("weirdo");
 var CHARACTERS = [
+  "Akuma_2019",
   "akuma",
   "deza1_09",
   "deza1_32_Link",
@@ -1359,6 +1361,8 @@ async function openCharacterEditor(opts = {}) {
 export {
   Adopt,
   akuma as Akuma,
+  Akuma_2019 as Akuma2019,
+  Akuma_2019,
   ArcadeCollider,
   ArcadePhysics,
   CHARACTERS,
