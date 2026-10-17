@@ -1258,6 +1258,7 @@ function character(name, defaults = {}) {
 
 // characters/src/generated.js
 var Akuma_2019 = character("Akuma_2019");
+var Daltonius = character("Daltonius");
 var akuma = character("akuma");
 var deza1_09 = character("deza1_09");
 var deza1_32_Link = character("deza1_32_Link");
@@ -1295,6 +1296,7 @@ var uglySister = character("uglySister");
 var weirdo = character("weirdo");
 var CHARACTERS = [
   "Akuma_2019",
+  "Daltonius",
   "akuma",
   "deza1_09",
   "deza1_32_Link",
@@ -1370,6 +1372,7 @@ export {
   Character,
   Container,
   DEFAULT_DB,
+  Daltonius,
   deza1_09 as Deza109,
   deza1_32_Link as Deza132Link,
   deza1_39 as Deza139,
