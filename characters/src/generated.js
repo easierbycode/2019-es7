@@ -60,6 +60,8 @@ export const flirty_revenge = character("flirty_revenge");
 export { flirty_revenge as FlirtyRevenge };
 export const hadoukenBoss = character("hadoukenBoss");
 export { hadoukenBoss as HadoukenBoss };
+export const invaders = character("invaders");
+export { invaders as Invaders };
 export const motorcycle_deza2_32 = character("motorcycle_deza2_32");
 export { motorcycle_deza2_32 as MotorcycleDeza232 };
 export const pyramid = character("pyramid");
@@ -107,6 +109,7 @@ export const CHARACTERS = [
   "eternal_deza3_56",
   "flirty_revenge",
   "hadoukenBoss",
+  "invaders",
   "motorcycle_deza2_32",
   "pyramid",
   "pyramidDefaultProjectile",
