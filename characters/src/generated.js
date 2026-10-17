@@ -56,22 +56,34 @@ export const enemyR = character("enemyR");
 export { enemyR as EnemyR };
 export const eternal_deza3_56 = character("eternal_deza3_56");
 export { eternal_deza3_56 as EternalDeza356 };
+export const fairy_shooters = character("fairy_shooters");
+export { fairy_shooters as FairyShooters };
 export const flirty_revenge = character("flirty_revenge");
 export { flirty_revenge as FlirtyRevenge };
 export const hadoukenBoss = character("hadoukenBoss");
 export { hadoukenBoss as HadoukenBoss };
 export const invaders = character("invaders");
 export { invaders as Invaders };
+export const megarush = character("megarush");
+export { megarush as Megarush };
 export const motorcycle_deza2_32 = character("motorcycle_deza2_32");
 export { motorcycle_deza2_32 as MotorcycleDeza232 };
+export const overhead_scaffold = character("overhead_scaffold");
+export { overhead_scaffold as OverheadScaffold };
 export const pyramid = character("pyramid");
 export { pyramid as Pyramid };
 export const pyramidDefaultProjectile = character("pyramidDefaultProjectile");
 export { pyramidDefaultProjectile as PyramidDefaultProjectile };
 export const red_dress_killer = character("red_dress_killer");
 export { red_dress_killer as RedDressKiller };
+export const ryu_level_moon = character("ryu_level_moon");
+export { ryu_level_moon as RyuLevelMoon };
+export const ryu_level_sign = character("ryu_level_sign");
+export { ryu_level_sign as RyuLevelSign };
 export const sakura = character("sakura");
 export { sakura as Sakura };
+export const simon_belmont = character("simon_belmont");
+export { simon_belmont as SimonBelmont };
 export const stage_over_c_png = character("stage_over_c_png");
 export { stage_over_c_png as StageOverCPng };
 export const uglySister = character("uglySister");
@@ -107,14 +119,20 @@ export const CHARACTERS = [
   "dukeNukem",
   "enemyR",
   "eternal_deza3_56",
+  "fairy_shooters",
   "flirty_revenge",
   "hadoukenBoss",
   "invaders",
+  "megarush",
   "motorcycle_deza2_32",
+  "overhead_scaffold",
   "pyramid",
   "pyramidDefaultProjectile",
   "red_dress_killer",
+  "ryu_level_moon",
+  "ryu_level_sign",
   "sakura",
+  "simon_belmont",
   "stage_over_c_png",
   "uglySister",
   "weirdo"

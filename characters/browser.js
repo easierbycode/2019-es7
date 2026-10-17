@@ -1284,14 +1284,20 @@ var deza_dragon = character("deza_dragon");
 var dukeNukem = character("dukeNukem");
 var enemyR = character("enemyR");
 var eternal_deza3_56 = character("eternal_deza3_56");
+var fairy_shooters = character("fairy_shooters");
 var flirty_revenge = character("flirty_revenge");
 var hadoukenBoss = character("hadoukenBoss");
 var invaders = character("invaders");
+var megarush = character("megarush");
 var motorcycle_deza2_32 = character("motorcycle_deza2_32");
+var overhead_scaffold = character("overhead_scaffold");
 var pyramid = character("pyramid");
 var pyramidDefaultProjectile = character("pyramidDefaultProjectile");
 var red_dress_killer = character("red_dress_killer");
+var ryu_level_moon = character("ryu_level_moon");
+var ryu_level_sign = character("ryu_level_sign");
 var sakura = character("sakura");
+var simon_belmont = character("simon_belmont");
 var stage_over_c_png = character("stage_over_c_png");
 var uglySister = character("uglySister");
 var weirdo = character("weirdo");
@@ -1323,14 +1329,20 @@ var CHARACTERS = [
   "dukeNukem",
   "enemyR",
   "eternal_deza3_56",
+  "fairy_shooters",
   "flirty_revenge",
   "hadoukenBoss",
   "invaders",
+  "megarush",
   "motorcycle_deza2_32",
+  "overhead_scaffold",
   "pyramid",
   "pyramidDefaultProjectile",
   "red_dress_killer",
+  "ryu_level_moon",
+  "ryu_level_sign",
   "sakura",
+  "simon_belmont",
   "stage_over_c_png",
   "uglySister",
   "weirdo"
@@ -1399,21 +1411,27 @@ export {
   dukeNukem as DukeNukem,
   enemyR as EnemyR,
   eternal_deza3_56 as EternalDeza356,
+  fairy_shooters as FairyShooters,
   flirty_revenge as FlirtyRevenge,
   GAME_CONTEXT_KEY,
   GAME_OBJECT_CONTEXT_KEY,
   Game,
   hadoukenBoss as HadoukenBoss,
   invaders as Invaders,
+  megarush as Megarush,
   motorcycle_deza2_32 as MotorcycleDeza232,
+  overhead_scaffold as OverheadScaffold,
   pyramid as Pyramid,
   pyramidDefaultProjectile as PyramidDefaultProjectile,
   Rectangle,
   red_dress_killer as RedDressKiller,
+  ryu_level_moon as RyuLevelMoon,
+  ryu_level_sign as RyuLevelSign,
   SCENE_CONTEXT_KEY,
   SPAWNER_CONTEXT_KEY,
   sakura as Sakura,
   Scene,
+  simon_belmont as SimonBelmont,
   Spawner,
   Sprite,
   stage_over_c_png as StageOverCPng,
@@ -1463,6 +1481,7 @@ export {
   enemyR,
   ensureCharacterAssets,
   eternal_deza3_56,
+  fairy_shooters,
   fetchAtlas,
   fetchCharacter,
   findGameObjectsByName,
@@ -1477,18 +1496,23 @@ export {
   isDestroyed,
   listCharacters,
   loadCharacterEditor,
+  megarush,
   motorcycle_deza2_32,
   onArcadePhysicsEvent,
   onGameEvent,
   onInputEvent,
   onSceneEvent,
   openCharacterEditor,
+  overhead_scaffold,
   pyramid,
   pyramidDefaultProjectile,
   red_dress_killer,
   removeUndefined,
+  ryu_level_moon,
+  ryu_level_sign,
   sakura,
   saveCharacter,
+  simon_belmont,
   stage_over_c_png,
   syncProps,
   toArray,
