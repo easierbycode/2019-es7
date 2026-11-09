@@ -352,7 +352,7 @@ export class PhaserContinueScene extends Phaser.Scene {
             openUrl(buildTweetUrl());
         });
 
-        // Exported level apps never TWEET (the share text is 2028.Ai's own).
+        // Exported level apps never TWEET (the share text is PsyOps.ai's own).
         // Keep the sprite for the layout below — gotoTitleBtn hangs off its y.
         if (isExportedLevelApp()) {
             this.tweetBtn.setVisible(false);

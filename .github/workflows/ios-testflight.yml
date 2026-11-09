@@ -16,7 +16,7 @@ env:
   CORDOVA_IOS_VERSION: "7.1.1"
   NODE_VERSION: "20"
   APP_ID: "com.easierbycode.game2028"
-  APP_NAME: "2028.ai"
+  APP_NAME: "PsyOps.ai"
 
 jobs:
   ios-build:
@@ -195,15 +195,15 @@ jobs:
       - name: Debug archive contents
         run: |
           echo "=== Archive app contents ==="
-          ls -la $RUNNER_TEMP/app.xcarchive/Products/Applications/2028.ai.app/
+          ls -la $RUNNER_TEMP/app.xcarchive/Products/Applications/${{ env.APP_NAME }}.app/
           echo "=== Embedded provisioning profile ==="
-          if [ -f "$RUNNER_TEMP/app.xcarchive/Products/Applications/2028.ai.app/embedded.mobileprovision" ]; then
-            security cms -D -i "$RUNNER_TEMP/app.xcarchive/Products/Applications/2028.ai.app/embedded.mobileprovision" | plutil -extract Name raw -
+          if [ -f "$RUNNER_TEMP/app.xcarchive/Products/Applications/${{ env.APP_NAME }}.app/embedded.mobileprovision" ]; then
+            security cms -D -i "$RUNNER_TEMP/app.xcarchive/Products/Applications/${{ env.APP_NAME }}.app/embedded.mobileprovision" | plutil -extract Name raw -
           else
             echo "NO embedded.mobileprovision found!"
           fi
           echo "=== Code signing info ==="
-          codesign -dvvv "$RUNNER_TEMP/app.xcarchive/Products/Applications/2028.ai.app" 2>&1 || true
+          codesign -dvvv "$RUNNER_TEMP/app.xcarchive/Products/Applications/${{ env.APP_NAME }}.app" 2>&1 || true
 
       - name: Export IPA
         run: |

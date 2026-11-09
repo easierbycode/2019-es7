@@ -1,5 +1,5 @@
 <script>
-  // The 2028.Ai title screen with red_dress_killer standing in it — the
+  // The PsyOps.ai title screen with red_dress_killer standing in it — the
   // characters-module version of the scene-script demo, as a public page
   // (../demo-title.html). Recreates PhaserTitleScene's final layout
   // (src/phaser/TitleScene.js) from the game's own deployed assets, with the

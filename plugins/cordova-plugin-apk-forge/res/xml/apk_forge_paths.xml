@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="forge_downloads" path="Download/EvilInvadersForge/" />
+    <external-path name="forge_downloads" path="Download/PsyOpsForge/" />
     <cache-path name="forge_cache" path="apkforge/" />
 </paths>

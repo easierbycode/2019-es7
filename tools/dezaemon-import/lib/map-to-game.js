@@ -68,7 +68,7 @@ export function enemyLetters(index) {
     return out;
 }
 
-// The historical "New Game" player: the stock Evil Invaders ship, exactly as
+// The historical "New Game" player: the stock PsyOps.ai ship, exactly as
 // the Phaser 4 runtime draws it — player00..player05 are the idle animation
 // Player.js builds, shot*/shotBig* are the bullet frames Bullet.js fires for
 // each shoot mode, and barrier0..3 is the shield. Every one of these frames

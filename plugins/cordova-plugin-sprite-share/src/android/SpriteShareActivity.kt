@@ -53,7 +53,7 @@ class SpriteShareActivity : Activity() {
     // ── attachBaseContext runs before any other Activity lifecycle hook, before
     //    super.onCreate, before WebView class load. Earliest place we can install
     //    a process-wide crash handler so a force-close anywhere in this Activity
-    //    leaves an evilinvaders-spriteshare-crash.txt on disk.
+    //    leaves an psyops-spriteshare-crash.txt on disk.
     //
     //    When the user shares an image without first launching the main app, the
     //    MainActivity diagnostics never run, so we install our own here.
@@ -492,7 +492,7 @@ class SpriteShareActivity : Activity() {
             } else {
                 try {
                     @Suppress("DEPRECATION")
-                    val dl = File(Environment.getExternalStorageDirectory(), "Download/EvilInvadersForge")
+                    val dl = File(Environment.getExternalStorageDirectory(), "Download/PsyOpsForge")
                     dl.mkdirs()
                     File(dl, "spriteshare-log.txt").appendText(line)
                 } catch (_: Throwable) {}
@@ -573,7 +573,7 @@ class SpriteShareActivity : Activity() {
                     } else {
                         try {
                             @Suppress("DEPRECATION")
-                            val dl = File(Environment.getExternalStorageDirectory(), "Download/EvilInvadersForge")
+                            val dl = File(Environment.getExternalStorageDirectory(), "Download/PsyOpsForge")
                             dl.mkdirs()
                             File(dl, "spriteshare-crash.txt").writeText(text)
                         } catch (_: Throwable) {}
@@ -588,8 +588,8 @@ class SpriteShareActivity : Activity() {
         private const val TAG = "SpriteShare"
         private const val MAX_IMAGE_DIMENSION = 1536
         private const val MAX_IMAGE_PIXELS = 1_250_000L
-        private const val SHARE_LOG_DOWNLOAD_NAME = "evilinvaders-spriteshare-log.txt"
-        private const val SHARE_CRASH_DOWNLOAD_NAME = "evilinvaders-spriteshare-crash.txt"
+        private const val SHARE_LOG_DOWNLOAD_NAME = "psyops-spriteshare-log.txt"
+        private const val SHARE_CRASH_DOWNLOAD_NAME = "psyops-spriteshare-crash.txt"
     }
 
     private enum class SaveResult {

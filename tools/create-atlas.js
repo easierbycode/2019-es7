@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Evil Invaders Atlas Creator (CLI)
+ * PsyOps.ai Atlas Creator (CLI)
  * Creates game_asset.png + game_asset.json (or custom name)
  * Uses professional MaxRects packer (better than the browser row packer)
  * 
@@ -18,7 +18,7 @@ const texturePacker = require('free-tex-packer-core');
 
 program
   .name('create-atlas')
-  .description('Create sprite atlas PNG + JSON for Evil Invaders')
+  .description('Create sprite atlas PNG + JSON for PsyOps.ai')
   .option('-i, --input <dir>', 'Folder with loose sprites (.png/.gif/.jpg)', './assets/sprites')
   .option('-o, --output <dir>', 'Output folder for atlas', './assets')
   .option('-n, --atlasName <name>', 'Base name (without extension)', 'game_asset')

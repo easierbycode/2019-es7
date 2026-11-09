@@ -1,7 +1,7 @@
 {
   "name": "phaser-game",
   "version": "1.0.0",
-  "description": "2028.ai — AI vs The World",
+  "description": "PsyOps.ai — AI vs The World",
   "main": "main.js",
   "scripts": {
     "start": "electron .",

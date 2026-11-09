@@ -15,10 +15,10 @@ This guide walks through the one-time setup needed before the GitHub Actions wor
 1. Go to [App Store Connect](https://appstoreconnect.apple.com) → **Apps** → **+** → **New App**
 2. Fill in:
    - **Platform**: iOS
-   - **Name**: 2028.ai
+   - **Name**: PsyOps.ai
    - **Primary Language**: English (U.S.)
-   - **Bundle ID**: Register `com.easierbycode.game2028.ai` first (see Step 2)
-   - **SKU**: `game-2028-ai` (any unique string)
+   - **Bundle ID**: Register `com.easierbycode.game2028` first (see Step 2)
+   - **SKU**: `psyops-ai` (any unique string)
 3. Click **Create**
 
 ## Step 2: Register the Bundle ID
@@ -26,8 +26,8 @@ This guide walks through the one-time setup needed before the GitHub Actions wor
 1. Go to [Apple Developer → Identifiers](https://developer.apple.com/account/resources/identifiers/list)
 2. Click **+** → **App IDs** → **App**
 3. Enter:
-   - **Description**: 2028.ai
-   - **Bundle ID** (Explicit): `com.easierbycode.game2028.ai`
+   - **Description**: PsyOps.ai
+   - **Bundle ID** (Explicit): `com.easierbycode.game2028`
 4. No special capabilities needed (it's a WebView game)
 5. Click **Continue** → **Register**
 
@@ -65,9 +65,9 @@ openssl pkcs12 -export \
 
 1. Go to [Apple Developer → Profiles](https://developer.apple.com/account/resources/profiles/list)
 2. Click **+** → **App Store Connect** (under Distribution)
-3. Select your App ID: `com.easierbycode.game2028.ai`
+3. Select your App ID: `com.easierbycode.game2028`
 4. Select your Distribution certificate
-5. Name it: `2028ai AppStore`
+5. Name it: `PsyOpsAI AppStore`
 6. Download the `.mobileprovision` file
 
 ## Step 5: Create an App Store Connect API Key
@@ -89,10 +89,10 @@ Add these secrets:
 |---|---|---|
 | `BUILD_CERTIFICATE_BASE64` | Base64-encoded `.p12` file | `base64 -i distribution.p12 \| pbcopy` |
 | `P12_PASSWORD` | Password you set when creating the `.p12` | From Step 3 |
-| `BUILD_PROVISION_PROFILE_BASE64` | Base64-encoded provisioning profile | `base64 -i 2028ai_AppStore.mobileprovision \| pbcopy` |
+| `BUILD_PROVISION_PROFILE_BASE64` | Base64-encoded provisioning profile | `base64 -i PsyOpsAI_AppStore.mobileprovision \| pbcopy` |
 | `KEYCHAIN_PASSWORD` | Any random string | Generate one: `openssl rand -hex 16` |
 | `APPLE_TEAM_ID` | Your 10-character Team ID | [developer.apple.com/account](https://developer.apple.com/account) → Membership details |
-| `PROVISIONING_PROFILE_NAME` | Profile name exactly as created | e.g. `2028ai AppStore` |
+| `PROVISIONING_PROFILE_NAME` | Profile name exactly as created | e.g. `PsyOpsAI AppStore` |
 | `CODE_SIGN_IDENTITY` | Certificate identity | Usually `Apple Distribution: Daniel Johnson (TEAM_ID)` |
 | `ASC_KEY_ID` | App Store Connect API Key ID | From Step 5 |
 | `ASC_ISSUER_ID` | App Store Connect Issuer ID | From Step 5 |
@@ -121,7 +121,7 @@ The workflow triggers on push to `main` or via manual dispatch (Actions tab → 
 - Check `CODE_SIGN_IDENTITY` matches exactly (run `security find-identity -v -p codesigning` on your Mac)
 
 ### "Provisioning profile doesn't match"
-- The profile must be for bundle ID `com.easierbycode.game2028.ai`
+- The profile must be for bundle ID `com.easierbycode.game2028`
 - The profile must include your distribution certificate
 - Re-download and re-encode if you regenerated the cert
 

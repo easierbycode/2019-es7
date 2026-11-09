@@ -1,5 +1,5 @@
 {
-  "name": "2028-ai",
+  "name": "psyops-ai",
   "version": "1.0.0",
   "private": true,
   "main": "electron/main.js",

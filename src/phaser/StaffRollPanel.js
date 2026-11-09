@@ -76,7 +76,7 @@ export class StaffRollPanel extends Phaser.GameObjects.Container {
         this.add(this.closeBtn);
 
         // A Dezaemon import's staff roll credits the SAVE's makers, not
-        // 2028.Ai's: title, developer and genre, each in both languages where
+        // PsyOps.ai's: title, developer and genre, each in both languages where
         // known (see dezaStaffCredits above for where they come from).
         var recipe = gameState._phaserRecipe;
         var dezaCredits = dezaStaffCredits(recipe);
@@ -87,7 +87,7 @@ export class StaffRollPanel extends Phaser.GameObjects.Container {
         } else if (recipe && recipe.dezaemonTitle) {
             // An import with nothing to credit: the button is hidden on the
             // title screen, so this is only a guard — show the empty card
-            // rather than the stock 2028.Ai staff sheet, which would credit
+            // rather than the stock PsyOps.ai staff sheet, which would credit
             // the wrong game.
             this.wakingG.setVisible(false);
         } else {

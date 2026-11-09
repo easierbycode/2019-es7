@@ -177,7 +177,7 @@ export class PhaserEndingScene extends Phaser.Scene {
         this.tweetBtn.on("pointerup", function () {
             openUrl(buildTweetUrl());
         });
-        // Exported level apps never TWEET (the share text is 2028.Ai's own).
+        // Exported level apps never TWEET (the share text is PsyOps.ai's own).
         // The pop-in tween below only scales it; visibility stays off.
         if (isExportedLevelApp()) {
             this.tweetBtn.setVisible(false);

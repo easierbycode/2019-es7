@@ -10,7 +10,7 @@ import {
 } from "./gameState.js";
 import { resolveGameId } from "./gameIdentity.js";
 
-// Where a game with no identity of its own scores — the stock 2028.Ai board,
+// Where a game with no identity of its own scores — the stock PsyOps.ai board,
 // left exactly where it has always been so its existing world best survives.
 const LEGACY_DATABASE_PATH = "leaderboards/globalHighScore";
 const LEADERBOARD_ROOT = "leaderboards";

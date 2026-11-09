@@ -1,4 +1,4 @@
-# Evil Invaders — Character CMS
+# PsyOps.ai — Character CMS
 
 A Deno Fresh 2.3 + Svelte 5 app for editing the game's player and enemy
 data live, with instant preview of textures, movement, and projectiles.

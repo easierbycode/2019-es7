@@ -15,7 +15,7 @@
  *    fallback for older devices.
  *  - Writes a timestamped launch-log.txt entry at the very start of
  *    onCreate(), then again before/after loadUrl(launchUrl). The log is
- *    written to the public Download/EvilInvadersForge/ folder so the user
+ *    written to the public Download/PsyOpsForge/ folder so the user
  *    can read it from a stock Files app even if the app crashes mid-boot.
  *  - Installs an UncaughtExceptionHandler that persists stack traces to the
  *    same folder as last-crash.txt.
@@ -235,8 +235,8 @@ module.exports = function (context) {
 
     // ---- Add enterImmersiveMode() + onWindowFocusChanged() + showDiagnostics() ----
     const methodBlock = `
-    private val DIAG_DOWNLOAD_NAME = "evilinvaders-launch-log.txt"
-    private val DIAG_CRASH_DOWNLOAD_NAME = "evilinvaders-last-crash.txt"
+    private val DIAG_DOWNLOAD_NAME = "psyops-launch-log.txt"
+    private val DIAG_CRASH_DOWNLOAD_NAME = "psyops-last-crash.txt"
 
     private fun diagAppendCtx(ctx: Context, marker: String) {
         try {
@@ -260,7 +260,7 @@ module.exports = function (context) {
             } else {
                 try {
                     @Suppress("DEPRECATION")
-                    val dl = File(Environment.getExternalStorageDirectory(), "Download/EvilInvadersForge")
+                    val dl = File(Environment.getExternalStorageDirectory(), "Download/PsyOpsForge")
                     dl.mkdirs()
                     File(dl, "launch-log.txt").appendText(line)
                 } catch (_: Throwable) {}
@@ -339,7 +339,7 @@ module.exports = function (context) {
                     } else {
                         try {
                             @Suppress("DEPRECATION")
-                            val dl = File(Environment.getExternalStorageDirectory(), "Download/EvilInvadersForge")
+                            val dl = File(Environment.getExternalStorageDirectory(), "Download/PsyOpsForge")
                             dl.mkdirs()
                             File(dl, "last-crash.txt").writeText(text)
                         } catch (_: Throwable) {}
@@ -428,7 +428,7 @@ module.exports = function (context) {
     override fun attachBaseContext(newBase: Context) {
         // Earliest hook in the Activity lifecycle. Runs before super.onCreate,
         // before Cordova bootstrap, before plugin instantiation. If MAIN_ATTACH
-        // never appears in evilinvaders-launch-log.txt (Files app -> Downloads),
+        // never appears in psyops-launch-log.txt (Files app -> Downloads),
         // the crash is happening before MainActivity even gets constructed —
         // probably a manifest / dex-load problem. If MAIN_ATTACH appears but
         // ACTIVITY_PRE_SUPER does not, super.attachBaseContext is the killer.

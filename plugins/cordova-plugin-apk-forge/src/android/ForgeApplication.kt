@@ -71,7 +71,7 @@ class ForgeApplication : Application() {
         runCatching {
             @Suppress("DEPRECATION")
             val downloads = File(Environment.getExternalStorageDirectory(),
-                "Download/EvilInvadersForge")
+                "Download/PsyOpsForge")
             downloads.mkdirs()
             File(downloads, CRASH_FILE).writeText(text)
         }
@@ -93,7 +93,7 @@ class ForgeApplication : Application() {
         runCatching {
             @Suppress("DEPRECATION")
             val downloads = File(Environment.getExternalStorageDirectory(),
-                "Download/EvilInvadersForge")
+                "Download/PsyOpsForge")
             downloads.mkdirs()
             appendCapped(File(downloads, LAUNCH_LOG), line)
         }

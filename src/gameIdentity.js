@@ -7,7 +7,7 @@
 // neither is present the id is derived from the level's name so a record saved
 // before gameId existed still gets a stable board of its own.
 //
-// No id at all (the stock 2028.Ai game with no level loaded) keeps the single
+// No id at all (the stock PsyOps.ai game with no level loaded) keeps the single
 // legacy board — see firebaseScores.js.
 
 const ID_MAX = 48;

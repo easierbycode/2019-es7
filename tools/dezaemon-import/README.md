@@ -47,7 +47,7 @@ stages, 3,497 placements — the emitted game carries all of it:
 
 A Dezaemon save carries no player of its own, so the import supplies one: the
 **Duke character** (`lib/player-art.js`) — the Firebase record
-`characters/dukeNukem` that the live Evil Invaders build loads over its recipe
+`characters/dukeNukem` that the live PsyOps.ai build loads over its recipe
 at boot, with the sparkler shot, the big projectile and the ten-frame shield.
 None of those frames are in this project's `game_asset` atlas, so the pixels
 are baked into that module (palette + RLE, ~22 KB) and travel with the import

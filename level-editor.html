@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>2028.ai Level Editor</title>
+    <title>PsyOps.ai Level Editor</title>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js"></script>
@@ -2730,7 +2730,7 @@
         function dezaClone(o) { return JSON.parse(JSON.stringify(o)); }
 
         // ---- Staff-roll credits for an imported save --------------------------
-        // The runtime's STAFF ROLL credits the SAVE's makers, not 2028.Ai's, so
+        // The runtime's STAFF ROLL credits the SAVE's makers, not PsyOps.ai's, so
         // an import attaches what the community table knows about it: title,
         // developer and genre in both languages. TitleScene hides the button
         // when a level carries none of it (see src/phaser/StaffRollPanel.js
@@ -3148,7 +3148,7 @@
             if (!st || st.selectedSlot === null || !st.decoded) return;
             const save = st.saves[st.selectedSlot];
             snapshotDefaultsOnce();
-            // mapSaveToGame supplies the Evil Invaders player and its bullets
+            // mapSaveToGame supplies the stock PsyOps.ai player and its bullets
             // regardless of `defaults` — a Dezaemon save has no player of its
             // own, and the atlas reset below would strip a custom one's frames.
             let { gameJson, sprites, warnings } = window.Dezaemon.mapSaveToGame(st.decoded, {

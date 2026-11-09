@@ -103,7 +103,7 @@ class ApkBuilder(private val ctx: Context, private val progress: ProgressFn) {
             put(MediaStore.Downloads.DISPLAY_NAME, outFilename)
             put(MediaStore.Downloads.MIME_TYPE, "application/vnd.android.package-archive")
             put(MediaStore.Downloads.RELATIVE_PATH,
-                Environment.DIRECTORY_DOWNLOADS + "/EvilInvadersForge")
+                Environment.DIRECTORY_DOWNLOADS + "/PsyOpsForge")
             put(MediaStore.Downloads.IS_PENDING, 1)
         }
         val uri = resolver.insert(collection, values)
@@ -125,7 +125,7 @@ class ApkBuilder(private val ctx: Context, private val progress: ProgressFn) {
     private fun publishViaLegacyFile(signed: File, outFilename: String): Pair<String?, String?> {
         val downloads = Environment.getExternalStoragePublicDirectory(
             Environment.DIRECTORY_DOWNLOADS)
-        val target = File(downloads, "EvilInvadersForge").apply { mkdirs() }
+        val target = File(downloads, "PsyOpsForge").apply { mkdirs() }
         val finalFile = File(target, outFilename)
         FileInputStream(signed).use { ins ->
             FileOutputStream(finalFile).use { out -> ins.copyTo(out) }

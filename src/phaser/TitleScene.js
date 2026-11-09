@@ -59,7 +59,7 @@ export class PhaserTitleScene extends Phaser.Scene {
         var deza = recipe && recipe.dezaemonTitle && atlas ? recipe.dezaemonTitle : null;
         var dezaFrame = (role) => deza && deza[role] && atlas.has(deza[role]) ? deza[role] : null;
         // Any drawn piece makes this an import's title — even a credit-only
-        // save must not fall back to the stock 2028.Ai logo screen.
+        // save must not fall back to the stock PsyOps.ai logo screen.
         this.dezaTitle = !!(dezaFrame("title1") || dezaFrame("title2") || dezaFrame("credit"));
         var dezaLogo = dezaFrame("title1") || dezaFrame("title2");
 
@@ -241,7 +241,7 @@ export class PhaserTitleScene extends Phaser.Scene {
         this.staffrollBtn.on("pointerup", this.showStaffroll, this);
 
         // An import's title screen keeps only the Saturn-appropriate chrome:
-        // no TWEET, no HOW TO PLAY (2028.Ai's tutorial). STAFF ROLL stays —
+        // no TWEET, no HOW TO PLAY (PsyOps.ai's tutorial). STAFF ROLL stays —
         // it shows the save's own title and developer.
         if (this.dezaTitle) {
             this.twitterBtn.setVisible(false);
@@ -251,7 +251,7 @@ export class PhaserTitleScene extends Phaser.Scene {
         }
 
         // An exported level app is a finished cartridge: never TWEET (the
-        // stock share text is 2028.Ai's, not this game's), and never the
+        // stock share text is PsyOps.ai's, not this game's), and never the
         // BUILD APK forge below — an export must not re-export itself.
         if (isExportedLevelApp()) {
             this.twitterBtn.setVisible(false);
@@ -358,7 +358,7 @@ export class PhaserTitleScene extends Phaser.Scene {
         });
 
         this.time.delayedCall(1500, function () {
-            // the stock title call is 2028.Ai's own voice — not an import's
+            // the stock title call is PsyOps.ai's own voice — not an import's
             if (!self.dezaTitle) self.playVoice("voice_titlecall");
         });
 

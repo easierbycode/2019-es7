@@ -350,7 +350,7 @@ test("New Game flies Duke, and his frames are baked in rather than referenced", 
     assert.deepStrictEqual(referenced.filter((f) => !baked.has(f)), []);
 });
 
-test("the stock Evil Invaders player stays available as the pixel-free fallback", () => {
+test("the stock PsyOps.ai player stays available as the pixel-free fallback", () => {
     // src/phaser/game-objects/Player.js and Bullet.js hardcode these same keys
     // as their fallbacks, and every one is a frame in assets/game_asset.
     assert.deepStrictEqual(EVIL_INVADERS_PLAYER.texture, [

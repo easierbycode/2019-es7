@@ -16,7 +16,7 @@ export default function App({ Component, url }: PageProps) {
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>Evil Invaders — Character CMS</title>
+        <title>PsyOps.ai — Character CMS</title>
         <link rel="stylesheet" href="/styles.css" />
       </head>
       <body>
