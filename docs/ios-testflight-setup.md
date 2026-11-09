@@ -17,7 +17,7 @@ This guide walks through the one-time setup needed before the GitHub Actions wor
    - **Platform**: iOS
    - **Name**: PsyOps.ai
    - **Primary Language**: English (U.S.)
-   - **Bundle ID**: Register `com.easierbycode.game2028` first (see Step 2)
+   - **Bundle ID**: Register `com.easierbycode.psyops` first (see Step 2)
    - **SKU**: `psyops-ai` (any unique string)
 3. Click **Create**
 
@@ -27,7 +27,7 @@ This guide walks through the one-time setup needed before the GitHub Actions wor
 2. Click **+** → **App IDs** → **App**
 3. Enter:
    - **Description**: PsyOps.ai
-   - **Bundle ID** (Explicit): `com.easierbycode.game2028`
+   - **Bundle ID** (Explicit): `com.easierbycode.psyops`
 4. No special capabilities needed (it's a WebView game)
 5. Click **Continue** → **Register**
 
@@ -65,7 +65,7 @@ openssl pkcs12 -export \
 
 1. Go to [Apple Developer → Profiles](https://developer.apple.com/account/resources/profiles/list)
 2. Click **+** → **App Store Connect** (under Distribution)
-3. Select your App ID: `com.easierbycode.game2028`
+3. Select your App ID: `com.easierbycode.psyops`
 4. Select your Distribution certificate
 5. Name it: `PsyOpsAI AppStore`
 6. Download the `.mobileprovision` file
@@ -121,7 +121,7 @@ The workflow triggers on push to `main` or via manual dispatch (Actions tab → 
 - Check `CODE_SIGN_IDENTITY` matches exactly (run `security find-identity -v -p codesigning` on your Mac)
 
 ### "Provisioning profile doesn't match"
-- The profile must be for bundle ID `com.easierbycode.game2028`
+- The profile must be for bundle ID `com.easierbycode.psyops`
 - The profile must include your distribution certificate
 - Re-download and re-encode if you regenerated the cert
 

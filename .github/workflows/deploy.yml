@@ -94,7 +94,7 @@ jobs:
       - name: Create Cordova project
         run: |
           if [ ! -d cordova ]; then
-            cordova create cordova com.easierbycode.game2028 "PsyOps.ai"
+            cordova create cordova com.easierbycode.psyops "PsyOps.ai"
             cd cordova
             cordova platform add android@14.0.1
           fi

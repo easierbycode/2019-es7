@@ -19,7 +19,7 @@ class ShareViewController: UIViewController, WKScriptMessageHandler, WKNavigatio
     private var pendingImagePath: String?
     private var pageLoaded = false
 
-    private let appGroupId = "group.com.easierbycode.game2028"
+    private let appGroupId = "group.com.easierbycode.psyops"
 
     // MARK: - Lifecycle
 
