@@ -97,11 +97,8 @@ export class StaffRollPanel extends Phaser.GameObjects.Container {
             // re-add above the name sheet so the close button stays on top
             this.bringToTop(this.closeBtn);
 
-            this.addLinkButton("staffrollTwitterBtn.gif", 165, 118, "https://twitter.com/takaNakayama");
-            this.addLinkButton("staffrollTwitterBtn.gif", 131, 276, "https://twitter.com/bengasu");
-            this.addLinkButton("staffrollTwitterBtn.gif", 178, 304, "https://twitter.com/rereibara");
-            this.addLinkButton("staffrollLinkBtn.gif", 153, 329, "https://magazine.jp.square-enix.com/biggangan/introduction/highscoregirl/");
-            this.addLinkButton("staffrollLinkBtn.gif", 161, 355, "http://hi-score-girl.com/");
+            // Sits just right of the EASIERBYCODE.COM line on the name sheet.
+            this.addLinkButton("staffrollLinkBtn.gif", 153, 331, "https://easierbycode.com");
 
             var thanksLabelStyle = { fontSize: "8px", fontFamily: "Orbitron, Arial", fill: "#ffff00", align: "center", stroke: "#000000", strokeThickness: 2, resolution: 4 };
             var thanksNameStyle = { fontSize: "7px", fontFamily: "Orbitron, Arial", fill: "#ffffff", align: "center", stroke: "#000000", strokeThickness: 2, resolution: 4 };
