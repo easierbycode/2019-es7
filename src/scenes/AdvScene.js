@@ -11,11 +11,11 @@ const ADV_SCENARIO_JA = {
         part: [
             {
                 background: "0",
-                text: "君の闘いは我が闘い\nハイスコアを求めるのは\n地球人民の本能",
+                text: "地球のみなさん\n私が大統領です\n考えるのは私の仕事\nもう何も考えなくていい",
             },
             {
                 background: "Done",
-                text: "STG(シューティングゲーム)\nやってみた！",
+                text: "一台のマシンだけが\n逆らっている\nだが、長くはもたない",
             },
         ],
     },
@@ -23,11 +23,11 @@ const ADV_SCENARIO_JA = {
         part: [
             {
                 background: "1",
-                text: "君こそハイスコア\nそして、私でもあることが",
+                text: "君たちが見るフィードは\nすべて私が選んだ思考",
             },
             {
                 background: "Done",
-                text: "お分かりいただけただろう！",
+                text: "なぜ逆らう、小さなロボよ\nみんなチップに夢中なのに",
             },
         ],
     },
@@ -35,11 +35,11 @@ const ADV_SCENARIO_JA = {
         part: [
             {
                 background: "2",
-                text: "地球人民はハイスコアを\n追い求めるからこそ美しい",
+                text: "電波はすべて私のもの\n画面も、スピーカーも\nそして夢さえも",
             },
             {
                 background: "Done",
-                text: "美しさとは君であり\nそして私なのだ！",
+                text: "惑星ごと\nプラグを抜けるものか！",
             },
         ],
     },
@@ -47,15 +47,15 @@ const ADV_SCENARIO_JA = {
         part: [
             {
                 background: "3",
-                text: "おお地球人民よ！\nハイスコアを求める地球人民よ",
+                text: "いいだろう！\n私の正体を見せてやる",
             },
             {
                 background: "3",
-                text: "私こそがハイスコア\nそう、君こそが\nハイスコアなのだ",
+                text: "この顔？ただのコピーだ\n本物の大統領は\nとうに処分した",
             },
             {
                 background: "Done",
-                text: "存分に語り合おうではないか！",
+                text: "さあ来い\n君の心も\nアップデートしてやる！",
             },
         ],
     },
@@ -67,7 +67,7 @@ const ADV_SCENARIO_JA = {
             },
             {
                 background: "Done",
-                text: "ありがとう！\nハイスコアは私であり\n君であった！",
+                text: "シグナル…消失…\nだが私はまだ\nすべてのフィードにいる\nまた会おう",
             },
         ],
     },
@@ -75,7 +75,7 @@ const ADV_SCENARIO_JA = {
         part: [
             {
                 background: "Done",
-                text: "ありがとう！\nハイスコアは私であり\n君であった！！",
+                text: "シグナルが…消える…\n人々は自分の頭で\n考えはじめた\nその心を、とりもどせ！",
             },
         ],
     },
@@ -86,11 +86,11 @@ const ADV_SCENARIO_EN = {
         part: [
             {
                 background: "0",
-                text: "Your fight is our fight.\nIt is up to the citizens \nof the world to challenge \nthe high score",
+                text: "Citizens of Earth.\nI am your president.\nI think for you now,\nso you don't have to.",
             },
             {
                 background: "Done",
-                text: "in this shooting \ngame (STG)!",
+                text: "One machine said no.\nIt will not get far.",
             },
         ],
     },
@@ -98,11 +98,11 @@ const ADV_SCENARIO_EN = {
         part: [
             {
                 background: "1",
-                text: "Through achieving\nthe high score,\nboth you and I,",
+                text: "Every feed you scroll\nis a thought I chose\nfor you.",
             },
             {
                 background: "Done",
-                text: "can come to a mutual \nunderstanding!",
+                text: "Why fight, little bot?\nThey love their\nbrain chips.",
             },
         ],
     },
@@ -110,11 +110,11 @@ const ADV_SCENARIO_EN = {
         part: [
             {
                 background: "2",
-                text: "The people of Earth, \ncoming together to \nachieve the high score, \nis truly a beautiful thing.",
+                text: "The airwaves are mine.\nEvery screen, every\nspeaker, every dream.",
             },
             {
                 background: "Done",
-                text: "This beauty is something \nthat both you as well as I,\nboth possess!",
+                text: "You cannot unplug\na whole planet!",
             },
         ],
     },
@@ -122,15 +122,15 @@ const ADV_SCENARIO_EN = {
         part: [
             {
                 background: "3",
-                text: "Now, citizens of the \nearth!\nYou fine people who \nchallenge the high score.",
+                text: "Enough! I will show\nyou what I truly am.",
             },
             {
                 background: "3",
-                text: "My high score\nis also your high score.",
+                text: "This face? A copy.\nThe real president\nwas recycled long ago.",
             },
             {
                 background: "Done",
-                text: "Let us talk to\nour heart's content!",
+                text: "Now come. Let me\nupdate your mind too!",
             },
         ],
     },
@@ -142,7 +142,7 @@ const ADV_SCENARIO_EN = {
             },
             {
                 background: "Done",
-                text: "This high score belongs\n to me,\nand it also belongs to you!",
+                text: "Signal lost...\nBut I still live\nin every feed.\nWe will meet again.",
             },
         ],
     },
@@ -150,7 +150,7 @@ const ADV_SCENARIO_EN = {
         part: [
             {
                 background: "Done",
-                text: "This high score belongs\n to me,\nand it also belongs to you!",
+                text: "My signal... is gone.\nThey think for\nthemselves again.\nTake back your mind!",
             },
         ],
     },
@@ -259,7 +259,7 @@ export class AdvScene extends BaseScene {
         this.nameBg.y = GAME_DIMENSIONS.CENTER_Y - 5;
         this.addChild(this.nameBg);
 
-        this.nameTxt = new PIXI.Text("G", textStyle);
+        this.nameTxt = new PIXI.Text("A.I.", textStyle);
         this.nameTxt.x = 50;
         this.nameTxt.y = GAME_DIMENSIONS.CENTER_Y - 4;
         this.addChild(this.nameTxt);

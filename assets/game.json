@@ -623,7 +623,7 @@
 		"ここぞという時には\nCA BOMB！を使用しよう！",
 		"CA BOMB！は\n全画面攻撃だ！",
 		"バリアを入手したら\nチャンスだ！",
-		"世界大統領の攻撃を\nもってしても破壊できない\n物体があるらしいぞ！",
+		"大統領AIの攻撃でも\n破壊できない物体が\nあるらしいぞ！",
 		"BIG SHOTは通常の\n2倍の威力で貫通するぞ！",
 		"苦手な敵は避けてしまおう！",
 		"硬い敵は無視するのも\n作戦の1つだ！",
@@ -633,14 +633,14 @@
 		"地球人民は1日に平均15000回\nまばたきをするらしいぞ！",
 		"地球人民のくしゃみの速度は\n平均時速160キロらしいぞ！",
 		"太陽の光は地球に届くまで\n500秒程度かかるらしいぞ！",
-		"Gの帽子の中には\n地球人民の夢が詰まっているぞ！",
+		"大統領の頭の中には\n盗まれた夢が詰まっているぞ！",
 		"今日の運勢は絶好調らしいぞ！",
 		"ご飯は\nよく噛んで食べると\nいいらしいぞ！",
 		"早起きは三文の徳らしいぞ！",
 		"寝る前には歯を磨こう！",
 		"人には優しくしよう！",
-		"カプコン社員食堂のカレーは\n美味しいらしいぞ！",
-		"今回の元ネタとなった\n「1942」は1984年に\nリリースされたぞ！"
+		"たまにはスマホを置いて\n空を見上げよう！",
+		"フィードの言うことを\nうのみにしないように！"
 	],
 
 	"continueCommentEn": [
@@ -650,7 +650,7 @@
 		"Be sure to use the CA BOMB when in a pinch!",
 		"The CA BOMB! is a full-screen attack!",
 		"Make full use of the Barrier once you have it!",
-		"Even for the world's president, there are some things his attack can't break!",
+		"Some things even the AI president can't break!",
 		"Break through with the 2x power of the BIG SHOT!",
 		"Try avoiding tough enemies!",
 		"Avoiding difficult enemies is part of a good battle strategy!",
@@ -660,13 +660,13 @@
 		"Did you know that the citizens of the earth blink 15,000 times a day?",
 		"Did you know that the citizens of the earth sneeze at an average speed of 100 mph?",
 		"It takes about 500 seconds for the light from the sun to reach the Earth!",
-		"Inside of G's hat you can find the hopes and dreams of all the Earth's citizens!",
+		"Inside the president's head are all the dreams it stole!",
 		"Our teamwork is on point today!",
 		"Be sure to properly chew your meals!",
 		"The early bird catches the worm!",
 		"Brush your teeth before bedtime!",
 		"Be kind to other people!",
-		"The curry in the Capcom employee cafeteria is really delicious!",
-		"This game's inspiration, \"1942,\" was released in 1984!"
+		"Put your phone down and look at the sky once in a while!",
+		"Don't believe everything your feed tells you!"
 	]
 }
