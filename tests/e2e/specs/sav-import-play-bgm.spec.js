@@ -14,7 +14,7 @@ const { test, expect } = require("@playwright/test");
 // NOTE: this spec deliberately runs WITHOUT ?lowmode=1 — low mode silences
 // every audio path, the sequencer included, so there would be nothing to
 // measure.
-const RAMSIE = path.resolve(__dirname, "..", "..", "..", "dev-fixtures", "Dez 2 - Ramsie.sav");
+const RAMSIE = path.resolve(__dirname, "..", "..", "..", "tools", "dezaemon-import", "fixtures", "ramsie.sav");
 const SLOT = 0;                 // DEZA2____01 — Ramsie's only save
 const STAGE0_MAIN_SONG = 4;     // its BGM table's stage-0 main assignment
 const SFX_SET_SF = 3;
