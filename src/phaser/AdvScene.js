@@ -170,7 +170,7 @@ export class PhaserAdvScene extends Phaser.Scene {
         }
 
         if (!gameState.bgmContinuityActive) {
-            this.playBgm("adventure_bgm", 0.2);
+            this.playBgm("adventure_bgm", 0.25);
         }
 
         var bgKey = "advBg" + this.scenario[this.stageKey].part[this.partNum].background + ".gif";
@@ -270,7 +270,10 @@ export class PhaserAdvScene extends Phaser.Scene {
         }
         try {
             var existing = this.sound.get(key);
-            if (existing) {
+            if (existing && existing.isPlaying) {
+                // Already playing (the title screen started it): carry on.
+                existing.setVolume(volume || 0.2);
+            } else if (existing) {
                 existing.play({ volume: volume || 0.2, loop: true });
             } else if (this.cache.audio.exists(key)) {
                 this.sound.add(key, { loop: true, volume: volume || 0.2 }).play();

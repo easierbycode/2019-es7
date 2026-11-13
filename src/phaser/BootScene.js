@@ -782,6 +782,8 @@ export class BootScene extends Phaser.Scene {
                             var localFilename = bgmManifest[uKey] || (uKey + ".mp3");
                             var localPath = baseUrl + "assets/custom-bgm/" + localFilename;
                             gameState.bgmSourceURLs[uKey] = uUrl;
+                            gameState.customBgmKeys = gameState.customBgmKeys || {};
+                            gameState.customBgmKeys[uKey] = true;
                             if (self.cache.audio.exists(uKey)) {
                                 self.cache.audio.remove(uKey);
                             }
@@ -940,6 +942,8 @@ export class BootScene extends Phaser.Scene {
                 var blob = data instanceof Blob ? data : new Blob([data], { type: "audio/mpeg" });
                 var url = URL.createObjectURL(blob);
                 blobURLs.push(url);
+                gameState.customBgmKeys = gameState.customBgmKeys || {};
+                gameState.customBgmKeys[key] = true;
 
                 // Remove previously cached audio so Phaser re-decodes
                 if (self.cache.audio.exists(key)) {

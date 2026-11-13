@@ -50,6 +50,11 @@ export const BGM_INFO = {
     },
 };
 
+// Long tracks that load when their scene opens, not at boot.
+export const LAZY_SOUND_PATHS = {
+    ending_bgm: "assets/sounds/scene_ending/ending_bgm.mp3",
+};
+
 export const RESOURCE_PATHS = {
     recipe: "assets/game.json",
     game_ui: "assets/game_ui.json",
@@ -61,6 +66,7 @@ export const RESOURCE_PATHS = {
     se_cursor: "assets/sounds/ui/se_cursor.mp3",
     se_over: "assets/sounds/ui/se_over.mp3",
     adventure_bgm: "assets/sounds/scene_adventure/adventure_bgm.mp3",
+    gameplay_bgm: "assets/sounds/gameplay_bgm.mp3",
     g_adbenture_voice0: "assets/sounds/scene_adventure/g_adbenture_voice0.mp3",
     voice_thankyou: "assets/sounds/voice_thankyou.mp3",
     se_explosion: "assets/sounds/se_explosion.mp3",

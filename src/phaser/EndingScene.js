@@ -1,4 +1,4 @@
-import { GAME_DIMENSIONS, LANG } from "../constants.js";
+import { GAME_DIMENSIONS, LANG, LAZY_SOUND_PATHS } from "../constants.js";
 import { gameState, isExportedLevelApp, saveHighScore, scoreCountsAsRecord } from "../gameState.js";
 import { submitHighScore } from "../firebaseScores.js";
 import {
@@ -229,6 +229,9 @@ export class PhaserEndingScene extends Phaser.Scene {
             ease: "Linear",
         });
 
+        // Ending music, loaded now rather than at boot (it is a long track).
+        this.playEndingBgm();
+
         // t=500ms: voice_congra plays (PIXI: "-=2.0" from end of 2.5s tween)
         this.time.delayedCall(500, function () {
             self.playSound("voice_congra", 0.7);
@@ -418,6 +421,34 @@ export class PhaserEndingScene extends Phaser.Scene {
                 },
             });
         });
+    }
+
+    playEndingBgm() {
+        if (gameState.lowModeFlg) return;
+        var self = this;
+        var key = "ending_bgm";
+        var start = function () {
+            if (!self.sys || !self.sys.isActive()) return;
+            try {
+                if (!self.cache.audio.exists(key)) return;
+                var existing = self.sound.get(key);
+                if (existing) {
+                    if (existing.isPlaying) existing.stop();
+                    existing.play({ volume: 0.3, loop: true });
+                } else {
+                    self.sound.add(key, { loop: true, volume: 0.3 }).play();
+                }
+            } catch (e) {}
+        };
+        if (this.cache.audio.exists(key)) {
+            start();
+            return;
+        }
+        try {
+            this.load.audio(key, LAZY_SOUND_PATHS[key]);
+            this.load.once("complete", start);
+            this.load.start();
+        } catch (e) {}
     }
 
     playSound(key, volume) {

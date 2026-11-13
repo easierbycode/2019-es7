@@ -934,6 +934,12 @@ export class PhaserGameScene extends Phaser.Scene {
         var bossNames = ["bison", "barlog", "sagat", "vega", "fang"];
         var name = bossNames[assetStageId(stageId)] || "bison";
         var key = "boss_" + name + "_bgm";
+        // Stages 1-5 share one gameplay track, unless a level or the editor
+        // supplied its own music for this stage's key.
+        var overridden = gameState.customBgmKeys && gameState.customBgmKeys[key];
+        if (!overridden && this.cache.audio.exists("gameplay_bgm")) {
+            key = "gameplay_bgm";
+        }
         this.stageBgmName = key;
 
         // Resume paused BGM if same custom audio URL carries over

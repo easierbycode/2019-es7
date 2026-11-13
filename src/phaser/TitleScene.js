@@ -287,6 +287,7 @@ export class PhaserTitleScene extends Phaser.Scene {
             this.forgeBtn.setOrigin(1, 0);
             this.forgeBtn.setInteractive({ useHandCursor: true });
             this.forgeBtn.on("pointerup", function () {
+                self.stopTitleBgm();
                 self.scene.start("PhaserForgeScene");
             });
         }
@@ -297,6 +298,8 @@ export class PhaserTitleScene extends Phaser.Scene {
         // The save's own title track (the BGM table's first special slot).
         if (this.dezaTitle && !gameState.lowModeFlg) {
             startDezaemonBgm(this, "title");
+        } else {
+            this.playTitleBgm();
         }
 
         // Keyboard: Enter or Space to start
@@ -466,6 +469,38 @@ export class PhaserTitleScene extends Phaser.Scene {
             } else if (this.cache.audio.exists(key)) {
                 this.sound.add(key).play({ volume: 0.7 });
             }
+        } catch (e) {}
+    }
+
+    // The title track also plays under the story scenes (key adventure_bgm),
+    // so it carries on into the story when the player starts.
+    playTitleBgm() {
+        if (gameState.lowModeFlg) return;
+        var recipe = gameState._phaserRecipe;
+        if (recipe && recipe.dezaemonBgm) return;
+        var self = this;
+        var start = function () {
+            try {
+                var existing = self.sound.get("adventure_bgm");
+                if (existing && existing.isPlaying) return;
+                if (existing) {
+                    existing.play({ volume: 0.25, loop: true });
+                } else if (self.cache.audio.exists("adventure_bgm")) {
+                    self.sound.add("adventure_bgm", { loop: true, volume: 0.25 }).play();
+                }
+            } catch (e) {}
+        };
+        if (this.sound.locked) {
+            this.sound.once("unlocked", start);
+        } else {
+            start();
+        }
+    }
+
+    stopTitleBgm() {
+        try {
+            var snd = this.sound.get("adventure_bgm");
+            if (snd && snd.isPlaying) snd.stop();
         } catch (e) {}
     }
 
