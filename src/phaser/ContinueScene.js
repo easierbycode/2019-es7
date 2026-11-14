@@ -1,4 +1,5 @@
 import { GAME_DIMENSIONS, LANG } from "../constants.js";
+import { shareStrings } from "./shareLinks.js";
 import { pollGamepads } from "./GamepadInput.js";
 import { gameState, isExportedLevelApp, saveHighScore, scoreCountsAsRecord } from "../gameState.js";
 import { submitHighScore } from "../firebaseScores.js";
@@ -19,14 +20,15 @@ function buildTweetUrl() {
     var score = Number(gameState.score || 0);
     var highScore = Number(gameState.highScore || 0);
     var url, hashtags, text;
+    var share = shareStrings();
     if (LANG === "ja") {
-        url = encodeURIComponent("https://easierbycode.com");
-        hashtags = encodeURIComponent("PsyOpsAI");
-        text = encodeURIComponent("PsyOps.ai\n今回のSCORE:" + score + "\nHISCORE:" + highScore + "\n");
+        url = encodeURIComponent(share.url);
+        hashtags = encodeURIComponent(share.hashtags);
+        text = encodeURIComponent(share.heading + "今回のSCORE:" + score + "\nHISCORE:" + highScore + "\n");
     } else {
-        url = encodeURIComponent("https://easierbycode.com");
-        hashtags = encodeURIComponent("PsyOpsAI");
-        text = encodeURIComponent("PSYOPS.AI\nSCORE:" + score + "\nBEST:" + highScore + "\n");
+        url = encodeURIComponent(share.url);
+        hashtags = encodeURIComponent(share.hashtags);
+        text = encodeURIComponent(share.heading + "SCORE:" + score + "\nBEST:" + highScore + "\n");
     }
     return "https://twitter.com/intent/tweet?url=" + url + "&hashtags=" + hashtags + "&text=" + text;
 }

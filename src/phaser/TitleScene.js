@@ -1,4 +1,5 @@
 import { GAME_DIMENSIONS, LANG } from "../constants.js";
+import { shareStrings } from "./shareLinks.js";
 import { gameState, isExportedLevelApp } from "../gameState.js";
 import {
     getDailyBestLabel,
@@ -429,14 +430,15 @@ export class PhaserTitleScene extends Phaser.Scene {
         var hashtags = "";
         var text = "";
 
+        var share = shareStrings();
         if (LANG === "ja") {
-            url = encodeURIComponent("https://easierbycode.com");
-            hashtags = encodeURIComponent("PsyOpsAI");
-            text = encodeURIComponent("PsyOps.ai\nHISCORE:" + highScore + "\n");
+            url = encodeURIComponent(share.url);
+            hashtags = encodeURIComponent(share.hashtags);
+            text = encodeURIComponent(share.heading + "HISCORE:" + highScore + "\n");
         } else {
-            url = encodeURIComponent("https://easierbycode.com");
-            hashtags = encodeURIComponent("PsyOpsAI");
-            text = encodeURIComponent("PSYOPS.AI\nBEST:" + highScore + "\n");
+            url = encodeURIComponent(share.url);
+            hashtags = encodeURIComponent(share.hashtags);
+            text = encodeURIComponent(share.heading + "BEST:" + highScore + "\n");
         }
 
         var tweetUrl = "https://twitter.com/intent/tweet?url=" + url + "&hashtags=" + hashtags + "&text=" + text + "&score=" + score;
