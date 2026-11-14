@@ -64,8 +64,8 @@ module.exports = function (context) {
         "plugins", "cordova-plugin-sprite-share");
     const extName = "SpriteShareExtension";
     const extDir = path.join(platformRoot, extName);
-    const bundleId = "com.easierbycode.psyops.sprite-share";
-    const appGroupId = "group.com.easierbycode.psyops";
+    const bundleId = "com.easierbycode.psyop2028.sprite-share";
+    const appGroupId = "group.com.easierbycode.psyop2028";
 
     // ── 1. Create extension directory and copy files ──
 

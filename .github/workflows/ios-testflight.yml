@@ -15,7 +15,7 @@ env:
   CORDOVA_VERSION: "12"
   CORDOVA_IOS_VERSION: "7.1.1"
   NODE_VERSION: "20"
-  APP_ID: "com.easierbycode.psyops"
+  APP_ID: "com.easierbycode.psyop2028"
   APP_NAME: "PsyOps.ai"
 
 jobs:
@@ -151,7 +151,7 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :signingStyle string manual" cordova/ExportOptions.plist
           /usr/libexec/PlistBuddy -c "Add :teamID string $TEAM_ID" cordova/ExportOptions.plist
           /usr/libexec/PlistBuddy -c "Add :provisioningProfiles dict" cordova/ExportOptions.plist
-          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.easierbycode.psyops string $PP_NAME" cordova/ExportOptions.plist
+          /usr/libexec/PlistBuddy -c "Add :provisioningProfiles:com.easierbycode.psyop2028 string $PP_NAME" cordova/ExportOptions.plist
           /usr/libexec/PlistBuddy -c "Add :uploadBitcode bool false" cordova/ExportOptions.plist
           /usr/libexec/PlistBuddy -c "Add :uploadSymbols bool true" cordova/ExportOptions.plist
 
