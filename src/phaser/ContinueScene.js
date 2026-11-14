@@ -20,13 +20,13 @@ function buildTweetUrl() {
     var highScore = Number(gameState.highScore || 0);
     var url, hashtags, text;
     if (LANG === "ja") {
-        url = encodeURIComponent("https://game.capcom.com/cfn/sfv/aprilfool/2019/?lang=ja");
-        hashtags = encodeURIComponent("シャド研,SFVAE,aprilfool,エイプリルフール");
-        text = encodeURIComponent("エイプリルフール 2019 世界大統領がSTGやってみた\n今回のSCORE:" + score + "\nHISCORE:" + highScore + "\n");
+        url = encodeURIComponent("https://easierbycode.com");
+        hashtags = encodeURIComponent("PsyOpsAI");
+        text = encodeURIComponent("PsyOps.ai\n今回のSCORE:" + score + "\nHISCORE:" + highScore + "\n");
     } else {
-        url = encodeURIComponent("https://game.capcom.com/cfn/sfv/aprilfool/2019/?lang=en");
-        hashtags = encodeURIComponent("ShadalooCRI, SFVAE, aprilfool");
-        text = encodeURIComponent("APRIL FOOL 2019 WORLD PRESIDENT CHALLENGES A STG\nSCORE:" + score + "\nBEST:" + highScore + "\n");
+        url = encodeURIComponent("https://easierbycode.com");
+        hashtags = encodeURIComponent("PsyOpsAI");
+        text = encodeURIComponent("PSYOPS.AI\nSCORE:" + score + "\nBEST:" + highScore + "\n");
     }
     return "https://twitter.com/intent/tweet?url=" + url + "&hashtags=" + hashtags + "&text=" + text;
 }

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <widget id="com.easierbycode.psyop2028" version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
     <name>PsyOps.ai</name>
-    <description>Street Fighter browser game</description>
+    <description>Retro vertical shoot 'em up: blast the 2028 AI takeover.</description>
     <content src="phaser-game.html" />
 
     <access origin="*" />

@@ -430,13 +430,13 @@ export class PhaserTitleScene extends Phaser.Scene {
         var text = "";
 
         if (LANG === "ja") {
-            url = encodeURIComponent("https://game.capcom.com/cfn/sfv/aprilfool/2019/?lang=ja");
-            hashtags = encodeURIComponent("シャド研,SFVAE,aprilfool,エイプリルフール");
-            text = encodeURIComponent("エイプリルフール 2019 世界大統領がSTGやってみた\nHISCORE:" + highScore + "\n");
+            url = encodeURIComponent("https://easierbycode.com");
+            hashtags = encodeURIComponent("PsyOpsAI");
+            text = encodeURIComponent("PsyOps.ai\nHISCORE:" + highScore + "\n");
         } else {
-            url = encodeURIComponent("https://game.capcom.com/cfn/sfv/aprilfool/2019/?lang=en");
-            hashtags = encodeURIComponent("ShadalooCRI, SFVAE, aprilfool");
-            text = encodeURIComponent("APRIL FOOL 2019 WORLD PRESIDENT CHALLENGES A STG\nBEST:" + highScore + "\n");
+            url = encodeURIComponent("https://easierbycode.com");
+            hashtags = encodeURIComponent("PsyOpsAI");
+            text = encodeURIComponent("PSYOPS.AI\nBEST:" + highScore + "\n");
         }
 
         var tweetUrl = "https://twitter.com/intent/tweet?url=" + url + "&hashtags=" + hashtags + "&text=" + text + "&score=" + score;
