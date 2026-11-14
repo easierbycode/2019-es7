@@ -31,6 +31,10 @@ jobs:
           java-version: "17"
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The action's default list starts with the legacy "tools" package,
+          # which Google no longer serves, so sdkmanager exits 1 on it.
+          packages: platform-tools
       - name: Install Android packages
         run: |
           sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0" || true
@@ -85,6 +89,10 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # The action's default list starts with the legacy "tools" package,
+          # which Google no longer serves, so sdkmanager exits 1 on it.
+          packages: platform-tools
 
       - name: Install Android packages
         run: |
