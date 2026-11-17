@@ -19,6 +19,16 @@ function readLevelParam() {
     }
 }
 
+// The store apps (iOS and Android, both built with Cordova) play only the
+// music and sounds they ship with. A cloud level's customAudioURLs and
+// dezaemonBgm can point at any track, so an edit to the record would change
+// what the published app plays without an app update, and could put music
+// in it that the store listing has no rights to. The web, Electron and
+// editor builds keep reading them.
+function cloudSoundsAllowed() {
+    return !(typeof window !== "undefined" && window.cordova);
+}
+
 function readStageParam() {
     if (typeof window === "undefined") {
         return null;
@@ -593,7 +603,7 @@ export class BootScene extends Phaser.Scene {
             // A Dezaemon import's soundtrack: dezaemon-runtime.js sequences it
             // straight out of the recipe, and no other boot path supplies music
             // for such a level, so without this the cloud copy is silent.
-            if (data.dezaemonBgm) baseRecipe.dezaemonBgm = data.dezaemonBgm;
+            if (data.dezaemonBgm && cloudSoundsAllowed()) baseRecipe.dezaemonBgm = data.dezaemonBgm;
 
             function finishLevelLoad() {
                 if (data.enemyData) {
@@ -767,7 +777,7 @@ export class BootScene extends Phaser.Scene {
                 // Prefer locally downloaded copies (assets/custom-bgm/) over remote URLs.
                 // The build-time manifest maps each key to a (possibly shared) filename
                 // so multiple keys pointing at the same URL reuse one on-disk mp3.
-                if (data.customAudioURLs && typeof data.customAudioURLs === "object") {
+                if (data.customAudioURLs && typeof data.customAudioURLs === "object" && cloudSoundsAllowed()) {
                     gameState.bgmSourceURLs = {};
                     var urlKeys = Object.keys(data.customAudioURLs);
                     var baseUrl = (document.getElementById("baseUrl") ? document.getElementById("baseUrl").textContent.trim() : "./");
