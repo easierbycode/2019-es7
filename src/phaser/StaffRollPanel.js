@@ -1,5 +1,7 @@
 import { GAME_DIMENSIONS } from "../constants.js";
 import { gameState } from "../gameState.js";
+import { isPlaying2019 } from "./shareLinks.js";
+import { STAFF_ROLL, STAFF_FONT, STAFF_ROLE_COLOR, STAFF_NAME_COLOR, STAFF_NAME_OFFSET, STAFF_ROW_HEIGHT } from "../staffRoll.js";
 
 function openExternalUrl(url) {
     if (!url) {
@@ -30,6 +32,27 @@ export function dezaStaffCredits(recipe) {
         if (typeof v === "string" && v.trim()) return credits;
     }
     return null;
+}
+
+// Sets STAFF_ROLL as role / name pairs centred down the screen from y, into
+// container (a Phaser Container). Returns the Text objects.
+export function addStaffRollText(scene, container, y) {
+    var shadow = { offsetX: 1, offsetY: 1, color: "#000000", blur: 0, stroke: false, fill: true };
+    var roleStyle = { fontSize: "8px", fontFamily: STAFF_FONT, fill: STAFF_ROLE_COLOR, align: "center", shadow: shadow, resolution: 1 };
+    var nameStyle = { fontSize: "8px", fontFamily: STAFF_FONT, fill: STAFF_NAME_COLOR, align: "center", shadow: shadow, resolution: 1 };
+    var cx = GAME_DIMENSIONS.CENTER_X;
+    var lines = [];
+    for (var i = 0; i < STAFF_ROLL.length; i++) {
+        var role = scene.add.text(cx, y, STAFF_ROLL[i][0], roleStyle);
+        role.setOrigin(0.5, 0);
+        container.add(role);
+        var name = scene.add.text(cx, y + STAFF_NAME_OFFSET, STAFF_ROLL[i][1], nameStyle);
+        name.setOrigin(0.5, 0);
+        container.add(name);
+        lines.push(role, name);
+        y += STAFF_ROW_HEIGHT;
+    }
+    return lines;
 }
 
 export class StaffRollPanel extends Phaser.GameObjects.Container {
@@ -90,6 +113,13 @@ export class StaffRollPanel extends Phaser.GameObjects.Container {
             // rather than the stock PsyOps.ai staff sheet, which would credit
             // the wrong game.
             this.wakingG.setVisible(false);
+        } else if (!isPlaying2019()) {
+            // PsyOps.ai's own roll, set as text (src/staffRoll.js). The plate
+            // below has the 2019 team's credits drawn into it, and the atlas
+            // an exported or installed copy loads may still carry the stock
+            // one, so the plate never decides who is credited here.
+            this.bringToTop(this.closeBtn);
+            this.staffLines = addStaffRollText(scene, this, 108);
         } else {
             this.namePanel = scene.add.sprite(15, 90, "game_ui", "staffrollName.gif");
             this.namePanel.setOrigin(0, 0);
@@ -116,6 +146,15 @@ export class StaffRollPanel extends Phaser.GameObjects.Container {
 
         scene.add.existing(this);
         this.showWithAnimation();
+
+        // Canvas text never fetches a CSS font itself: redraw the roll once
+        // athenaFont is in, in case it was set in the Arial fallback.
+        if (this.staffLines && document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(() => {
+                if (!this.active || !this.staffLines) return;
+                this.staffLines.forEach(function (t) { if (t.updateText) t.updateText(); });
+            });
+        }
     }
 
     // The import's credits card: title and developer, English and Japanese.

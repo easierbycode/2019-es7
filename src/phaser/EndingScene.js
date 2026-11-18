@@ -1,5 +1,6 @@
 import { GAME_DIMENSIONS, LANG, LAZY_SOUND_PATHS } from "../constants.js";
-import { shareStrings } from "./shareLinks.js";
+import { shareStrings, isPlaying2019 } from "./shareLinks.js";
+import { addStaffRollText } from "./StaffRollPanel.js";
 import { gameState, isExportedLevelApp, saveHighScore, scoreCountsAsRecord } from "../gameState.js";
 import { submitHighScore } from "../firebaseScores.js";
 import {
@@ -389,11 +390,17 @@ export class PhaserEndingScene extends Phaser.Scene {
             staffG.play("staffroll_waking");
         } catch (e) {}
 
-        try {
-            var namePanel = this.add.sprite(15, 90, "game_ui", "staffrollName.gif");
-            namePanel.setOrigin(0, 0);
-            this.staffRollContainer.add(namePanel);
-        } catch (e) {}
+        // The same roll the title's STAFF ROLL shows (src/staffRoll.js); the
+        // stock plate only for the 2019 game.
+        if (isPlaying2019()) {
+            try {
+                var namePanel = this.add.sprite(15, 90, "game_ui", "staffrollName.gif");
+                namePanel.setOrigin(0, 0);
+                this.staffRollContainer.add(namePanel);
+            } catch (e) {}
+        } else {
+            addStaffRollText(this, this.staffRollContainer, 100);
+        }
 
         var closeText = this.add.text(GCX, GH - 30, "TAP TO CLOSE", {
             fontFamily: "sans-serif",
