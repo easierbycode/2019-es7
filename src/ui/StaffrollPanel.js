@@ -2,6 +2,8 @@ import { BaseCast } from "../game-objects/BaseCast.js";
 import { GAME_DIMENSIONS } from "../constants.js";
 import { StaffrollCloseButton } from "./StaffrollCloseButton.js";
 import { ExternalLinkButton } from "./ExternalLinkButton.js";
+import { isPlaying2019 } from "../phaser/shareLinks.js";
+import { STAFF_ROLL, STAFF_FONT, STAFF_ROLE_COLOR, STAFF_NAME_COLOR, STAFF_NAME_OFFSET, STAFF_ROW_HEIGHT } from "../staffRoll.js";
 
 export class StaffrollPanel extends BaseCast {
     constructor() {
@@ -21,7 +23,16 @@ export class StaffrollPanel extends BaseCast {
         this.panelBg.endFill();
         this.addChild(this.panelBg);
 
-        this.panel = new PIXI.Sprite(PIXI.Texture.fromFrame("staffrollName.gif"));
+        // PsyOps.ai's own roll, set as text (src/staffRoll.js), on an empty
+        // container that slides in where the plate did. The plate has the
+        // 2019 team's credits drawn into it: only the 2019 game shows it.
+        var use2019Plate = isPlaying2019();
+        if (use2019Plate) {
+            this.panel = new PIXI.Sprite(PIXI.Texture.fromFrame("staffrollName.gif"));
+        } else {
+            this.panel = new PIXI.Container();
+            this.addStaffRollText();
+        }
         this.panel.x = 15;
         this.panel.y = 90;
         this.addChild(this.panel);
@@ -33,27 +44,61 @@ export class StaffrollPanel extends BaseCast {
         this._onCloseUp = this.close.bind(this);
         this.closeBtn.on("pointerup", this._onCloseUp);
 
-        this.addLinkButton("staffrollTwitterBtn.gif", 165, 118, "https://twitter.com/takaNakayama");
-        this.addLinkButton("staffrollTwitterBtn.gif", 131, 276, "https://twitter.com/bengasu");
-        this.addLinkButton("staffrollTwitterBtn.gif", 178, 304, "https://twitter.com/rereibara");
-        this.addLinkButton("staffrollLinkBtn.gif", 153, 329, "https://magazine.jp.square-enix.com/biggangan/introduction/highscoregirl/");
-        this.addLinkButton("staffrollLinkBtn.gif", 161, 355, "http://hi-score-girl.com/");
+        if (use2019Plate) {
+            this.addLinkButton("staffrollTwitterBtn.gif", 165, 118, "https://twitter.com/takaNakayama");
+            this.addLinkButton("staffrollTwitterBtn.gif", 131, 276, "https://twitter.com/bengasu");
+            this.addLinkButton("staffrollTwitterBtn.gif", 178, 304, "https://twitter.com/rereibara");
+            this.addLinkButton("staffrollLinkBtn.gif", 153, 329, "https://magazine.jp.square-enix.com/biggangan/introduction/highscoregirl/");
+            this.addLinkButton("staffrollLinkBtn.gif", 161, 355, "http://hi-score-girl.com/");
 
-        const thanksLabel = new PIXI.Text("SPECIAL THANKS", { fontSize: 8, fontFamily: "Orbitron, Arial", fill: 0xffff00, align: "center", stroke: 0x000000, strokeThickness: 2 });
-        thanksLabel.resolution = 4;
-        thanksLabel.anchor.set(0.5, 0);
-        thanksLabel.x = GAME_DIMENSIONS.CENTER_X - 15;
-        thanksLabel.y = 303;
-        this.panel.addChild(thanksLabel);
+            const thanksLabel = new PIXI.Text("SPECIAL THANKS", { fontSize: 8, fontFamily: "Orbitron, Arial", fill: 0xffff00, align: "center", stroke: 0x000000, strokeThickness: 2 });
+            thanksLabel.resolution = 4;
+            thanksLabel.anchor.set(0.5, 0);
+            thanksLabel.x = GAME_DIMENSIONS.CENTER_X - 15;
+            thanksLabel.y = 303;
+            this.panel.addChild(thanksLabel);
 
-        const thanksName = new PIXI.Text("SEAMUS MCNAMARA", { fontSize: 7, fontFamily: "Orbitron, Arial", fill: 0xffffff, align: "center", stroke: 0x000000, strokeThickness: 2 });
-        thanksName.resolution = 4;
-        thanksName.anchor.set(0.5, 0);
-        thanksName.x = GAME_DIMENSIONS.CENTER_X - 15;
-        thanksName.y = 315;
-        this.panel.addChild(thanksName);
+            const thanksName = new PIXI.Text("SEAMUS MCNAMARA", { fontSize: 7, fontFamily: "Orbitron, Arial", fill: 0xffffff, align: "center", stroke: 0x000000, strokeThickness: 2 });
+            thanksName.resolution = 4;
+            thanksName.anchor.set(0.5, 0);
+            thanksName.x = GAME_DIMENSIONS.CENTER_X - 15;
+            thanksName.y = 315;
+            this.panel.addChild(thanksName);
+        }
 
         this.tl = null;
+    }
+
+    // STAFF_ROLL as role / name pairs, centred on the screen. Panel-local
+    // coordinates: the panel sits at (15, 90), so y 18 is the screen's 108,
+    // where the Phaser panel starts its roll.
+    addStaffRollText() {
+        var cx = GAME_DIMENSIONS.CENTER_X - 15;
+        var y = 18;
+        for (var i = 0; i < STAFF_ROLL.length; i++) {
+            this.addStaffLine(STAFF_ROLL[i][0], STAFF_ROLE_COLOR, cx, y);
+            this.addStaffLine(STAFF_ROLL[i][1], STAFF_NAME_COLOR, cx, y + STAFF_NAME_OFFSET);
+            y += STAFF_ROW_HEIGHT;
+        }
+    }
+
+    addStaffLine(text, color, x, y) {
+        var t = new PIXI.Text(text, {
+            fontSize: 8,
+            fontFamily: STAFF_FONT,
+            fill: color,
+            align: "center",
+            dropShadow: true,
+            dropShadowColor: "#000000",
+            dropShadowDistance: 1,
+            dropShadowAngle: Math.PI / 4,
+            dropShadowBlur: 0,
+        });
+        t.anchor.set(0.5, 0);
+        t.x = x;
+        t.y = y;
+        this.panel.addChild(t);
+        return t;
     }
 
     addLinkButton(frameName, x, y, url) {

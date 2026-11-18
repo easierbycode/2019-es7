@@ -13,6 +13,21 @@
     <meta name="theme-color" content="#000000" />
 
     <style>
+        /* athenaFont: the staff roll's face (src/staffRoll.js), the same file
+           codemonkey.games sets its roll in. Canvas text never fetches a CSS
+           font on its own, so the script below starts the load. */
+        @font-face {
+            font-family: 'athenaFont';
+            src: url('./assets/fonts/athenaFont.ttf') format('truetype');
+            font-display: swap;
+        }
+    </style>
+    <script>
+        if (document.fonts && document.fonts.load) {
+            document.fonts.load("8px athenaFont").catch(function () {});
+        }
+    </script>
+    <style>
         @font-face {
             font-family: 'Orbitron';
             src: url('assets/fonts/Orbitron-Variable.woff2') format('woff2'),
